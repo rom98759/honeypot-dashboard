@@ -45,3 +45,15 @@ def test_missing_file_returns_no_lines(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
     tailer = LogTailer(db, "test-source", tmp_path / "missing.log")
     assert tailer.read_new_lines() == []
+
+
+def test_survives_in_place_truncation_same_inode(tmp_path):
+    log_path = tmp_path / "test.log"
+    log_path.write_text("a very long line that will not exist after truncation\n")
+    db = connect(tmp_path / "db.sqlite3")
+    tailer = LogTailer(db, "test-source", log_path)
+    assert len(tailer.read_new_lines()) == 1
+
+    with log_path.open("w") as f:  # truncates in place, same inode
+        f.write("short\n")
+    assert tailer.read_new_lines() == ["short\n"]
