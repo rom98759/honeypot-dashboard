@@ -1,7 +1,7 @@
 import { icons } from "./icons.js";
 import { startRouter, navigate } from "./router.js";
 import { renderOverview } from "./pages/overview.js";
-import { renderSessions } from "./pages/sessions.js";
+import { renderSessions, removeExistingPanel } from "./pages/sessions.js";
 import { renderCorrelation } from "./pages/correlation.js";
 
 const content = document.getElementById("content");
@@ -23,6 +23,7 @@ document.querySelectorAll(".nav-item").forEach((btn) => {
 
 startRouter(({ page, params }) => {
   const render = pages[page] || pages.overview;
+  if (page !== "sessions") removeExistingPanel();
   setActiveNav(page in pages ? page : "overview");
   render(content, params);
 });

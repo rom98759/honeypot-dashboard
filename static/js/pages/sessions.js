@@ -19,7 +19,7 @@ function formatDuration(ms) {
 
 let activeKeydownHandler = null;
 
-function removeExistingPanel() {
+export function removeExistingPanel() {
   document.getElementById("session-panel")?.remove();
   document.getElementById("session-backdrop")?.remove();
   if (activeKeydownHandler) {
