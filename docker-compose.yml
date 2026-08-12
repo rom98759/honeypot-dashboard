@@ -38,4 +38,5 @@ networks:
 volumes:
   cowrie-var:
     external: true
+    name: honeypot_cowrie-var # compose project prefix from /home/user/honeypot/
   dashboard-data:
