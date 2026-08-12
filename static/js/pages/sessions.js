@@ -19,17 +19,23 @@ function formatDuration(ms) {
 
 let activeKeydownHandler = null;
 
-function closeSessionPanel(baseParams) {
+function removeExistingPanel() {
   document.getElementById("session-panel")?.remove();
   document.getElementById("session-backdrop")?.remove();
   if (activeKeydownHandler) {
     document.removeEventListener("keydown", activeKeydownHandler);
     activeKeydownHandler = null;
   }
+}
+
+function closeSessionPanel(baseParams) {
+  removeExistingPanel();
   navigate("sessions", baseParams);
 }
 
 async function openSessionPanel(sessionId, baseParams) {
+  removeExistingPanel();
+
   const backdrop = document.createElement("div");
   backdrop.id = "session-backdrop";
   backdrop.className = "panel-backdrop";
@@ -87,6 +93,7 @@ export async function renderSessions(content, params = {}) {
   const page = Math.max(1, parseInt(params.page, 10) || 1);
   const offset = (page - 1) * PAGE_SIZE;
 
+  removeExistingPanel();
   content.innerHTML = renderSkeleton(8);
   try {
     const query = new URLSearchParams({
