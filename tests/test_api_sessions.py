@@ -39,8 +39,55 @@ def test_list_sessions_filters_by_ip(tmp_path):
     response = client.get("/api/sessions", params={"ip": "1.2.3.4"})
     assert response.status_code == 200
     body = response.json()
-    assert len(body) == 1
-    assert body[0]["session_id"] == "s1"
+    assert body["total"] == 1
+    assert len(body["items"]) == 1
+    assert body["items"][0]["session_id"] == "s1"
+
+
+def test_list_sessions_paginates_with_offset_and_limit(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    _seed(db, tmp_path)
+    app = create_app(db=db, start_background_tasks=False)
+    client = TestClient(app)
+
+    response = client.get("/api/sessions", params={"limit": 1, "offset": 1, "sort": "connect_time", "order": "asc"})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 2
+    assert len(body["items"]) == 1
+    assert body["items"][0]["session_id"] == "s2"
+
+
+def test_list_sessions_sorts_by_requested_column(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    _seed(db, tmp_path)
+    app = create_app(db=db, start_background_tasks=False)
+    client = TestClient(app)
+
+    response = client.get("/api/sessions", params={"sort": "src_ip", "order": "asc"})
+    assert response.status_code == 200
+    ips = [item["src_ip"] for item in response.json()["items"]]
+    assert ips == ["1.2.3.4", "5.6.7.8"]
+
+
+def test_list_sessions_rejects_unknown_sort_column(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    _seed(db, tmp_path)
+    app = create_app(db=db, start_background_tasks=False)
+    client = TestClient(app)
+
+    response = client.get("/api/sessions", params={"sort": "session_id; DROP TABLE sessions"})
+    assert response.status_code == 400
+
+
+def test_list_sessions_rejects_unknown_order(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    _seed(db, tmp_path)
+    app = create_app(db=db, start_background_tasks=False)
+    client = TestClient(app)
+
+    response = client.get("/api/sessions", params={"order": "sideways"})
+    assert response.status_code == 400
 
 
 def test_get_session_detail_includes_commands(tmp_path):

@@ -6,19 +6,37 @@ from app.ttyplayer import TTYLogError, ttylogs_to_asciicast
 
 router = APIRouter()
 
+SORTABLE_COLUMNS = {"src_ip", "connect_time", "duration_ms", "login_username"}
+
 
 @router.get("/api/sessions")
-async def list_sessions(request: Request, ip: str | None = None, limit: int = 100):
+async def list_sessions(
+    request: Request,
+    ip: str | None = None,
+    limit: int = 100,
+    offset: int = 0,
+    sort: str = "connect_time",
+    order: str = "desc",
+):
+    if sort not in SORTABLE_COLUMNS:
+        raise HTTPException(status_code=400, detail=f"invalid sort column: {sort}")
+    if order not in ("asc", "desc"):
+        raise HTTPException(status_code=400, detail=f"invalid order: {order}")
+
     db = request.app.state.db
-    query = "SELECT * FROM sessions"
-    params: list = []
-    if ip:
-        query += " WHERE src_ip = ?"
-        params.append(ip)
-    query += " ORDER BY connect_time DESC LIMIT ?"
-    params.append(limit)
-    rows = db.execute(query, params).fetchall()
-    return [dict(r) for r in rows]
+    where_clause = " WHERE src_ip = ?" if ip else ""
+    where_params: list = [ip] if ip else []
+
+    total = db.execute(
+        f"SELECT COUNT(*) AS n FROM sessions{where_clause}", where_params
+    ).fetchone()["n"]
+
+    rows = db.execute(
+        f"SELECT * FROM sessions{where_clause} ORDER BY {sort} {order.upper()} LIMIT ? OFFSET ?",
+        [*where_params, limit, offset],
+    ).fetchall()
+
+    return {"items": [dict(r) for r in rows], "total": total}
 
 
 @router.get("/api/sessions/{session_id}")
