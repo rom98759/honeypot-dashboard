@@ -17,6 +17,69 @@ function formatDuration(ms) {
   return ms ? `${Math.round(ms / 1000)}s` : "-";
 }
 
+let activeKeydownHandler = null;
+
+function closeSessionPanel(baseParams) {
+  document.getElementById("session-panel")?.remove();
+  document.getElementById("session-backdrop")?.remove();
+  if (activeKeydownHandler) {
+    document.removeEventListener("keydown", activeKeydownHandler);
+    activeKeydownHandler = null;
+  }
+  navigate("sessions", baseParams);
+}
+
+async function openSessionPanel(sessionId, baseParams) {
+  const backdrop = document.createElement("div");
+  backdrop.id = "session-backdrop";
+  backdrop.className = "panel-backdrop";
+  document.body.appendChild(backdrop);
+
+  const panel = document.createElement("aside");
+  panel.id = "session-panel";
+  panel.className = "session-panel";
+  panel.innerHTML = renderSkeleton(6);
+  document.body.appendChild(panel);
+
+  activeKeydownHandler = (e) => {
+    if (e.key === "Escape") closeSessionPanel(baseParams);
+  };
+  document.addEventListener("keydown", activeKeydownHandler);
+  backdrop.addEventListener("click", () => closeSessionPanel(baseParams));
+
+  try {
+    const data = await fetchJSON(`/api/sessions/${encodeURIComponent(sessionId)}`);
+    panel.innerHTML = `
+      <div class="panel-header">
+        <h2 class="mono">${escapeHtml(data.session.session_id)}</h2>
+        <button data-action="close" class="btn-icon">${icons.close}</button>
+      </div>
+      <div id="replay-container"></div>
+      <h3>Commandes</h3>
+      <ul class="commands-list">
+        ${
+          data.commands
+            .map((c) => `<li><span class="mono">${escapeHtml(c.timestamp)}</span><code>${escapeHtml(c.input_text)}</code></li>`)
+            .join("") || "<li>Aucune commande</li>"
+        }
+      </ul>
+    `;
+    panel.querySelector('[data-action="close"]').addEventListener("click", () => closeSessionPanel(baseParams));
+
+    const replayContainer = panel.querySelector("#replay-container");
+    const replayUrl = `/api/sessions/${encodeURIComponent(sessionId)}/replay`;
+    const check = await fetch(replayUrl);
+    if (check.ok) {
+      AsciinemaPlayer.create(replayUrl, replayContainer);
+    } else {
+      replayContainer.textContent = "Replay indisponible pour cette session.";
+    }
+  } catch (err) {
+    panel.innerHTML = renderError("Erreur de chargement de la session.");
+    panel.querySelector('[data-action="retry"]').addEventListener("click", () => openSessionPanel(sessionId, baseParams));
+  }
+}
+
 export async function renderSessions(content, params = {}) {
   const ip = params.ip || "";
   const sort = params.sort || "connect_time";
@@ -96,12 +159,22 @@ export async function renderSessions(content, params = {}) {
       });
     });
 
+    content.querySelectorAll(".session-row").forEach((row) => {
+      row.addEventListener("click", () => {
+        navigate("sessions", { ...(ip ? { ip } : {}), sort, order, page: String(page), session: row.dataset.id });
+      });
+    });
+
     content.querySelector('[data-action="prev"]')?.addEventListener("click", () => {
       navigate("sessions", { ...(ip ? { ip } : {}), sort, order, page: String(page - 1) });
     });
     content.querySelector('[data-action="next"]')?.addEventListener("click", () => {
       navigate("sessions", { ...(ip ? { ip } : {}), sort, order, page: String(page + 1) });
     });
+
+    if (params.session) {
+      openSessionPanel(params.session, { ip, sort, order, page: String(page) });
+    }
   } catch (err) {
     content.innerHTML = renderError("Erreur de chargement, réessaie.");
     content.querySelector('[data-action="retry"]').addEventListener("click", () => renderSessions(content, params));
