@@ -6,5 +6,5 @@ router = APIRouter()
 
 
 @router.get("/api/correlation")
-def get_correlation(request: Request):
+async def get_correlation(request: Request):
     return get_correlation_rows(request.app.state.db)

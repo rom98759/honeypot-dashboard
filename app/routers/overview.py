@@ -4,7 +4,7 @@ router = APIRouter()
 
 
 @router.get("/api/overview")
-def get_overview(request: Request):
+async def get_overview(request: Request):
     db = request.app.state.db
     total_connections = db.execute("SELECT COUNT(*) AS n FROM sessions").fetchone()["n"]
     unique_ips = db.execute("SELECT COUNT(DISTINCT src_ip) AS n FROM sessions").fetchone()["n"]

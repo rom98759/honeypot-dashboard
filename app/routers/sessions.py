@@ -8,7 +8,7 @@ router = APIRouter()
 
 
 @router.get("/api/sessions")
-def list_sessions(request: Request, ip: str | None = None, limit: int = 100):
+async def list_sessions(request: Request, ip: str | None = None, limit: int = 100):
     db = request.app.state.db
     query = "SELECT * FROM sessions"
     params: list = []
@@ -22,7 +22,7 @@ def list_sessions(request: Request, ip: str | None = None, limit: int = 100):
 
 
 @router.get("/api/sessions/{session_id}")
-def get_session(request: Request, session_id: str):
+async def get_session(request: Request, session_id: str):
     db = request.app.state.db
     session = db.execute(
         "SELECT * FROM sessions WHERE session_id = ?", (session_id,)
@@ -37,7 +37,7 @@ def get_session(request: Request, session_id: str):
 
 
 @router.get("/api/sessions/{session_id}/replay")
-def replay_session(request: Request, session_id: str):
+async def replay_session(request: Request, session_id: str):
     db = request.app.state.db
     ttylog_rows = db.execute(
         "SELECT ttylog_path FROM ttylogs WHERE session_id = ? ORDER BY close_time",
