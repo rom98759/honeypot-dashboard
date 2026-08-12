@@ -1,0 +1,8 @@
+# .dockerignore
+.git
+.superpowers
+tests
+docs
+__pycache__
+*.pyc
+.venv

@@ -1,0 +1,41 @@
+# docker-compose.yml
+services:
+  dashboard:
+    build: .
+    container_name: honeypot-dashboard
+    restart: unless-stopped
+    networks:
+      - nginx-proxy-network
+    volumes:
+      - cowrie-var:/cowrie-var:ro
+      - dashboard-data:/data
+      - /var/log/fail2ban.log:/var/log/fail2ban.log:ro
+      - /var/log/sshd-auth.log:/var/log/sshd-auth.log:ro
+      - ./geoip:/geoip:ro
+    group_add:
+      - "4" # adm on the VPS host: read access to the two mounted log files
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    mem_limit: 256m
+    cpus: "0.5"
+    environment:
+      - COWRIE_JSON_PATH=/cowrie-var/log/cowrie/cowrie.json
+      - COWRIE_VAR_PATH=/cowrie-var
+      - DASHBOARD_DB_PATH=/data/dashboard.sqlite3
+      - FAIL2BAN_LOG_PATH=/var/log/fail2ban.log
+      - SSHD_AUTH_LOG_PATH=/var/log/sshd-auth.log
+      - GEOIP_DB_PATH=/geoip/GeoLite2-City.mmdb
+
+networks:
+  nginx-proxy-network:
+    external: true
+
+volumes:
+  cowrie-var:
+    external: true
+  dashboard-data:
