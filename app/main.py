@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from app.correlation import FailbanIngester, SshdAuthIngester
 from app.db import connect
 from app.ingester import CowrieIngester
-from app.routers import overview
+from app.routers import overview, sessions
 
 POLL_INTERVAL_SECONDS = 5
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
@@ -60,6 +60,7 @@ def create_app(db=None, start_background_tasks: bool = True) -> FastAPI:
     app.state.sshd_auth_ingester = SshdAuthIngester(app.state.db, sshd_auth_log_path)
 
     app.include_router(overview.router)
+    app.include_router(sessions.router)
     if STATIC_DIR.exists():
         app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
     return app
