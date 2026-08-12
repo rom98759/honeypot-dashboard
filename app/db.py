@@ -58,6 +58,10 @@ CREATE TABLE IF NOT EXISTS ingest_offsets (
     inode INTEGER NOT NULL,
     offset INTEGER NOT NULL
 );
+
+CREATE INDEX IF NOT EXISTS idx_sessions_src_ip ON sessions(src_ip);
+CREATE INDEX IF NOT EXISTS idx_fail2ban_events_ip_timestamp ON fail2ban_events(ip, timestamp);
+CREATE INDEX IF NOT EXISTS idx_sshd_auth_events_ip ON sshd_auth_events(ip);
 """
 
 
