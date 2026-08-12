@@ -51,7 +51,7 @@ def parse_event(event: dict):
     if eventid == "cowrie.session.connect":
         return SessionConnect(
             session_id=session_id,
-            src_ip=event["src_ip"],
+            src_ip=event.get("src_ip", ""),
             src_port=event.get("src_port", 0),
             protocol=event.get("protocol", "ssh"),
             timestamp=timestamp,

@@ -68,3 +68,16 @@ def test_parses_session_closed():
 def test_ignores_unrelated_event():
     record = parse_event({"eventid": "cowrie.client.version", "session": "x"})
     assert record is None
+
+
+def test_handles_missing_src_ip_gracefully():
+    """Verify that missing src_ip in cowrie.session.connect degrades gracefully."""
+    record = parse_event({
+        "eventid": "cowrie.session.connect",
+        "session": "x",
+        "timestamp": "t"
+    })
+    assert isinstance(record, SessionConnect)
+    assert record.src_ip == ""
+    assert record.session_id == "x"
+    assert record.timestamp == "t"
