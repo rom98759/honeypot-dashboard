@@ -1,0 +1,9 @@
+/var/log/sshd-auth.log {
+    weekly
+    rotate 8
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 640 root adm
+}

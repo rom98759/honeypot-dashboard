@@ -1,0 +1,14 @@
+[Unit]
+Description=Reconstruit la chain iptables DOCKER-USER (Cloudflare-only 80/443, block 81, isolation honeypot)
+After=docker.service ufw.service
+Requires=docker.service
+Wants=ufw.service
+PartOf=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/docker-user-firewall.sh
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,6 @@
+[Unit]
+Description=Export sshd journal entries to /var/log/sshd-auth.log
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/sshd-auth-export.sh
