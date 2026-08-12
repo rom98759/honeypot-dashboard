@@ -49,8 +49,13 @@ async def replay_session(request: Request, session_id: str):
     cowrie_var = Path(request.app.state.cowrie_var_path)
     blobs = []
     for row in ttylog_rows:
+        # Cowrie logs ttylog paths relative to its own root (e.g. "var/lib/cowrie/tty/..."),
+        # but our mount points directly at that "var" directory, so drop the leading segment.
+        ttylog_path = row["ttylog_path"]
+        if ttylog_path.startswith("var/"):
+            ttylog_path = ttylog_path[len("var/") :]
         try:
-            blobs.append((cowrie_var / row["ttylog_path"]).read_bytes())
+            blobs.append((cowrie_var / ttylog_path).read_bytes())
         except FileNotFoundError:
             continue
 

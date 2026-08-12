@@ -19,7 +19,7 @@ def _seed(db, tmp_path):
         VALUES ('s1', '2026-08-12T10:00:01Z', 'whoami');
         """
     )
-    tty_dir = tmp_path / "var/lib/cowrie/tty"
+    tty_dir = tmp_path / "lib/cowrie/tty"
     tty_dir.mkdir(parents=True)
     tty_path = tty_dir / "abc123"
     tty_path.write_bytes(FIXTURE_TTY.read_bytes())
@@ -100,7 +100,7 @@ def test_replay_concatenates_multiple_ttylogs(tmp_path):
         "INSERT INTO sessions (session_id, src_ip, connect_time, duration_ms) "
         "VALUES ('s3', '9.9.9.9', '2026-08-12T12:00:00Z', 5000)"
     )
-    tty_dir = tmp_path / "var/lib/cowrie/tty"
+    tty_dir = tmp_path / "lib/cowrie/tty"
     tty_dir.mkdir(parents=True)
     tty_path_a = tty_dir / "multi_a"
     tty_path_b = tty_dir / "multi_b"
@@ -136,7 +136,7 @@ def test_replay_404_when_ttylog_corrupted(tmp_path):
     db.execute(
         "INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('s4', '1.1.1.1', 't')"
     )
-    tty_dir = tmp_path / "var/lib/cowrie/tty"
+    tty_dir = tmp_path / "lib/cowrie/tty"
     tty_dir.mkdir(parents=True)
     tty_path = tty_dir / "corrupt"
     tty_path.write_bytes(b"\x01\x00\x00")  # shorter than one valid frame header
