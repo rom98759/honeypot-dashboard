@@ -50,7 +50,12 @@ class CowrieIngester:
         self.tailer = LogTailer(db, "cowrie.json", cowrie_json_path)
 
     def tick(self) -> int:
-        """Ingest all new lines since the last tick. Returns the number of events applied."""
+        """Ingest all new lines since the last tick. Returns the number of events applied.
+
+        Commits atomically, so both the ingest_offsets update and all applied session/command/ttylog
+        data persist together. If a crash occurs between returning lines and this commit,
+        neither the offset update nor the applied data will be persisted.
+        """
         applied = 0
         for line in self.tailer.read_new_lines():
             line = line.strip()

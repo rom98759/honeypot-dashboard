@@ -11,6 +11,12 @@ class LogTailer:
         self.path = path
 
     def read_new_lines(self) -> list[str]:
+        """Return new lines appended since last successful call.
+
+        Updates ingest_offsets in the current transaction but does NOT commit.
+        The caller is responsible for committing once all returned lines have been processed.
+        This ensures offset updates and ingested data land atomically in the same transaction.
+        """
         try:
             stat = self.path.stat()
         except FileNotFoundError:
@@ -51,5 +57,4 @@ class LogTailer:
             "ON CONFLICT(source) DO UPDATE SET inode = excluded.inode, offset = excluded.offset",
             (self.source_name, stat.st_ino, offset),
         )
-        self.db.commit()
         return lines
