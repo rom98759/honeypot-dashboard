@@ -1,0 +1,6 @@
+2026-08-12 09:44:38,400 fail2ban.actions        [292579]: NOTICE  [sshd] Ban 195.178.110.228
+2026-08-12 09:44:38,545 fail2ban.filter         [292579]: INFO    [recidive] Found 195.178.110.228 - 2026-08-12 09:44:38
+2026-08-12 09:49:42,568 fail2ban.actions        [292579]: NOTICE  [sshd] Unban 195.178.110.228
+2026-08-12 09:49:44,387 fail2ban.actions        [306409]: NOTICE  [sshd] Restore Ban 195.178.110.228
+2026-08-12 09:52:59,167 fail2ban.actions        [306409]: NOTICE  [sshd] Unban 195.178.110.228
+2026-08-12 09:53:01,024 fail2ban.actions        [308835]: NOTICE  [sshd] Restore Ban 195.178.110.228

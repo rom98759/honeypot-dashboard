@@ -1,0 +1,6 @@
+2026-08-12T09:41:14+0000 vps sshd[300516]: Invalid user admin from 195.178.110.228 port 60270
+2026-08-12T09:41:14+0000 vps sshd[300516]: Connection closed by invalid user admin 195.178.110.228 port 60270 [preauth]
+2026-08-12T09:42:54+0000 vps sshd[301673]: Invalid user admin from 195.178.110.228 port 34820
+2026-08-12T09:42:55+0000 vps sshd[301673]: Connection closed by invalid user admin 195.178.110.228 port 34820 [preauth]
+2026-08-12T09:44:37+0000 vps sshd[302837]: Invalid user admin from 195.178.110.228 port 37620
+2026-08-12T09:44:37+0000 vps sshd[302837]: Connection closed by invalid user admin 195.178.110.228 port 37620 [preauth]
