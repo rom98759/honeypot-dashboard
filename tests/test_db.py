@@ -22,3 +22,9 @@ def test_connect_creates_all_expected_tables(tmp_path):
     }.issubset(tables)
     assert isinstance(db, sqlite3.Connection)
     assert db.row_factory is sqlite3.Row
+
+
+def test_connect_enables_wal_mode(tmp_path):
+    db = connect(tmp_path / "test.sqlite3")
+    mode = db.execute("PRAGMA journal_mode").fetchone()[0]
+    assert mode.lower() == "wal"
