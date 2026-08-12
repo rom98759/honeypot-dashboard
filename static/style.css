@@ -15,6 +15,17 @@ main#content { flex: 1; padding: 24px; overflow-x: auto; }
 .card b { font-size: 1.6em; }
 .panels { display: flex; gap: 16px; }
 .panel { flex: 1; background: #1c1f26; padding: 12px 16px; border-radius: 8px; }
+.timeline-panel { margin-bottom: 16px; }
+.timeline-chart {
+  display: flex; align-items: flex-end; gap: 4px; height: 84px;
+  overflow-x: auto; padding-top: 8px;
+}
+.timeline-bar {
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+  min-width: 16px;
+}
+.timeline-bar-fill { width: 12px; background: #4a90e2; border-radius: 2px 2px 0 0; }
+.timeline-bar-label { font-size: 0.65em; opacity: 0.6; margin-top: 2px; white-space: nowrap; }
 table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
 th { text-align: left; opacity: 0.7; padding: 6px; }
 td { padding: 6px; border-top: 1px solid #2a2e37; }
