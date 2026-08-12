@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Honeypot Dashboard</title>
+  <link rel="stylesheet" href="/vendor/asciinema-player.css">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="layout">
+    <nav class="sidebar">
+      <div class="brand">🛡 Honeypot</div>
+      <button class="nav-item active" data-page="overview">📊 Overview</button>
+      <button class="nav-item" data-page="sessions">📋 Sessions</button>
+      <button class="nav-item" data-page="correlation">🔗 Corrélation</button>
+    </nav>
+    <main id="content"></main>
+  </div>
+  <script src="/vendor/asciinema-player.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
