@@ -6,11 +6,14 @@ router = APIRouter()
 @router.get("/api/overview")
 async def get_overview(request: Request):
     db = request.app.state.db
-    total_connections = db.execute("SELECT COUNT(*) AS n FROM sessions").fetchone()["n"]
-    unique_ips = db.execute("SELECT COUNT(DISTINCT src_ip) AS n FROM sessions").fetchone()["n"]
-    login_attempts = db.execute(
-        "SELECT COUNT(*) AS n FROM sessions WHERE login_username IS NOT NULL"
-    ).fetchone()["n"]
+    stats = db.execute(
+        "SELECT COUNT(*) AS total, COUNT(DISTINCT src_ip) AS unique_ips, "
+        "SUM(CASE WHEN login_username IS NOT NULL THEN 1 ELSE 0 END) AS login_attempts "
+        "FROM sessions"
+    ).fetchone()
+    total_connections = stats["total"]
+    unique_ips = stats["unique_ips"]
+    login_attempts = stats["login_attempts"] or 0
     currently_banned = db.execute(
         "SELECT COUNT(DISTINCT ip) AS n FROM fail2ban_events f1 "
         "WHERE action IN ('Ban', 'Restore Ban') AND NOT EXISTS ("

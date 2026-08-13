@@ -78,22 +78,25 @@ def get_correlation_rows(db: sqlite3.Connection) -> list[dict]:
         "ORDER BY session_count DESC"
     ).fetchall()
 
-    rows = []
-    for r in ip_rows:
-        ip = r["src_ip"]
-        banned = db.execute(
-            "SELECT COUNT(*) AS n FROM fail2ban_events WHERE ip = ? AND action IN ('Ban', 'Restore Ban')",
-            (ip,),
-        ).fetchone()["n"]
-        real_ssh_hits = db.execute(
-            "SELECT COUNT(*) AS n FROM sshd_auth_events WHERE ip = ?", (ip,)
-        ).fetchone()["n"]
-        rows.append(
-            {
-                "ip": ip,
-                "honeypot_sessions": r["session_count"],
-                "fail2ban_banned": banned > 0,
-                "real_ssh_attempts": real_ssh_hits,
-            }
-        )
-    return rows
+    banned_ips = {
+        r["ip"]
+        for r in db.execute(
+            "SELECT DISTINCT ip FROM fail2ban_events WHERE action IN ('Ban', 'Restore Ban')"
+        ).fetchall()
+    }
+    ssh_hits_by_ip = {
+        r["ip"]: r["n"]
+        for r in db.execute(
+            "SELECT ip, COUNT(*) AS n FROM sshd_auth_events GROUP BY ip"
+        ).fetchall()
+    }
+
+    return [
+        {
+            "ip": r["src_ip"],
+            "honeypot_sessions": r["session_count"],
+            "fail2ban_banned": r["src_ip"] in banned_ips,
+            "real_ssh_attempts": ssh_hits_by_ip.get(r["src_ip"], 0),
+        }
+        for r in ip_rows
+    ]
