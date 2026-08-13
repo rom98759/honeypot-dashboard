@@ -2,15 +2,10 @@
 
 ## Frontend / refonte visuelle
 
-- [ ] Panneau détail session : afficher les métadonnées de connexion (IP, port
-      source, protocole, login/password tentés, succès ou non, connect/close
-      time, durée) même quand il n'y a ni commande ni replay disponible.
-      Les données existent déjà via `/api/sessions/{id}` (champ `session`),
-      seul l'affichage manque (`static/js/pages/sessions.js` → `openSessionPanel`).
 - [ ] Vérifier le libellé "Tentatives port 50022" (page Corrélation) — c'est un
       texte en dur qui suppose que le port réel du sshd est 50022
-      (`static/app.js` → `renderCorrelation`). À rendre dynamique ou au moins
-      vérifier qu'il correspond toujours à la conf actuelle du VPS.
+      (`static/js/pages/correlation.js` → `renderCorrelation`). À rendre dynamique
+      ou au moins vérifier qu'il correspond toujours à la conf actuelle du VPS.
 
 ## Backend / perf
 

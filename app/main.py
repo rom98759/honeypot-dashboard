@@ -3,11 +3,13 @@ import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import geoip2.database
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app.correlation import FailbanIngester, SshdAuthIngester
 from app.db import connect
+from app.geoip import GeoLookup
 from app.ingester import CowrieIngester
 from app.routers import correlation, overview, sessions
 
@@ -27,6 +29,20 @@ class NoCacheStaticFiles(StaticFiles):
         response = super().file_response(*args, **kwargs)
         response.headers["Cache-Control"] = "no-cache"
         return response
+
+
+def _open_geoip_reader(geoip_db_path: str | None):
+    """
+    Returns None (rather than raising) when the path is unset or the .mmdb file
+    isn't there — GeoLookup already treats a missing reader as "no geo data",
+    so a dev checkout or a VPS where geoip-update.sh hasn't run yet still works.
+    """
+    if not geoip_db_path or not Path(geoip_db_path).exists():
+        return None
+    try:
+        return geoip2.database.Reader(geoip_db_path)
+    except Exception:
+        return None
 
 
 async def _poll_loop(app: FastAPI) -> None:
@@ -56,6 +72,7 @@ def create_app(db=None, start_background_tasks: bool = True) -> FastAPI:
     cowrie_var_path = Path(os.environ.get("COWRIE_VAR_PATH", "/cowrie-var"))
     fail2ban_log_path = Path(os.environ.get("FAIL2BAN_LOG_PATH", "/var/log/fail2ban.log"))
     sshd_auth_log_path = Path(os.environ.get("SSHD_AUTH_LOG_PATH", "/var/log/sshd-auth.log"))
+    geoip_db_path = os.environ.get("GEOIP_DB_PATH")
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -69,7 +86,8 @@ def create_app(db=None, start_background_tasks: bool = True) -> FastAPI:
     app = FastAPI(lifespan=lifespan)
     app.state.db = db if db is not None else connect(db_path)
     app.state.cowrie_var_path = cowrie_var_path
-    app.state.cowrie_ingester = CowrieIngester(app.state.db, cowrie_json_path)
+    app.state.geo_lookup = GeoLookup(app.state.db, _open_geoip_reader(geoip_db_path))
+    app.state.cowrie_ingester = CowrieIngester(app.state.db, cowrie_json_path, app.state.geo_lookup)
     app.state.fail2ban_ingester = FailbanIngester(app.state.db, fail2ban_log_path)
     app.state.sshd_auth_ingester = SshdAuthIngester(app.state.db, sshd_auth_log_path)
 

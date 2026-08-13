@@ -13,13 +13,15 @@ from app.cowrie_parser import (
 from app.tailer import LogTailer
 
 
-def apply_cowrie_record(db: sqlite3.Connection, record) -> None:
+def apply_cowrie_record(db: sqlite3.Connection, record, geo_lookup=None) -> None:
     if isinstance(record, SessionConnect):
         db.execute(
             "INSERT INTO sessions (session_id, src_ip, src_port, protocol, connect_time) "
             "VALUES (?, ?, ?, ?, ?) ON CONFLICT(session_id) DO NOTHING",
             (record.session_id, record.src_ip, record.src_port, record.protocol, record.timestamp),
         )
+        if geo_lookup is not None:
+            geo_lookup.lookup(record.src_ip)
     elif isinstance(record, LoginAttempt):
         db.execute(
             "UPDATE sessions SET login_username = ?, login_password = ?, login_success = ? "
@@ -45,9 +47,10 @@ def apply_cowrie_record(db: sqlite3.Connection, record) -> None:
 
 
 class CowrieIngester:
-    def __init__(self, db: sqlite3.Connection, cowrie_json_path: Path):
+    def __init__(self, db: sqlite3.Connection, cowrie_json_path: Path, geo_lookup=None):
         self.db = db
         self.tailer = LogTailer(db, "cowrie.json", cowrie_json_path)
+        self.geo_lookup = geo_lookup
 
     def tick(self) -> int:
         """Ingest all new lines since the last tick. Returns the number of events applied.
@@ -67,7 +70,7 @@ class CowrieIngester:
                 continue
             record = parse_event(event)
             if record is not None:
-                apply_cowrie_record(self.db, record)
+                apply_cowrie_record(self.db, record, self.geo_lookup)
                 applied += 1
         self.db.commit()
         return applied

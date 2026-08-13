@@ -50,6 +50,34 @@ def test_second_tick_with_no_new_data_applies_nothing(tmp_path):
     assert ingester.tick() == 0
 
 
+def test_session_connect_triggers_geo_lookup(tmp_path):
+    class _StubGeoLookup:
+        def __init__(self):
+            self.looked_up_ips = []
+
+        def lookup(self, ip):
+            self.looked_up_ips.append(ip)
+
+    cowrie_json = tmp_path / "cowrie.json"
+    shutil.copy(FIXTURE, cowrie_json)
+    db = connect(tmp_path / "db.sqlite3")
+    geo_lookup = _StubGeoLookup()
+    ingester = CowrieIngester(db, cowrie_json, geo_lookup=geo_lookup)
+
+    ingester.tick()
+
+    assert geo_lookup.looked_up_ips == ["172.21.0.1"]
+
+
+def test_ingestion_works_without_a_geo_lookup(tmp_path):
+    cowrie_json = tmp_path / "cowrie.json"
+    shutil.copy(FIXTURE, cowrie_json)
+    db = connect(tmp_path / "db.sqlite3")
+    ingester = CowrieIngester(db, cowrie_json)
+
+    assert ingester.tick() == 35
+
+
 def test_picks_up_appended_lines(tmp_path):
     cowrie_json = tmp_path / "cowrie.json"
     lines = FIXTURE.read_text().splitlines(keepends=True)
