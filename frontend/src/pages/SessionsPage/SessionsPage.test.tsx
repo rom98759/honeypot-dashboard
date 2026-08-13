@@ -84,6 +84,35 @@ describe("SessionsPage", () => {
     expect(document.activeElement).toBe(input);
   });
 
+  it("cancels a pending debounced filter update when a sort click happens before it fires", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const fetchMock = vi.fn((_url: string) => jsonResponse(SESSIONS_PAGE_1));
+    vi.stubGlobal("fetch", fetchMock);
+    renderWithProviders(<SessionsPage />, { route: "/sessions" });
+    await waitFor(() => expect(screen.getByText("1.2.3.4")).toBeInTheDocument());
+
+    const input = screen.getByPlaceholderText("Filtrer par IP...") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "9.9.9.9" } });
+
+    // Advance partway through the 300ms debounce window, then navigate away
+    // from the pending filter update by clicking a sort header.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+    fireEvent.click(screen.getByRole("button", { name: /IP/ }));
+
+    // Advance past the original debounce deadline.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("sort=src_ip&order=asc"))
+    );
+    const lastUrl = fetchMock.mock.calls[fetchMock.mock.calls.length - 1][0] as string;
+    expect(lastUrl).not.toContain("ip=9.9.9.9");
+  });
+
   it("opens the detail panel with the session id when a row is clicked, and Escape closes it", async () => {
     const fetchMock = vi.fn((url: string) => {
       if (url.startsWith("/api/sessions/s1/replay")) {

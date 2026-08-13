@@ -48,6 +48,7 @@ export function SessionsPage() {
   const { data, isPending, isError, refetch } = useSessions({ ip, sort, order, page });
 
   function updateParams(next: ParamUpdate) {
+    clearTimeout(debounceRef.current);
     const params = new URLSearchParams();
     if (next.ip) params.set("ip", next.ip);
     params.set("sort", next.sort);

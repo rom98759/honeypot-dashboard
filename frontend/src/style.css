@@ -57,6 +57,7 @@ body {
   padding: var(--space-3) var(--space-4);
   background: none; border: none; border-left: 3px solid transparent;
   color: var(--text-secondary); cursor: pointer; font-size: 14px; font-family: var(--font-sans);
+  text-decoration: none;
 }
 .nav-item svg { width: 18px; height: 18px; }
 .nav-item:hover { background: var(--neutral-subtle); }
@@ -88,6 +89,7 @@ main#content { flex: 1; padding: var(--space-8); overflow-x: auto; max-width: 12
   display: inline-flex; align-items: center; justify-content: center;
   width: 28px; height: 28px; border-radius: var(--radius);
   border: 1px solid var(--border); background: var(--bg-surface); cursor: pointer; color: var(--text-secondary);
+  text-decoration: none;
 }
 .btn-icon:hover { background: var(--neutral-subtle); color: var(--text-primary); }
 .btn-icon svg { width: 16px; height: 16px; }

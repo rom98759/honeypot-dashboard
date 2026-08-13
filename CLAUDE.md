@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A self-hosted dashboard for a Cowrie SSH/Telnet honeypot running on the user's VPS. It tails Cowrie's
 JSON event log, fail2ban's log, and an sshd auth log into a SQLite database, then serves an overview,
 a session browser (with terminal replay), and an IP correlation view (honeypot sessions vs. real sshd
-auth attempts vs. fail2ban bans) via a FastAPI backend + vanilla JS frontend.
+auth attempts vs. fail2ban bans) via a FastAPI backend + React frontend.
 
 ## Commands
 
