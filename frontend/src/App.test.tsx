@@ -25,6 +25,9 @@ beforeEach(() => {
       if (url.startsWith("/api/sessions")) {
         return jsonResponse({ items: [], total: 0 });
       }
+      if (url.startsWith("/api/correlation")) {
+        return jsonResponse([]);
+      }
       return jsonResponse({});
     })
   );
@@ -47,6 +50,17 @@ describe("App", () => {
     await waitFor(() => expect(within(nav).getByText("Sessions").closest("a")).toHaveClass("active"));
     await waitFor(() =>
       expect(screen.getByRole("heading", { name: "Sessions" })).toBeInTheDocument()
+    );
+  });
+
+  it("renders the Correlation page when navigating there", async () => {
+    renderWithProviders(<App />, { route: "/correlation" });
+    const nav = screen.getByRole("navigation");
+    await waitFor(() =>
+      expect(within(nav).getByText("Corrélation").closest("a")).toHaveClass("active")
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Corrélation" })).toBeInTheDocument()
     );
   });
 });

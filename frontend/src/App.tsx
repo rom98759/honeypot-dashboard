@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { Sidebar } from "./components/Sidebar";
 import { OverviewPage } from "./pages/OverviewPage";
 import { SessionsPage } from "./pages/SessionsPage/SessionsPage";
+import { CorrelationPage } from "./pages/CorrelationPage";
 
 export default function App() {
   return (
@@ -12,7 +13,7 @@ export default function App() {
           <Route path="/" element={<Navigate to="/overview" replace />} />
           <Route path="/overview" element={<OverviewPage />} />
           <Route path="/sessions" element={<SessionsPage />} />
-          <Route path="/correlation" element={<div>Correlation page</div>} />
+          <Route path="/correlation" element={<CorrelationPage />} />
           <Route path="*" element={<Navigate to="/overview" replace />} />
         </Routes>
       </main>
