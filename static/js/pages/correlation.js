@@ -1,5 +1,5 @@
 import { fetchJSON, escapeHtml } from "../api.js";
-import { renderSkeleton, renderError, renderEmpty, badge } from "../ui.js";
+import { renderSkeleton, renderError, renderEmpty, badge, renderSortHeaders, bindSortHeaders, bindRetry } from "../ui.js";
 import { icons } from "../icons.js";
 import { navigate } from "../router.js";
 
@@ -21,25 +21,19 @@ function sortRows(rows, sort, order) {
 }
 
 export async function renderCorrelation(content, params = {}) {
+  const renderId = content.dataset.renderId;
   const sort = params.sort || "honeypot_sessions";
   const order = params.order === "asc" ? "asc" : "desc";
 
   content.innerHTML = renderSkeleton(6);
   try {
     const rows = sortRows(await fetchJSON("/api/correlation"), sort, order);
+    if (content.dataset.renderId !== renderId) return;
     content.innerHTML = `
       <div class="topbar"><h1>Corrélation</h1></div>
       <table class="correlation-table">
         <thead><tr>
-          ${COLUMNS.map(
-            (col) => `
-            <th>
-              <button class="sort-header" data-sort="${col.key}">
-                ${col.label}
-                ${sort === col.key ? (order === "asc" ? icons.sortUp : icons.sortDown) : ""}
-              </button>
-            </th>`
-          ).join("")}
+          ${renderSortHeaders(COLUMNS, sort, order)}
           <th></th>
         </tr></thead>
         <tbody>
@@ -61,19 +55,17 @@ export async function renderCorrelation(content, params = {}) {
       </table>
     `;
 
-    content.querySelectorAll(".sort-header").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const col = btn.dataset.sort;
-        const nextOrder = sort === col && order === "asc" ? "desc" : "asc";
-        navigate("correlation", { sort: col, order: nextOrder });
-      });
+    bindSortHeaders(content, (col) => {
+      const nextOrder = sort === col && order === "asc" ? "desc" : "asc";
+      navigate("correlation", { sort: col, order: nextOrder });
     });
 
     content.querySelectorAll(".view-sessions").forEach((btn) => {
       btn.addEventListener("click", () => navigate("sessions", { ip: btn.dataset.ip }));
     });
   } catch (err) {
+    if (content.dataset.renderId !== renderId) return;
     content.innerHTML = renderError("Erreur de chargement, réessaie.");
-    content.querySelector('[data-action="retry"]').addEventListener("click", () => renderCorrelation(content, params));
+    bindRetry(content, () => renderCorrelation(content, params));
   }
 }
