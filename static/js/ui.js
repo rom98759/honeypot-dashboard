@@ -16,3 +16,27 @@ export function renderEmpty(message) {
 export function badge(label, tone) {
   return `<span class="badge badge-${tone}">${label}</span>`;
 }
+
+export function renderSortHeaders(columns, sort, order) {
+  return columns
+    .map(
+      (col) => `
+      <th>
+        <button class="sort-header" data-sort="${col.key}">
+          ${col.label}
+          ${sort === col.key ? (order === "asc" ? icons.sortUp : icons.sortDown) : ""}
+        </button>
+      </th>`
+    )
+    .join("");
+}
+
+export function bindSortHeaders(container, onSort) {
+  container.querySelectorAll(".sort-header").forEach((btn) => {
+    btn.addEventListener("click", () => onSort(btn.dataset.sort));
+  });
+}
+
+export function bindRetry(container, onRetry) {
+  container.querySelector('[data-action="retry"]').addEventListener("click", onRetry);
+}
