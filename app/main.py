@@ -45,6 +45,23 @@ def _open_geoip_reader(geoip_db_path: str | None):
         return None
 
 
+def _backfill_geo_cache(db, geo_lookup: GeoLookup) -> None:
+    """
+    Populates geo_cache for sessions ingested before GeoLookup was wired up
+    (or before geoip-update.sh had produced an .mmdb file). Runs once at
+    startup; cheap since it's a local mmdb lookup per IP, and only touches
+    IPs geo_cache doesn't already have — a rerun is a no-op.
+    """
+    if geo_lookup.reader is None:
+        return
+    rows = db.execute(
+        "SELECT DISTINCT s.src_ip FROM sessions s "
+        "LEFT JOIN geo_cache g ON g.ip = s.src_ip WHERE g.ip IS NULL"
+    ).fetchall()
+    for row in rows:
+        geo_lookup.lookup(row["src_ip"])
+
+
 async def _poll_loop(app: FastAPI) -> None:
     while True:
         app.state.cowrie_ingester.tick()
@@ -87,6 +104,7 @@ def create_app(db=None, start_background_tasks: bool = True) -> FastAPI:
     app.state.db = db if db is not None else connect(db_path)
     app.state.cowrie_var_path = cowrie_var_path
     app.state.geo_lookup = GeoLookup(app.state.db, _open_geoip_reader(geoip_db_path))
+    _backfill_geo_cache(app.state.db, app.state.geo_lookup)
     app.state.cowrie_ingester = CowrieIngester(app.state.db, cowrie_json_path, app.state.geo_lookup)
     app.state.fail2ban_ingester = FailbanIngester(app.state.db, fail2ban_log_path)
     app.state.sshd_auth_ingester = SshdAuthIngester(app.state.db, sshd_auth_log_path)
