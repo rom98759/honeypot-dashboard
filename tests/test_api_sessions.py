@@ -90,6 +90,88 @@ def test_list_sessions_rejects_unknown_order(tmp_path):
     assert response.status_code == 400
 
 
+def test_list_sessions_rejects_negative_limit(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    _seed(db, tmp_path)
+    app = create_app(db=db, start_background_tasks=False)
+    client = TestClient(app)
+
+    response = client.get("/api/sessions", params={"limit": -1})
+    assert response.status_code == 422
+
+
+def test_list_sessions_rejects_zero_limit(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    _seed(db, tmp_path)
+    app = create_app(db=db, start_background_tasks=False)
+    client = TestClient(app)
+
+    response = client.get("/api/sessions", params={"limit": 0})
+    assert response.status_code == 422
+
+
+def test_list_sessions_rejects_negative_offset(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    _seed(db, tmp_path)
+    app = create_app(db=db, start_background_tasks=False)
+    client = TestClient(app)
+
+    response = client.get("/api/sessions", params={"offset": -1})
+    assert response.status_code == 422
+
+
+def test_list_sessions_defaults_to_descending_order(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    _seed(db, tmp_path)
+    app = create_app(db=db, start_background_tasks=False)
+    client = TestClient(app)
+
+    response = client.get("/api/sessions", params={"sort": "src_ip"})
+    assert response.status_code == 200
+    ips = [item["src_ip"] for item in response.json()["items"]]
+    assert ips == ["5.6.7.8", "1.2.3.4"]
+
+
+def test_list_sessions_combines_ip_filter_with_pagination(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    db.executescript(
+        """
+        INSERT INTO sessions (session_id, src_ip, connect_time, duration_ms)
+        VALUES ('s1', '1.2.3.4', '2026-08-12T10:00:00Z', 5000);
+        INSERT INTO sessions (session_id, src_ip, connect_time, duration_ms)
+        VALUES ('s2', '1.2.3.4', '2026-08-12T11:00:00Z', 1000);
+        INSERT INTO sessions (session_id, src_ip, connect_time, duration_ms)
+        VALUES ('s3', '1.2.3.4', '2026-08-12T12:00:00Z', 2000);
+        INSERT INTO sessions (session_id, src_ip, connect_time, duration_ms)
+        VALUES ('s4', '5.6.7.8', '2026-08-12T13:00:00Z', 3000);
+        """
+    )
+    db.commit()
+    app = create_app(db=db, start_background_tasks=False)
+    client = TestClient(app)
+
+    response = client.get(
+        "/api/sessions",
+        params={"ip": "1.2.3.4", "limit": 1, "offset": 1, "sort": "connect_time", "order": "asc"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    # total must reflect only rows matching the ip filter, not the whole table
+    assert body["total"] == 3
+    assert len(body["items"]) == 1
+    assert body["items"][0]["session_id"] == "s2"
+
+
+def test_list_sessions_rejects_unlisted_real_column(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    _seed(db, tmp_path)
+    app = create_app(db=db, start_background_tasks=False)
+    client = TestClient(app)
+
+    response = client.get("/api/sessions", params={"sort": "login_password"})
+    assert response.status_code == 400
+
+
 def test_get_session_detail_includes_commands(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
     _seed(db, tmp_path)

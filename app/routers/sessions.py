@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, HTTPException, Query, Request, Response
 
 from app.ttyplayer import TTYLogError, ttylogs_to_asciicast
 
@@ -13,8 +13,8 @@ SORTABLE_COLUMNS = {"src_ip", "connect_time", "duration_ms", "login_username"}
 async def list_sessions(
     request: Request,
     ip: str | None = None,
-    limit: int = 100,
-    offset: int = 0,
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
     sort: str = "connect_time",
     order: str = "desc",
 ):
