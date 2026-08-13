@@ -1,5 +1,5 @@
 import { fetchJSON, escapeHtml } from "../api.js";
-import { renderSkeleton, renderError, renderEmpty, renderSortHeaders, bindSortHeaders, bindRetry } from "../ui.js";
+import { renderSkeleton, renderError, renderEmpty, renderSortHeaders, bindSortHeaders, bindRetry, badge } from "../ui.js";
 import { icons } from "../icons.js";
 import { navigate } from "../router.js";
 
@@ -15,6 +15,30 @@ let filterDebounce = null;
 
 function formatDuration(ms) {
   return ms ? `${Math.round(ms / 1000)}s` : "-";
+}
+
+function renderSessionMeta(session) {
+  const address = session.src_port ? `${session.src_ip}:${session.src_port}` : session.src_ip;
+  let authBadge;
+  if (session.login_username == null) {
+    authBadge = badge("Aucune tentative", "neutral");
+  } else if (session.login_success === 1) {
+    authBadge = badge("Réussie", "danger");
+  } else {
+    authBadge = badge("Échouée", "neutral");
+  }
+  return `
+    <dl class="session-meta">
+      <dt>Adresse</dt><dd class="mono">${escapeHtml(address)}</dd>
+      <dt>Protocole</dt><dd>${escapeHtml(session.protocol || "-")}</dd>
+      <dt>Login tenté</dt><dd class="mono">${escapeHtml(session.login_username || "-")}</dd>
+      <dt>Mot de passe tenté</dt><dd class="mono">${escapeHtml(session.login_password || "-")}</dd>
+      <dt>Authentification</dt><dd>${authBadge}</dd>
+      <dt>Connexion</dt><dd class="mono">${escapeHtml(session.connect_time)}</dd>
+      <dt>Déconnexion</dt><dd class="mono">${escapeHtml(session.close_time || "-")}</dd>
+      <dt>Durée</dt><dd>${formatDuration(session.duration_ms)}</dd>
+    </dl>
+  `;
 }
 
 let activeKeydownHandler = null;
@@ -65,6 +89,7 @@ async function openSessionPanel(sessionId, baseParams) {
         <h2 class="mono">${escapeHtml(data.session.session_id)}</h2>
         <button data-action="close" class="btn-icon">${icons.close}</button>
       </div>
+      ${renderSessionMeta(data.session)}
       <div id="replay-container"></div>
       <h3>Commandes</h3>
       <ul class="commands-list">
