@@ -7,6 +7,7 @@ import { ErrorState } from "../../components/ErrorState";
 import { EmptyState } from "../../components/EmptyState";
 import { SortableTableHeader, type Column } from "../../components/SortableTableHeader";
 import { Pagination } from "../../components/Pagination";
+import { SessionDetailPanel } from "./SessionDetailPanel";
 
 const COLUMNS: Column[] = [
   { key: "src_ip", label: "IP" },
@@ -33,6 +34,7 @@ export function SessionsPage() {
   const sort = searchParams.get("sort") ?? "connect_time";
   const order = searchParams.get("order") === "asc" ? "asc" : "desc";
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
+  const sessionId = searchParams.get("session");
 
   const [ipInput, setIpInput] = useState(ip);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -70,6 +72,10 @@ export function SessionsPage() {
 
   function handleRowClick(id: string) {
     updateParams({ ip, sort, order, page: String(page), session: id });
+  }
+
+  function closePanel() {
+    updateParams({ ip, sort, order, page: String(page) });
   }
 
   if (isPending) return <SkeletonBlock rows={8} />;
@@ -127,6 +133,7 @@ export function SessionsPage() {
         onPrev={() => updateParams({ ip, sort, order, page: String(page - 1) })}
         onNext={() => updateParams({ ip, sort, order, page: String(page + 1) })}
       />
+      {sessionId ? <SessionDetailPanel sessionId={sessionId} onClose={closePanel} /> : null}
     </>
   );
 }

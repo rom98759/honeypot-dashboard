@@ -1,6 +1,7 @@
 import { screen, waitFor, fireEvent, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, afterEach } from "vitest";
+import { Link, Routes, Route } from "react-router-dom";
 import { renderWithProviders } from "../../test-utils";
 import { SessionsPage } from "./SessionsPage";
 
@@ -81,5 +82,100 @@ describe("SessionsPage", () => {
       expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("ip=9.9.9.9"))
     );
     expect(document.activeElement).toBe(input);
+  });
+
+  it("opens the detail panel with the session id when a row is clicked, and Escape closes it", async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url.startsWith("/api/sessions/s1/replay")) {
+        return Promise.resolve({ ok: false, status: 404 } as Response);
+      }
+      if (url.startsWith("/api/sessions/s1")) {
+        return jsonResponse({
+          session: {
+            session_id: "s1",
+            src_ip: "1.2.3.4",
+            src_port: 4444,
+            protocol: "ssh",
+            connect_time: "2026-08-13T10:00:00",
+            close_time: "2026-08-13T10:05:00",
+            duration_ms: 5000,
+            login_username: "root",
+            login_password: "toor",
+            login_success: 0,
+          },
+          commands: [],
+        });
+      }
+      return jsonResponse(SESSIONS_PAGE_1);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderWithProviders(<SessionsPage />, { route: "/sessions" });
+    await waitFor(() => expect(screen.getByText("1.2.3.4")).toBeInTheDocument());
+
+    await userEvent.click(screen.getByText("1.2.3.4"));
+    await waitFor(() => expect(screen.getByRole("heading", { name: "s1" })).toBeInTheDocument());
+    expect(document.body.querySelector(".session-panel")).not.toBeNull();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(document.body.querySelector(".session-panel")).toBeNull());
+  });
+
+  it("closes the panel when the backdrop is clicked", async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url.startsWith("/api/sessions/s1/replay")) {
+        return Promise.resolve({ ok: false, status: 404 } as Response);
+      }
+      if (url.startsWith("/api/sessions/s1")) {
+        return jsonResponse({
+          session: { session_id: "s1", src_ip: "1.2.3.4", connect_time: "t", login_username: null },
+          commands: [],
+        });
+      }
+      return jsonResponse(SESSIONS_PAGE_1);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderWithProviders(<SessionsPage />, { route: "/sessions" });
+    await waitFor(() => expect(screen.getByText("1.2.3.4")).toBeInTheDocument());
+    await userEvent.click(screen.getByText("1.2.3.4"));
+    await waitFor(() => expect(document.body.querySelector(".session-panel")).not.toBeNull());
+
+    const backdrop = document.body.querySelector(".panel-backdrop") as HTMLElement;
+    await userEvent.click(backdrop);
+    await waitFor(() => expect(document.body.querySelector(".session-panel")).toBeNull());
+  });
+
+  it("unmounts the panel cleanly when navigating away from Sessions", async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url.startsWith("/api/sessions/s1/replay")) {
+        return Promise.resolve({ ok: false, status: 404 } as Response);
+      }
+      if (url.startsWith("/api/sessions/s1")) {
+        return jsonResponse({
+          session: { session_id: "s1", src_ip: "1.2.3.4", connect_time: "t", login_username: null },
+          commands: [],
+        });
+      }
+      return jsonResponse(SESSIONS_PAGE_1);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    function Harness() {
+      return (
+        <div>
+          <Link to="/overview">Go overview</Link>
+          <Routes>
+            <Route path="/sessions" element={<SessionsPage />} />
+            <Route path="/overview" element={<div>Overview stub</div>} />
+          </Routes>
+        </div>
+      );
+    }
+
+    renderWithProviders(<Harness />, { route: "/sessions?session=s1" });
+    await waitFor(() => expect(document.body.querySelector(".session-panel")).not.toBeNull());
+
+    await userEvent.click(screen.getByText("Go overview"));
+    await waitFor(() => expect(screen.getByText("Overview stub")).toBeInTheDocument());
+    expect(document.body.querySelector(".session-panel")).toBeNull();
   });
 });
