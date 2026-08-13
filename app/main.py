@@ -15,6 +15,20 @@ POLL_INTERVAL_SECONDS = 5
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
 
+class NoCacheStaticFiles(StaticFiles):
+    """
+    Forces browsers/CDNs to revalidate (If-None-Match) on every request instead
+    of trusting a long default TTL. Without this, Cloudflare's default edge
+    cache for .css/.js (hours) served stale UI code after a deploy until a
+    manual purge — this makes every deploy self-correcting via cheap 304s.
+    """
+
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 async def _poll_loop(app: FastAPI) -> None:
     while True:
         app.state.cowrie_ingester.tick()
@@ -63,7 +77,7 @@ def create_app(db=None, start_background_tasks: bool = True) -> FastAPI:
     app.include_router(sessions.router)
     app.include_router(correlation.router)
     if STATIC_DIR.exists():
-        app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
+        app.mount("/", NoCacheStaticFiles(directory=STATIC_DIR, html=True), name="static")
     return app
 
 
