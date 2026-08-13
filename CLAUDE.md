@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A self-hosted dashboard for a Cowrie SSH/Telnet honeypot running on the user's VPS. It tails Cowrie's
 JSON event log, fail2ban's log, and an sshd auth log into a SQLite database, then serves an overview,
 a session browser (with terminal replay), and an IP correlation view (honeypot sessions vs. real sshd
-auth attempts vs. fail2ban bans) via a FastAPI backend + vanilla JS frontend.
+auth attempts vs. fail2ban bans) via a FastAPI backend + React frontend.
 
 ## Commands
 
@@ -21,6 +21,15 @@ auth attempts vs. fail2ban bans) via a FastAPI backend + vanilla JS frontend.
 # Run a single test file / test
 .venv/bin/pytest tests/test_ingester.py
 .venv/bin/pytest tests/test_ingester.py::test_name -v
+
+# Frontend dev server (run alongside the backend above)
+cd frontend && npm run dev
+
+# Frontend tests
+cd frontend && npm test
+
+# Frontend production build (also runs automatically inside the Docker build)
+cd frontend && npm run build
 
 # Docker (production deployment on the VPS)
 docker compose up -d --build
@@ -78,10 +87,23 @@ an oversight to "fix" by adding `await asyncio.to_thread(...)`.
 
 ## Frontend
 
-Vanilla JS, no build step. `static/index.html` loads `/js/app.js` as an ES module plus `Chart.js` from
-a CDN and a vendored `asciinema-player`. The UI is mid-rewrite (see `docs/superpowers/specs/` and
-`docs/superpowers/plans/` for the design spec and implementation plan) — check `static/js/` for the
-current module layout rather than assuming `static/app.js` (the old monolithic file) still exists.
+React + TypeScript, built with Vite (`frontend/`). `frontend/src/main.tsx` mounts `App.tsx`, which
+pairs a `HashRouter` (URLs stay `#/overview`, `#/sessions`, `#/correlation`, matching the
+pre-migration vanilla-JS routing so no backend routing changes were needed) with TanStack Query for
+all `/api/*` data fetching. `frontend/src/style.css` (ported from the pre-React vanilla version) is
+imported once in `main.tsx` and is the single global stylesheet — no CSS modules, no Tailwind (a
+future styling-layer migration is anticipated in component prop design but not implemented). The
+session detail panel (`frontend/src/pages/SessionsPage/SessionDetailPanel.tsx`) renders via a React
+Portal into `document.body` rather than as a DOM node inside the router's normal tree, which
+eliminates by construction the manual listener/timer cleanup code the earlier vanilla slide-over panel
+needed. `frontend/public/vendor/` holds the vendored `asciinema-player` bundle (loaded via a plain
+`<script>` tag in `index.html`, since it's a UMD global, not an ES module); Chart.js is an npm
+dependency (`chart.js` + `react-chartjs-2`) rather than vendored. The Docker build compiles
+`frontend/` in a `node:20-slim` stage and copies `frontend/dist/` into the Python runtime image's
+`static/` mount point — see the root `Dockerfile`. For local development, run the Vite dev server
+(`npm run dev` inside `frontend/`) alongside the FastAPI backend
+(`.venv/bin/uvicorn app.main:app --reload`); `vite.config.ts` proxies `/api/*` to `localhost:8000` so
+both run side by side without a Docker rebuild per change.
 
 ## Deployment context
 
