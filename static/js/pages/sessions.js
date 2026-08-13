@@ -1,5 +1,5 @@
 import { fetchJSON, escapeHtml } from "../api.js";
-import { renderSkeleton, renderError, renderEmpty } from "../ui.js";
+import { renderSkeleton, renderError, renderEmpty, renderSortHeaders, bindSortHeaders, bindRetry } from "../ui.js";
 import { icons } from "../icons.js";
 import { navigate } from "../router.js";
 
@@ -19,7 +19,12 @@ function formatDuration(ms) {
 
 let activeKeydownHandler = null;
 
-export function removeExistingPanel() {
+// Cleans up anything the Sessions page leaves behind outside of #content
+// (the session detail panel, its backdrop, the Escape-key listener) and
+// cancels any pending debounced filter navigation. Called both when leaving
+// the Sessions page entirely (from app.js) and when re-rendering it.
+export function cleanupSessionsPage() {
+  clearTimeout(filterDebounce);
   document.getElementById("session-panel")?.remove();
   document.getElementById("session-backdrop")?.remove();
   if (activeKeydownHandler) {
@@ -29,12 +34,12 @@ export function removeExistingPanel() {
 }
 
 function closeSessionPanel(baseParams) {
-  removeExistingPanel();
+  cleanupSessionsPage();
   navigate("sessions", baseParams);
 }
 
 async function openSessionPanel(sessionId, baseParams) {
-  removeExistingPanel();
+  cleanupSessionsPage();
 
   const backdrop = document.createElement("div");
   backdrop.id = "session-backdrop";
@@ -82,18 +87,23 @@ async function openSessionPanel(sessionId, baseParams) {
     }
   } catch (err) {
     panel.innerHTML = renderError("Erreur de chargement de la session.");
-    panel.querySelector('[data-action="retry"]').addEventListener("click", () => openSessionPanel(sessionId, baseParams));
+    bindRetry(panel, () => openSessionPanel(sessionId, baseParams));
   }
 }
 
 export async function renderSessions(content, params = {}) {
+  const renderId = content.dataset.renderId;
+  const focused = document.activeElement;
+  const focusState =
+    focused && focused.id === "ip-filter" ? { selectionStart: focused.selectionStart } : null;
+
   const ip = params.ip || "";
   const sort = params.sort || "connect_time";
   const order = params.order === "asc" ? "asc" : "desc";
   const page = Math.max(1, parseInt(params.page, 10) || 1);
   const offset = (page - 1) * PAGE_SIZE;
 
-  removeExistingPanel();
+  cleanupSessionsPage();
   content.innerHTML = renderSkeleton(8);
   try {
     const query = new URLSearchParams({
@@ -104,6 +114,7 @@ export async function renderSessions(content, params = {}) {
     });
     if (ip) query.set("ip", ip);
     const data = await fetchJSON(`/api/sessions?${query.toString()}`);
+    if (content.dataset.renderId !== renderId) return;
     const totalPages = Math.max(1, Math.ceil(data.total / PAGE_SIZE));
 
     content.innerHTML = `
@@ -117,15 +128,7 @@ export async function renderSessions(content, params = {}) {
       </div>
       <table class="sessions-table">
         <thead><tr>
-          ${COLUMNS.map(
-            (col) => `
-            <th>
-              <button class="sort-header" data-sort="${col.key}">
-                ${col.label}
-                ${sort === col.key ? (order === "asc" ? icons.sortUp : icons.sortDown) : ""}
-              </button>
-            </th>`
-          ).join("")}
+          ${renderSortHeaders(COLUMNS, sort, order)}
         </tr></thead>
         <tbody>
           ${
@@ -150,20 +153,23 @@ export async function renderSessions(content, params = {}) {
       </div>
     `;
 
-    content.querySelector("#ip-filter").addEventListener("input", (e) => {
+    const ipFilterEl = content.querySelector("#ip-filter");
+    ipFilterEl.addEventListener("input", (e) => {
       clearTimeout(filterDebounce);
       const value = e.target.value;
       filterDebounce = setTimeout(() => {
         navigate("sessions", value ? { ip: value } : {});
       }, 300);
     });
+    if (focusState) {
+      ipFilterEl.focus();
+      const pos = Math.min(focusState.selectionStart, ipFilterEl.value.length);
+      ipFilterEl.setSelectionRange(pos, pos);
+    }
 
-    content.querySelectorAll(".sort-header").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const col = btn.dataset.sort;
-        const nextOrder = sort === col && order === "asc" ? "desc" : "asc";
-        navigate("sessions", { ...(ip ? { ip } : {}), sort: col, order: nextOrder });
-      });
+    bindSortHeaders(content, (col) => {
+      const nextOrder = sort === col && order === "asc" ? "desc" : "asc";
+      navigate("sessions", { ...(ip ? { ip } : {}), sort: col, order: nextOrder });
     });
 
     content.querySelectorAll(".session-row").forEach((row) => {
@@ -180,10 +186,12 @@ export async function renderSessions(content, params = {}) {
     });
 
     if (params.session) {
+      if (content.dataset.renderId !== renderId) return;
       openSessionPanel(params.session, { ip, sort, order, page: String(page) });
     }
   } catch (err) {
+    if (content.dataset.renderId !== renderId) return;
     content.innerHTML = renderError("Erreur de chargement, réessaie.");
-    content.querySelector('[data-action="retry"]').addEventListener("click", () => renderSessions(content, params));
+    bindRetry(content, () => renderSessions(content, params));
   }
 }
