@@ -1,5 +1,5 @@
 import { fetchJSON, escapeHtml } from "../api.js";
-import { renderSkeleton, renderError, renderEmpty } from "../ui.js";
+import { renderSkeleton, renderError, renderEmpty, bindRetry } from "../ui.js";
 import { renderTimelineChart } from "../charts.js";
 import { icons } from "../icons.js";
 
@@ -17,10 +17,12 @@ function proportionRows(items, labelKey) {
     .join("");
 }
 
-export async function renderOverview(content, params = {}) {
-  content.innerHTML = renderSkeleton(6);
+export async function renderOverview(content, params = {}, { skeleton = true } = {}) {
+  const renderId = content.dataset.renderId;
+  if (skeleton) content.innerHTML = renderSkeleton(6);
   try {
     const data = await fetchJSON("/api/overview");
+    if (content.dataset.renderId !== renderId) return;
     content.innerHTML = `
       <div class="topbar">
         <h1>Overview</h1>
@@ -48,11 +50,16 @@ export async function renderOverview(content, params = {}) {
       </div>
     `;
     if (data.timeline.length) {
-      renderTimelineChart(document.getElementById("timeline-chart"), data.timeline);
+      try {
+        renderTimelineChart(document.getElementById("timeline-chart"), data.timeline);
+      } catch (chartErr) {
+        content.querySelector(".chart-container").textContent = "Graphique indisponible.";
+      }
     }
-    content.querySelector('[data-action="refresh"]').addEventListener("click", () => renderOverview(content));
+    content.querySelector('[data-action="refresh"]').addEventListener("click", () => renderOverview(content, params));
   } catch (err) {
+    if (content.dataset.renderId !== renderId) return;
     content.innerHTML = renderError("Erreur de chargement, réessaie.");
-    content.querySelector('[data-action="retry"]').addEventListener("click", () => renderOverview(content));
+    bindRetry(content, () => renderOverview(content, params));
   }
 }
