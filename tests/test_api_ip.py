@@ -1,0 +1,94 @@
+from fastapi.testclient import TestClient
+
+from app.db import connect
+from app.main import create_app
+
+
+def test_ip_summary_404_for_unknown_ip(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    app = create_app(db=db, start_background_tasks=False)
+    client = TestClient(app)
+
+    response = client.get("/api/ip/9.9.9.9/summary")
+    assert response.status_code == 404
+
+
+def test_ip_summary_aggregates_sessions_and_geo(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    db.executescript(
+        """
+        INSERT INTO geo_cache (ip, country, city, latitude, longitude, looked_up_at)
+        VALUES ('1.2.3.4', 'France', 'Paris', 48.85, 2.35, 't');
+        INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('s1', '1.2.3.4', '2026-08-01T10:00:00Z');
+        INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('s2', '1.2.3.4', '2026-08-14T09:00:00Z');
+        INSERT INTO commands (session_id, timestamp, input_text) VALUES ('s1', '2026-08-01T10:00:01Z', 'whoami');
+        INSERT INTO commands (session_id, timestamp, input_text) VALUES ('s1', '2026-08-01T10:00:02Z', 'ls');
+        """
+    )
+    db.commit()
+
+    app = create_app(db=db, start_background_tasks=False)
+    client = TestClient(app)
+
+    response = client.get("/api/ip/1.2.3.4/summary")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["country"] == "France"
+    assert body["city"] == "Paris"
+    assert body["total_sessions"] == 2
+    assert body["total_commands"] == 2
+    assert body["first_seen"] == "2026-08-01T10:00:00Z"
+    assert body["last_seen"] == "2026-08-14T09:00:00Z"
+    assert body["currently_banned"] is False
+
+
+def test_ip_summary_currently_banned_true_after_ban_with_no_later_unban(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    db.execute(
+        "INSERT INTO fail2ban_events (ip, action, jail, timestamp) "
+        "VALUES ('1.2.3.4', 'Ban', 'sshd', '2026-08-14T08:00:00Z')"
+    )
+    db.commit()
+
+    app = create_app(db=db, start_background_tasks=False)
+    client = TestClient(app)
+
+    response = client.get("/api/ip/1.2.3.4/summary")
+    assert response.status_code == 200
+    assert response.json()["currently_banned"] is True
+
+
+def test_ip_summary_currently_banned_false_after_later_unban(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    db.executescript(
+        """
+        INSERT INTO fail2ban_events (ip, action, jail, timestamp) VALUES ('1.2.3.4', 'Ban', 'sshd', '2026-08-14T08:00:00Z');
+        INSERT INTO fail2ban_events (ip, action, jail, timestamp) VALUES ('1.2.3.4', 'Unban', 'sshd', '2026-08-14T09:00:00Z');
+        """
+    )
+    db.commit()
+
+    app = create_app(db=db, start_background_tasks=False)
+    client = TestClient(app)
+
+    response = client.get("/api/ip/1.2.3.4/summary")
+    assert response.json()["currently_banned"] is False
+
+
+def test_ip_summary_returns_data_for_ip_with_only_fail2ban_events_and_no_sessions(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    db.execute(
+        "INSERT INTO fail2ban_events (ip, action, jail, timestamp) "
+        "VALUES ('1.2.3.4', 'Ban', 'sshd', '2026-08-14T08:00:00Z')"
+    )
+    db.commit()
+
+    app = create_app(db=db, start_background_tasks=False)
+    client = TestClient(app)
+
+    response = client.get("/api/ip/1.2.3.4/summary")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total_sessions"] == 0
+    assert body["first_seen"] is None
+    assert body["last_seen"] is None

@@ -12,7 +12,7 @@ from app.correlation import FailbanIngester, SshdAuthIngester
 from app.db import connect
 from app.geoip import GeoLookup
 from app.ingester import CowrieIngester
-from app.routers import correlation, map as map_router, overview, sessions
+from app.routers import correlation, ip, map as map_router, overview, sessions
 
 POLL_INTERVAL_SECONDS = 5
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
@@ -158,6 +158,7 @@ def create_app(db=None, start_background_tasks: bool = True) -> FastAPI:
     app.include_router(sessions.router)
     app.include_router(correlation.router)
     app.include_router(map_router.router)
+    app.include_router(ip.router)
     if STATIC_DIR.exists():
         app.mount("/", NoCacheStaticFiles(directory=STATIC_DIR, html=True), name="static")
     return app
