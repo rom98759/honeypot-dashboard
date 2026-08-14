@@ -42,3 +42,24 @@ export interface CorrelationRow {
   fail2ban_banned: boolean;
   real_ssh_attempts: number;
 }
+
+export interface MapPoint {
+  city: string | null;
+  country: string | null;
+  latitude: number;
+  longitude: number;
+  session_count: number;
+  ips: string[];
+}
+
+export interface MapDestination {
+  latitude: number;
+  longitude: number;
+}
+
+export interface MapData {
+  points: MapPoint[];
+  destination: MapDestination | null;
+}
+
+export type MapPeriod = "24h" | "7d" | "30d" | "all";
