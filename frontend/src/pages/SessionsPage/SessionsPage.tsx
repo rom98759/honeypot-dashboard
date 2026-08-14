@@ -114,7 +114,11 @@ export function SessionsPage() {
             data.items.map((s) => (
               <tr key={s.session_id} className="session-row" onClick={() => handleRowClick(s.session_id)}>
                 <td className="mono">
-                  <Link to={`/ip/${encodeURIComponent(s.src_ip)}`} onClick={(e) => e.stopPropagation()}>
+                  <Link
+                    to={`/ip/${encodeURIComponent(s.src_ip)}`}
+                    className="ip-link"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     {s.src_ip}
                   </Link>
                 </td>

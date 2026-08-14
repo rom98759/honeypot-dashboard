@@ -16,6 +16,19 @@ const SESSION_COLUMNS: Column[] = [
   { key: "login_username", label: "Login" },
 ];
 
+const FAIL2BAN_ACTION_LABELS: Record<string, string> = {
+  Ban: "Ban",
+  "Restore Ban": "Ban restauré",
+  Unban: "Unban",
+};
+
+const SSHD_RESULT_LABELS: Record<string, string> = {
+  accepted: "Accepté",
+  failed_password: "Mot de passe échoué",
+  invalid_user: "Utilisateur invalide",
+  other: "Autre",
+};
+
 function formatDuration(ms: number | null): string {
   return ms ? `${Math.round(ms / 1000)}s` : "-";
 }
@@ -79,11 +92,12 @@ export function IpDetailPage() {
         <StatCard
           label="Localisation"
           value={data.city && data.country ? `${data.city}, ${data.country}` : "Non géolocalisé"}
+          small
         />
         <StatCard label="Sessions" value={data.total_sessions} />
         <StatCard label="Commandes" value={data.total_commands} />
-        <StatCard label="Première vue" value={data.first_seen ?? "-"} />
-        <StatCard label="Dernière vue" value={data.last_seen ?? "-"} />
+        <StatCard label="Première vue" value={data.first_seen ?? "-"} small />
+        <StatCard label="Dernière vue" value={data.last_seen ?? "-"} small />
       </div>
 
       <div className="panel">
@@ -139,32 +153,36 @@ export function IpDetailPage() {
           <SkeletonBlock rows={4} />
         ) : fail2ban.isError ? (
           <ErrorState message="Erreur de chargement, réessaie." onRetry={() => fail2ban.refetch()} />
-        ) : fail2ban.data.items.length ? (
+        ) : (
           <>
-            <table>
-              <thead>
-                <tr>
-                  <th>Action</th>
-                  <th>Jail</th>
-                  <th>Horodatage</th>
-                </tr>
-              </thead>
-              <tbody>
-                {fail2ban.data.items.map((e, i) => (
-                  <tr key={i}>
-                    <td>
-                      {e.action === "Unban" ? (
-                        <Badge label="Unban" tone="success" />
-                      ) : (
-                        <Badge label={e.action} tone="danger" />
-                      )}
-                    </td>
-                    <td>{e.jail}</td>
-                    <td className="mono">{e.timestamp}</td>
+            {fail2ban.data.items.length ? (
+              <table className="plain-table">
+                <thead>
+                  <tr>
+                    <th>Action</th>
+                    <th>Jail</th>
+                    <th>Horodatage</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {fail2ban.data.items.map((e, i) => (
+                    <tr key={i}>
+                      <td>
+                        {e.action === "Unban" ? (
+                          <Badge label={FAIL2BAN_ACTION_LABELS[e.action] ?? e.action} tone="success" />
+                        ) : (
+                          <Badge label={FAIL2BAN_ACTION_LABELS[e.action] ?? e.action} tone="danger" />
+                        )}
+                      </td>
+                      <td>{e.jail}</td>
+                      <td className="mono">{e.timestamp}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <EmptyState message="Aucun événement fail2ban" />
+            )}
             <Pagination
               page={f2bPage}
               totalPages={Math.max(1, Math.ceil(fail2ban.data.total / IP_PAGE_SIZE))}
@@ -172,8 +190,6 @@ export function IpDetailPage() {
               onNext={() => updateParams({ f2b_page: String(f2bPage + 1) })}
             />
           </>
-        ) : (
-          <EmptyState message="Aucun événement fail2ban" />
         )}
       </div>
 
@@ -183,30 +199,34 @@ export function IpDetailPage() {
           <SkeletonBlock rows={4} />
         ) : sshdAuth.isError ? (
           <ErrorState message="Erreur de chargement, réessaie." onRetry={() => sshdAuth.refetch()} />
-        ) : sshdAuth.data.items.length ? (
+        ) : (
           <>
-            <table>
-              <thead>
-                <tr>
-                  <th>Résultat</th>
-                  <th>Horodatage</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sshdAuth.data.items.map((e, i) => (
-                  <tr key={i}>
-                    <td>
-                      {e.result === "accepted" ? (
-                        <Badge label="Accepté" tone="danger" />
-                      ) : (
-                        <Badge label={e.result} tone="neutral" />
-                      )}
-                    </td>
-                    <td className="mono">{e.timestamp}</td>
+            {sshdAuth.data.items.length ? (
+              <table className="plain-table">
+                <thead>
+                  <tr>
+                    <th>Résultat</th>
+                    <th>Horodatage</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {sshdAuth.data.items.map((e, i) => (
+                    <tr key={i}>
+                      <td>
+                        {e.result === "accepted" ? (
+                          <Badge label={SSHD_RESULT_LABELS[e.result] ?? e.result} tone="danger" />
+                        ) : (
+                          <Badge label={SSHD_RESULT_LABELS[e.result] ?? e.result} tone="neutral" />
+                        )}
+                      </td>
+                      <td className="mono">{e.timestamp}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <EmptyState message="Aucune tentative sshd réelle" />
+            )}
             <Pagination
               page={sshdPage}
               totalPages={Math.max(1, Math.ceil(sshdAuth.data.total / IP_PAGE_SIZE))}
@@ -214,8 +234,6 @@ export function IpDetailPage() {
               onNext={() => updateParams({ sshd_page: String(sshdPage + 1) })}
             />
           </>
-        ) : (
-          <EmptyState message="Aucune tentative sshd réelle" />
         )}
       </div>
 

@@ -18,4 +18,9 @@ describe("StatCard", () => {
     render(<StatCard label="Localisation" value="Paris, France" />);
     expect(screen.getByText("Paris, France")).toBeInTheDocument();
   });
+
+  it("applies the small value class when small is true", () => {
+    render(<StatCard label="Première vue" value="2026-08-01T10:00:00Z" small />);
+    expect(screen.getByText("2026-08-01T10:00:00Z")).toHaveClass("card-value-small");
+  });
 });

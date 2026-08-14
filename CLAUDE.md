@@ -72,7 +72,9 @@ blobs off disk (mounted read-only at `app.state.cowrie_var_path`) and converts t
 ttylog paths relative to its own root (`var/lib/cowrie/tty/...`); the mount points directly at that
 `var/` dir, so the router strips the leading `var/` segment before resolving. `app/routers/map.py`
 (backed by `app/attack_map.py`) serves `/api/map`, aggregating sessions by geo_cache coordinates into
-points for the attack map, plus the optional VPS destination point.
+points for the attack map, plus the optional VPS destination point. `app/routers/ip.py` serves the IP
+detail page's data: `/api/ip/{ip}/summary` (session/command counts, geo, ban status), `/fail2ban`, and
+`/sshd-auth` (paginated per-IP event history for each source).
 
 **`app/ttyplayer.py`** parses Cowrie's binary ttylog frame format (struct `<iLiiLL`) and mirrors
 upstream `playlog`'s stream-direction selection logic (`_select_events`) to pick one I/O direction plus
@@ -92,8 +94,8 @@ an oversight to "fix" by adding `await asyncio.to_thread(...)`.
 ## Frontend
 
 React + TypeScript, built with Vite (`frontend/`). `frontend/src/main.tsx` mounts `App.tsx`, which
-pairs a `HashRouter` (URLs stay `#/overview`, `#/sessions`, `#/correlation`, `#/map`, matching the
-pre-migration vanilla-JS routing so no backend routing changes were needed) with TanStack Query for
+pairs a `HashRouter` (URLs stay `#/overview`, `#/sessions`, `#/correlation`, `#/map`, `#/ip/:ip`,
+matching the pre-migration vanilla-JS routing so no backend routing changes were needed) with TanStack Query for
 all `/api/*` data fetching. `frontend/src/style.css` (ported from the pre-React vanilla version) is
 imported once in `main.tsx` and is the single global stylesheet — no CSS modules, no Tailwind (a
 future styling-layer migration is anticipated in component prop design but not implemented). The

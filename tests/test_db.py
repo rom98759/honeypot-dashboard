@@ -42,3 +42,9 @@ def test_connect_migration_is_idempotent_on_existing_db(tmp_path):
     db = connect(db_path)  # second connect() on the same file must not raise
     columns = {row["name"] for row in db.execute("PRAGMA table_info(geo_cache)").fetchall()}
     assert {"latitude", "longitude"}.issubset(columns)
+
+
+def test_connect_adds_commands_session_id_index(tmp_path):
+    db = connect(tmp_path / "test.sqlite3")
+    indexes = {row["name"] for row in db.execute("SELECT name FROM sqlite_master WHERE type = 'index'").fetchall()}
+    assert "idx_commands_session_id" in indexes
