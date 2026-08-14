@@ -13,7 +13,7 @@ import { Line } from "react-chartjs-2";
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler);
 
 export interface TimelinePoint {
-  hour: string;
+  bucket: string;
   n: number;
 }
 
@@ -34,7 +34,7 @@ export class ChartErrorBoundary extends Component<{ children: ReactNode }, { has
 
 export function TimelineChart({ timeline }: { timeline: TimelinePoint[] }) {
   const data = {
-    labels: timeline.map((t) => t.hour),
+    labels: timeline.map((t) => t.bucket),
     datasets: [
       {
         label: "Connexions",

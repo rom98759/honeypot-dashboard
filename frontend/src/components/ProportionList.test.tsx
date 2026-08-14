@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import { ProportionList } from "./ProportionList";
 
@@ -17,5 +18,14 @@ describe("ProportionList", () => {
     const fills = container.querySelectorAll(".proportion-fill");
     expect(fills[0]).toHaveStyle({ width: "100%" });
     expect(fills[1]).toHaveStyle({ width: "50%" });
+  });
+
+  it("renders labels as links to linkPrefix + label when linkPrefix is set", () => {
+    render(
+      <MemoryRouter>
+        <ProportionList items={[{ label: "1.2.3.4", n: 3 }]} linkPrefix="/ip/" />
+      </MemoryRouter>
+    );
+    expect(screen.getByRole("link", { name: "1.2.3.4" })).toHaveAttribute("href", "/ip/1.2.3.4");
   });
 });

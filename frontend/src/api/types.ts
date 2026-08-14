@@ -33,8 +33,13 @@ export interface OverviewData {
   currently_banned: number;
   top_ips: { src_ip: string; n: number }[];
   top_countries: { country: string; n: number }[];
-  timeline: { hour: string; n: number }[];
+  timeline: { bucket: string; n: number }[];
+  protocol_split: { protocol: string; n: number }[];
+  top_credentials: { login_username: string; login_password: string | null; n: number }[];
+  bans_timeline: { bucket: string; n: number }[];
 }
+
+export type OverviewPeriod = "24h" | "7d" | "30d" | "all";
 
 export interface CorrelationRow {
   ip: string;
