@@ -1,13 +1,24 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { act } from "@testing-library/react";
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { renderWithProviders } from "../test-utils";
 import { OverviewPage } from "./OverviewPage";
 
 vi.mock("../components/TimelineChart", () => ({
-  TimelineChart: ({ timeline }: { timeline: { hour: string; n: number }[] }) => (
+  TimelineChart: ({ timeline }: { timeline: { bucket: string; n: number }[] }) => (
     <div data-testid="timeline-chart-stub">{timeline.length}</div>
+  ),
+}));
+
+vi.mock("../components/ProtocolDonut", () => ({
+  ProtocolDonut: ({ protocolSplit }: { protocolSplit: { protocol: string; n: number }[] }) => (
+    <div data-testid="protocol-donut-stub">{protocolSplit.length}</div>
+  ),
+}));
+
+vi.mock("../components/BansBarChart", () => ({
+  BansBarChart: ({ bansTimeline }: { bansTimeline: { bucket: string; n: number }[] }) => (
+    <div data-testid="bans-bar-chart-stub">{bansTimeline.length}</div>
   ),
 }));
 
@@ -22,7 +33,13 @@ const FULL_OVERVIEW = {
   currently_banned: 1,
   top_ips: [{ src_ip: "1.2.3.4", n: 6 }],
   top_countries: [{ country: "France", n: 6 }],
-  timeline: [{ hour: "2026-08-13T10", n: 6 }],
+  timeline: [{ bucket: "2026-08-13T10", n: 6 }],
+  protocol_split: [
+    { protocol: "ssh", n: 10 },
+    { protocol: "telnet", n: 2 },
+  ],
+  top_credentials: [{ login_username: "root", login_password: "123456", n: 5 }],
+  bans_timeline: [{ bucket: "2026-08-13T10", n: 2 }],
 };
 
 describe("OverviewPage", () => {
@@ -45,10 +62,63 @@ describe("OverviewPage", () => {
     expect(container.querySelector(".skeleton-block")).toBeNull();
   });
 
-  it("renders empty states and skips the chart when there is no data", async () => {
-    vi.stubGlobal("fetch", vi.fn(() => jsonResponse({ ...FULL_OVERVIEW, top_countries: [], top_ips: [] })));
+  it("fetches with the default 24h period and switches period on click", async () => {
+    const fetchMock = vi.fn(() => jsonResponse(FULL_OVERVIEW));
+    vi.stubGlobal("fetch", fetchMock);
     renderWithProviders(<OverviewPage />);
-    await waitFor(() => expect(screen.getAllByText("Aucune donnée")).toHaveLength(2));
+    await waitFor(() => expect(screen.getByText("12")).toBeInTheDocument());
+    expect(fetchMock).toHaveBeenCalledWith("/api/overview?period=24h");
+
+    await userEvent.click(screen.getByRole("button", { name: "30j" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith("/api/overview?period=30d"));
+  });
+
+  it("renders the protocol donut, bans chart, and top credentials table", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => jsonResponse(FULL_OVERVIEW)));
+    renderWithProviders(<OverviewPage />);
+    await waitFor(() => expect(screen.getByTestId("protocol-donut-stub")).toBeInTheDocument());
+    expect(screen.getByTestId("bans-bar-chart-stub")).toBeInTheDocument();
+    expect(screen.getByText("root")).toBeInTheDocument();
+    expect(screen.getByText("123456")).toBeInTheDocument();
+  });
+
+  it("shows (vide) for a null attempted password", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        jsonResponse({
+          ...FULL_OVERVIEW,
+          top_credentials: [{ login_username: "admin", login_password: null, n: 2 }],
+        })
+      )
+    );
+    renderWithProviders(<OverviewPage />);
+    await waitFor(() => expect(screen.getByText("(vide)")).toBeInTheDocument());
+  });
+
+  it("links the Top IP row to its IP detail page", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => jsonResponse(FULL_OVERVIEW)));
+    renderWithProviders(<OverviewPage />);
+    await waitFor(() => expect(screen.getByRole("link", { name: "1.2.3.4" })).toBeInTheDocument());
+    expect(screen.getByRole("link", { name: "1.2.3.4" })).toHaveAttribute("href", "/ip/1.2.3.4");
+  });
+
+  it("renders empty states and skips charts when there is no data", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        jsonResponse({
+          ...FULL_OVERVIEW,
+          top_countries: [],
+          top_ips: [],
+          protocol_split: [],
+          bans_timeline: [],
+          top_credentials: [],
+        })
+      )
+    );
+    renderWithProviders(<OverviewPage />);
+    await waitFor(() => expect(screen.getAllByText("Aucune donnée")).toHaveLength(5));
     expect(screen.getByTestId("timeline-chart-stub")).toBeInTheDocument();
   });
 

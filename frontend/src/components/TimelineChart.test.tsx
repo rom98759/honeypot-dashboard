@@ -14,8 +14,8 @@ describe("TimelineChart", () => {
     render(
       <TimelineChart
         timeline={[
-          { hour: "2026-08-13T10", n: 5 },
-          { hour: "2026-08-13T11", n: 8 },
+          { bucket: "2026-08-13T10", n: 5 },
+          { bucket: "2026-08-13T11", n: 8 },
         ]}
       />
     );
