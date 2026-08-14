@@ -6,8 +6,17 @@ Wants=ufw.service
 PartOf=docker.service
 
 [Service]
+# Pas de RemainAfterExit=yes : ce service est retrigger periodiquement par
+# docker-user-firewall.timer. Avec RemainAfterExit=yes, une fois "active
+# (exited)" un `systemctl start` (donc chaque declenchement du timer) est
+# un no-op tant que le service n'a pas ete stoppe explicitement (ex: par
+# PartOf= au restart de docker.service) - constate en prod le 2026-08-14 :
+# le service restait "active (exited)" depuis le boot et un `systemctl
+# start` manuel ne relancait pas le script. Sans RemainAfterExit, l'unite
+# repasse a "inactive (dead)" juste apres l'execution, donc chaque `start`
+# (boot, restart docker.service via PartOf=, ou timer) re-execute vraiment
+# le script.
 Type=oneshot
-RemainAfterExit=yes
 ExecStart=/usr/local/sbin/docker-user-firewall.sh
 
 [Install]
