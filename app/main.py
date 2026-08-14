@@ -47,19 +47,34 @@ def _open_geoip_reader(geoip_db_path: str | None):
 
 def _backfill_geo_cache(db, geo_lookup: GeoLookup) -> None:
     """
-    Populates geo_cache for sessions ingested before GeoLookup was wired up
-    (or before geoip-update.sh had produced an .mmdb file). Runs once at
-    startup; cheap since it's a local mmdb lookup per IP, and only touches
-    IPs geo_cache doesn't already have — a rerun is a no-op.
+    Two passes. First: populate geo_cache for sessions ingested before GeoLookup
+    was wired up (or before geoip-update.sh had produced an .mmdb file) — a
+    rerun is a no-op since it only touches IPs geo_cache doesn't already have.
+    Second: re-resolve rows already in geo_cache but missing coordinates (added
+    after GeoLookup started extracting them) — GeoLookup.lookup() only queries
+    the reader on a cache miss, so those rows are deleted first so the lookup()
+    calls below see a miss and do a fresh reader query. The `country IS NOT
+    NULL` guard skips IPs that already failed to resolve (private IPs, etc.) —
+    retrying those every startup would be wasted work for no new information.
     """
     if geo_lookup.reader is None:
         return
-    rows = db.execute(
+
+    missing_entirely = db.execute(
         "SELECT DISTINCT s.src_ip FROM sessions s "
         "LEFT JOIN geo_cache g ON g.ip = s.src_ip WHERE g.ip IS NULL"
     ).fetchall()
-    for row in rows:
+    for row in missing_entirely:
         geo_lookup.lookup(row["src_ip"])
+
+    missing_coordinates = db.execute(
+        "SELECT ip FROM geo_cache WHERE latitude IS NULL AND country IS NOT NULL"
+    ).fetchall()
+    if missing_coordinates:
+        db.execute("DELETE FROM geo_cache WHERE latitude IS NULL AND country IS NOT NULL")
+        db.commit()
+        for row in missing_coordinates:
+            geo_lookup.lookup(row["ip"])
 
 
 async def _poll_loop(app: FastAPI) -> None:
