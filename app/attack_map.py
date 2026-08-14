@@ -1,20 +1,13 @@
 import sqlite3
-from datetime import datetime, timedelta, timezone
 
-VALID_PERIODS = {"24h", "7d", "30d", "all"}
-
-_PERIOD_DELTAS = {
-    "24h": timedelta(hours=24),
-    "7d": timedelta(days=7),
-    "30d": timedelta(days=30),
-}
+from app.periods import period_cutoff
 
 
 def get_map_points(db: sqlite3.Connection, period: str) -> list[dict]:
     where_clause = ""
     params: list = []
-    if period != "all":
-        cutoff = (datetime.now(timezone.utc) - _PERIOD_DELTAS[period]).strftime("%Y-%m-%dT%H:%M:%SZ")
+    cutoff = period_cutoff(period)
+    if cutoff is not None:
         where_clause = " AND s.connect_time >= ?"
         params.append(cutoff)
 

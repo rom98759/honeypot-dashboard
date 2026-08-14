@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Request
 
-from app.attack_map import VALID_PERIODS, get_map_points
+from app.attack_map import get_map_points
+from app.periods import VALID_PERIODS
 
 router = APIRouter()
 
