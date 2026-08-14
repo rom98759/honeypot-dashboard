@@ -45,7 +45,7 @@ def get_overview_stats(db: sqlite3.Connection, period: str) -> dict:
 
     protocol_split = db.execute(
         "SELECT COALESCE(protocol, 'ssh') AS protocol, COUNT(*) AS n FROM sessions s WHERE 1=1"
-        + where + " GROUP BY protocol",
+        + where + " GROUP BY COALESCE(protocol, 'ssh')",
         params,
     ).fetchall()
 
@@ -58,11 +58,12 @@ def get_overview_stats(db: sqlite3.Connection, period: str) -> dict:
 
     bans_bucket = bucket_expr(period, "timestamp")
     ban_where = " AND timestamp >= ?" if cutoff else ""
+    ban_params = [cutoff] if cutoff else []
     bans_timeline = db.execute(
         f"SELECT {bans_bucket} AS bucket, COUNT(*) AS n FROM fail2ban_events "
         "WHERE action IN ('Ban', 'Restore Ban')" + ban_where + " "
         "GROUP BY bucket ORDER BY bucket",
-        params,
+        ban_params,
     ).fetchall()
 
     return {

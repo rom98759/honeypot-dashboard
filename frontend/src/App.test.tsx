@@ -20,6 +20,9 @@ beforeEach(() => {
           top_ips: [],
           top_countries: [],
           timeline: [],
+          protocol_split: [],
+          top_credentials: [],
+          bans_timeline: [],
         });
       }
       if (url.includes("/summary")) {

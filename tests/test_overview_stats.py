@@ -56,10 +56,14 @@ def test_protocol_split_defaults_null_protocol_to_ssh(tmp_path):
         "INSERT INTO sessions (session_id, src_ip, connect_time, protocol) VALUES ('s2', '5.6.7.8', ?, 'telnet')",
         (_iso(now),),
     )
+    db.execute(
+        "INSERT INTO sessions (session_id, src_ip, connect_time, protocol) VALUES ('s3', '9.9.9.9', ?, 'ssh')",
+        (_iso(now),),
+    )
     db.commit()
 
-    protocol_split = {row["protocol"]: row["n"] for row in get_overview_stats(db, "all")["protocol_split"]}
-    assert protocol_split == {"ssh": 1, "telnet": 1}
+    protocol_split = sorted(get_overview_stats(db, "all")["protocol_split"], key=lambda r: r["protocol"])
+    assert protocol_split == [{"protocol": "ssh", "n": 2}, {"protocol": "telnet", "n": 1}]
 
 
 def test_top_credentials_handles_null_password(tmp_path):
