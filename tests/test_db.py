@@ -48,3 +48,10 @@ def test_connect_adds_commands_session_id_index(tmp_path):
     db = connect(tmp_path / "test.sqlite3")
     indexes = {row["name"] for row in db.execute("SELECT name FROM sqlite_master WHERE type = 'index'").fetchall()}
     assert "idx_commands_session_id" in indexes
+
+
+def test_connect_adds_connect_time_and_timestamp_indexes(tmp_path):
+    db = connect(tmp_path / "test.sqlite3")
+    indexes = {row["name"] for row in db.execute("SELECT name FROM sqlite_master WHERE type = 'index'").fetchall()}
+    assert "idx_sessions_connect_time" in indexes
+    assert "idx_fail2ban_events_timestamp" in indexes

@@ -111,3 +111,37 @@ def test_timeline_bucket_is_hourly_for_24h_and_daily_for_30d(tmp_path):
     bucket_30d = get_overview_stats(db, "30d")["timeline"][0]["bucket"]
     assert len(bucket_24h) == 13
     assert len(bucket_30d) == 10
+
+
+def test_bans_timeline_bucket_is_hourly_for_24h_and_daily_for_30d(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    now = datetime.now(timezone.utc)
+    db.execute(
+        "INSERT INTO fail2ban_events (ip, action, jail, timestamp) VALUES ('1.2.3.4', 'Ban', 'sshd', ?)",
+        (_iso(now),),
+    )
+    db.commit()
+
+    bucket_24h = get_overview_stats(db, "24h")["bans_timeline"][0]["bucket"]
+    bucket_30d = get_overview_stats(db, "30d")["bans_timeline"][0]["bucket"]
+    assert len(bucket_24h) == 13
+    assert len(bucket_30d) == 10
+
+
+def test_bans_timeline_is_period_scoped(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    now = datetime.now(timezone.utc)
+    db.execute(
+        "INSERT INTO fail2ban_events (ip, action, jail, timestamp) VALUES ('1.2.3.4', 'Ban', 'sshd', ?)",
+        (_iso(now),),
+    )
+    db.execute(
+        "INSERT INTO fail2ban_events (ip, action, jail, timestamp) VALUES ('5.6.7.8', 'Ban', 'sshd', ?)",
+        (_iso(now - timedelta(days=10)),),
+    )
+    db.commit()
+
+    bans_24h = get_overview_stats(db, "24h")["bans_timeline"]
+    bans_all = get_overview_stats(db, "all")["bans_timeline"]
+    assert sum(bucket["n"] for bucket in bans_24h) == 1
+    assert sum(bucket["n"] for bucket in bans_all) == 2
