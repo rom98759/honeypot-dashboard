@@ -96,3 +96,26 @@ def test_backfill_does_not_retry_ips_that_never_resolved(tmp_path):
     geo_lookup = GeoLookup(db, _ExplodingReader())
 
     _backfill_geo_cache(db, geo_lookup)  # must not raise
+
+
+def test_backfill_preserves_existing_country_city_when_reader_fails_to_reresolve(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    db.execute("INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('s1', '9.9.9.9', 't')")
+    db.execute(
+        "INSERT INTO geo_cache (ip, country, city, latitude, longitude, looked_up_at) "
+        "VALUES ('9.9.9.9', 'United States', 'Mountain View', NULL, NULL, 't')"
+    )
+    db.commit()
+
+    class _NoLongerResolvableReader:
+        def city(self, ip):
+            raise ValueError("address not found in database")
+
+    geo_lookup = GeoLookup(db, _NoLongerResolvableReader())
+
+    _backfill_geo_cache(db, geo_lookup)
+
+    row = db.execute("SELECT country, city, latitude FROM geo_cache WHERE ip = '9.9.9.9'").fetchone()
+    assert row["country"] == "United States"
+    assert row["city"] == "Mountain View"
+    assert row["latitude"] is None

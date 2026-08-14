@@ -220,6 +220,8 @@ td { padding: var(--space-3); border-top: 1px solid var(--border); }
   position: absolute; top: var(--space-4); right: var(--space-4);
   background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
   box-shadow: var(--shadow-sm); padding: var(--space-4); width: 240px; z-index: 10;
+  max-height: calc(100% - var(--space-8));
+  overflow-y: auto;
 }
 .map-tooltip h3 { margin: 0 0 var(--space-1); font-size: 14px; }
 .map-tooltip p { margin: 0 0 var(--space-2); font-size: 13px; color: var(--text-secondary); }

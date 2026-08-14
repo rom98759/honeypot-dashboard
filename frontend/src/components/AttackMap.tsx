@@ -11,7 +11,7 @@ function radiusFor(sessionCount: number, maxSessionCount: number): number {
   return MIN_RADIUS + ratio * (MAX_RADIUS - MIN_RADIUS);
 }
 
-function pointKey(point: { latitude: number; longitude: number }): string {
+export function pointKey(point: { latitude: number; longitude: number }): string {
   return `${point.latitude},${point.longitude}`;
 }
 

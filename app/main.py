@@ -1,4 +1,5 @@
 import asyncio
+import math
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -49,9 +50,12 @@ def _parse_optional_float(value: str | None) -> float | None:
     if value is None:
         return None
     try:
-        return float(value)
+        parsed = float(value)
     except ValueError:
         return None
+    if not math.isfinite(parsed):
+        return None
+    return parsed
 
 
 def _backfill_geo_cache(db, geo_lookup: GeoLookup) -> None:
@@ -60,11 +64,13 @@ def _backfill_geo_cache(db, geo_lookup: GeoLookup) -> None:
     was wired up (or before geoip-update.sh had produced an .mmdb file) — a
     rerun is a no-op since it only touches IPs geo_cache doesn't already have.
     Second: re-resolve rows already in geo_cache but missing coordinates (added
-    after GeoLookup started extracting them) — GeoLookup.lookup() only queries
-    the reader on a cache miss, so those rows are deleted first so the lookup()
-    calls below see a miss and do a fresh reader query. The `country IS NOT
-    NULL` guard skips IPs that already failed to resolve (private IPs, etc.) —
-    retrying those every startup would be wasted work for no new information.
+    after GeoLookup started extracting them). This queries the reader directly
+    and only writes on a successful response — unlike deleting the row first
+    and calling geo_lookup.lookup() again, this never destroys a previously
+    correct country/city if the IP no longer resolves under the current mmdb
+    (GeoLite2-City's coverage shifts release to release). The `country IS NOT
+    NULL` guard on the SELECT skips IPs that already failed to resolve entirely
+    (private IPs, etc.) — retrying those every startup would be wasted work.
     """
     if geo_lookup.reader is None:
         return
@@ -79,11 +85,22 @@ def _backfill_geo_cache(db, geo_lookup: GeoLookup) -> None:
     missing_coordinates = db.execute(
         "SELECT ip FROM geo_cache WHERE latitude IS NULL AND country IS NOT NULL"
     ).fetchall()
-    if missing_coordinates:
-        db.execute("DELETE FROM geo_cache WHERE latitude IS NULL AND country IS NOT NULL")
-        db.commit()
-        for row in missing_coordinates:
-            geo_lookup.lookup(row["ip"])
+    for row in missing_coordinates:
+        try:
+            response = geo_lookup.reader.city(row["ip"])
+        except Exception:
+            continue  # keep the existing country/city rather than nulling it
+        db.execute(
+            "UPDATE geo_cache SET latitude = ?, longitude = ?, country = ?, city = ? WHERE ip = ?",
+            (
+                response.location.latitude,
+                response.location.longitude,
+                response.country.name,
+                response.city.name,
+                row["ip"],
+            ),
+        )
+    db.commit()
 
 
 async def _poll_loop(app: FastAPI) -> None:

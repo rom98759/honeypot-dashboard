@@ -40,6 +40,19 @@ def test_map_returns_destination_when_vps_coordinates_set(tmp_path, monkeypatch)
     assert body["destination"] == {"latitude": 51.0162051, "longitude": 2.1556627}
 
 
+def test_map_treats_non_finite_vps_coordinate_as_unset(tmp_path, monkeypatch):
+    monkeypatch.setenv("VPS_LATITUDE", "nan")
+    monkeypatch.setenv("VPS_LONGITUDE", "2.1556627")
+    db = connect(tmp_path / "db.sqlite3")
+
+    app = create_app(db=db, start_background_tasks=False)
+    client = TestClient(app)
+
+    response = client.get("/api/map")
+    assert response.status_code == 200
+    assert response.json()["destination"] is None
+
+
 def test_map_rejects_invalid_period(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
     app = create_app(db=db, start_background_tasks=False)

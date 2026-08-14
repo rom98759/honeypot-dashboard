@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { X } from "lucide-react";
 import { useMap } from "../api/map";
-import { AttackMap } from "../components/AttackMap";
+import { AttackMap, pointKey } from "../components/AttackMap";
 import { SkeletonBlock } from "../components/SkeletonBlock";
 import { ErrorState } from "../components/ErrorState";
 import { EmptyState } from "../components/EmptyState";
@@ -17,13 +17,10 @@ const PERIODS: { value: MapPeriod; label: string }[] = [
 
 const ARRIVAL_ANIMATION_MS = 2000;
 
-function pointKey(point: { latitude: number; longitude: number }): string {
-  return `${point.latitude},${point.longitude}`;
-}
-
 export function MapPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const period = (searchParams.get("period") as MapPeriod) || "24h";
+  const requestedPeriod = searchParams.get("period");
+  const period = PERIODS.some((p) => p.value === requestedPeriod) ? (requestedPeriod as MapPeriod) : "24h";
   const live = searchParams.get("live") === "true";
 
   const [arrivingKeys, setArrivingKeys] = useState<Set<string>>(new Set());
@@ -38,7 +35,7 @@ export function MapPage() {
   }, [period]);
 
   useEffect(() => {
-    if (!data) return;
+    if (!data || !live) return;
     const previous = previousCountsRef.current;
     const nextCounts = new Map(data.points.map((p) => [pointKey(p), p.session_count]));
 
@@ -59,7 +56,7 @@ export function MapPage() {
     }
 
     previousCountsRef.current = nextCounts;
-  }, [data]);
+  }, [data, live]);
 
   useEffect(() => () => clearTimeout(arrivalTimeoutRef.current), []);
 
