@@ -22,6 +22,26 @@ beforeEach(() => {
           timeline: [],
         });
       }
+      if (url.includes("/summary")) {
+        return jsonResponse({
+          ip: "1.2.3.4",
+          country: null,
+          city: null,
+          latitude: null,
+          longitude: null,
+          first_seen: null,
+          last_seen: null,
+          total_sessions: 0,
+          total_commands: 0,
+          currently_banned: false,
+        });
+      }
+      if (url.includes("/fail2ban")) {
+        return jsonResponse({ items: [], total: 0 });
+      }
+      if (url.includes("/sshd-auth")) {
+        return jsonResponse({ items: [], total: 0 });
+      }
       if (url.startsWith("/api/sessions")) {
         return jsonResponse({ items: [], total: 0 });
       }
@@ -72,5 +92,10 @@ describe("App", () => {
     const nav = screen.getByRole("navigation");
     await waitFor(() => expect(within(nav).getByText("Carte").closest("a")).toHaveClass("active"));
     await waitFor(() => expect(screen.getByRole("heading", { name: "Carte" })).toBeInTheDocument());
+  });
+
+  it("renders the IP detail page when navigating there", async () => {
+    renderWithProviders(<App />, { route: "/ip/1.2.3.4" });
+    await waitFor(() => expect(screen.getByRole("heading", { name: "1.2.3.4" })).toBeInTheDocument());
   });
 });
