@@ -4,7 +4,7 @@ export function StatCard({
   danger = false,
 }: {
   label: string;
-  value: number;
+  value: string | number;
   danger?: boolean;
 }) {
   return (

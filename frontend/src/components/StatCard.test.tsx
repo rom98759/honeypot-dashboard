@@ -13,4 +13,9 @@ describe("StatCard", () => {
     const { container } = render(<StatCard label="Actuellement banni" value={3} danger />);
     expect(container.querySelector(".card")).toHaveClass("card-danger");
   });
+
+  it("renders a string value", () => {
+    render(<StatCard label="Localisation" value="Paris, France" />);
+    expect(screen.getByText("Paris, France")).toBeInTheDocument();
+  });
 });

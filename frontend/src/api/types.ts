@@ -63,3 +63,37 @@ export interface MapData {
 }
 
 export type MapPeriod = "24h" | "7d" | "30d" | "all";
+
+export interface IpSummary {
+  ip: string;
+  country: string | null;
+  city: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  first_seen: string | null;
+  last_seen: string | null;
+  total_sessions: number;
+  total_commands: number;
+  currently_banned: boolean;
+}
+
+export interface Fail2banEvent {
+  action: string;
+  jail: string;
+  timestamp: string;
+}
+
+export interface SshdAuthEvent {
+  result: string;
+  timestamp: string;
+}
+
+export interface PaginatedFail2ban {
+  items: Fail2banEvent[];
+  total: number;
+}
+
+export interface PaginatedSshdAuth {
+  items: SshdAuthEvent[];
+  total: number;
+}
