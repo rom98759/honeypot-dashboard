@@ -28,6 +28,9 @@ beforeEach(() => {
       if (url.startsWith("/api/correlation")) {
         return jsonResponse([]);
       }
+      if (url.startsWith("/api/map")) {
+        return jsonResponse({ points: [], destination: null });
+      }
       return jsonResponse({});
     })
   );
@@ -62,5 +65,12 @@ describe("App", () => {
     await waitFor(() =>
       expect(screen.getByRole("heading", { name: "Corrélation" })).toBeInTheDocument()
     );
+  });
+
+  it("renders the Map page when navigating there", async () => {
+    renderWithProviders(<App />, { route: "/map" });
+    const nav = screen.getByRole("navigation");
+    await waitFor(() => expect(within(nav).getByText("Carte").closest("a")).toHaveClass("active"));
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Carte" })).toBeInTheDocument());
   });
 });

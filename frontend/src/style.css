@@ -213,3 +213,16 @@ td { padding: var(--space-3); border-top: 1px solid var(--border); }
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+.map-controls { display: flex; align-items: center; gap: var(--space-4); }
+.period-selector { display: flex; gap: var(--space-1); }
+.map-tooltip {
+  position: absolute; top: var(--space-4); right: var(--space-4);
+  background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow-sm); padding: var(--space-4); width: 240px; z-index: 10;
+}
+.map-tooltip h3 { margin: 0 0 var(--space-1); font-size: 14px; }
+.map-tooltip p { margin: 0 0 var(--space-2); font-size: 13px; color: var(--text-secondary); }
+.map-tooltip-close { position: absolute; top: var(--space-2); right: var(--space-2); }
+.map-tooltip-ips { list-style: none; padding: 0; margin: var(--space-2) 0 0; font-size: 13px; }
+.map-tooltip-ips li { padding: var(--space-1) 0; }

@@ -3,6 +3,7 @@ import { Sidebar } from "./components/Sidebar";
 import { OverviewPage } from "./pages/OverviewPage";
 import { SessionsPage } from "./pages/SessionsPage/SessionsPage";
 import { CorrelationPage } from "./pages/CorrelationPage";
+import { MapPage } from "./pages/MapPage";
 
 export default function App() {
   return (
@@ -14,6 +15,7 @@ export default function App() {
           <Route path="/overview" element={<OverviewPage />} />
           <Route path="/sessions" element={<SessionsPage />} />
           <Route path="/correlation" element={<CorrelationPage />} />
+          <Route path="/map" element={<MapPage />} />
           <Route path="*" element={<Navigate to="/overview" replace />} />
         </Routes>
       </main>
