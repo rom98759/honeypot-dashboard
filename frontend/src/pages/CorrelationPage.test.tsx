@@ -36,13 +36,13 @@ describe("CorrelationPage", () => {
     expect(cells[0]).toHaveTextContent("1.2.3.4");
   });
 
-  it('links "view sessions" to the Sessions page pre-filtered by IP', async () => {
+  it('links "view detail" to the IP detail page', async () => {
     vi.stubGlobal("fetch", vi.fn(() => jsonResponse(ROWS)));
     renderWithProviders(<CorrelationPage />, { route: "/correlation" });
     await waitFor(() => expect(screen.getByText("1.2.3.4")).toBeInTheDocument());
     // Default sort is honeypot_sessions desc (set in CorrelationPage), so the row with the
     // higher honeypot_sessions count (5.6.7.8, 20) renders first, not ROWS[0] (1.2.3.4, 10).
-    const link = screen.getAllByTitle("Voir les sessions")[0];
-    expect(link).toHaveAttribute("href", "/sessions?ip=5.6.7.8");
+    const link = screen.getAllByTitle("Voir le détail")[0];
+    expect(link).toHaveAttribute("href", "/ip/5.6.7.8");
   });
 });

@@ -84,8 +84,8 @@ export function CorrelationPage() {
                 <td>
                   <Link
                     className="btn-icon"
-                    to={`/sessions?ip=${encodeURIComponent(r.ip)}`}
-                    title="Voir les sessions"
+                    to={`/ip/${encodeURIComponent(r.ip)}`}
+                    title="Voir le détail"
                   >
                     <ExternalLink />
                   </Link>

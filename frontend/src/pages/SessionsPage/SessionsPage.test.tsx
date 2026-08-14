@@ -141,7 +141,7 @@ describe("SessionsPage", () => {
     renderWithProviders(<SessionsPage />, { route: "/sessions" });
     await waitFor(() => expect(screen.getByText("1.2.3.4")).toBeInTheDocument());
 
-    await userEvent.click(screen.getByText("1.2.3.4"));
+    await userEvent.click(screen.getByText("2026-08-13T10:00:00"));
     await waitFor(() => expect(screen.getByRole("heading", { name: "s1" })).toBeInTheDocument());
     expect(document.body.querySelector(".session-panel")).not.toBeNull();
 
@@ -165,7 +165,7 @@ describe("SessionsPage", () => {
     vi.stubGlobal("fetch", fetchMock);
     renderWithProviders(<SessionsPage />, { route: "/sessions" });
     await waitFor(() => expect(screen.getByText("1.2.3.4")).toBeInTheDocument());
-    await userEvent.click(screen.getByText("1.2.3.4"));
+    await userEvent.click(screen.getByText("2026-08-13T10:00:00"));
     await waitFor(() => expect(document.body.querySelector(".session-panel")).not.toBeNull());
 
     const backdrop = document.body.querySelector(".panel-backdrop") as HTMLElement;
@@ -205,6 +205,26 @@ describe("SessionsPage", () => {
 
     await userEvent.click(screen.getByText("Go overview"));
     await waitFor(() => expect(screen.getByText("Overview stub")).toBeInTheDocument());
+    expect(document.body.querySelector(".session-panel")).toBeNull();
+  });
+
+  it("the IP link navigates to the IP detail page without opening the session panel", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => jsonResponse(SESSIONS_PAGE_1)));
+
+    function Harness() {
+      return (
+        <Routes>
+          <Route path="/sessions" element={<SessionsPage />} />
+          <Route path="/ip/:ip" element={<div>IP detail stub</div>} />
+        </Routes>
+      );
+    }
+
+    renderWithProviders(<Harness />, { route: "/sessions" });
+    await waitFor(() => expect(screen.getByText("1.2.3.4")).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole("link", { name: "1.2.3.4" }));
+    await waitFor(() => expect(screen.getByText("IP detail stub")).toBeInTheDocument());
     expect(document.body.querySelector(".session-panel")).toBeNull();
   });
 });

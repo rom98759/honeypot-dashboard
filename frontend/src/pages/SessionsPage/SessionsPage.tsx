@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import { Search } from "lucide-react";
 import { useSessions, PAGE_SIZE } from "../../api/sessions";
 import { SkeletonBlock } from "../../components/SkeletonBlock";
@@ -113,7 +113,11 @@ export function SessionsPage() {
           {data.items.length ? (
             data.items.map((s) => (
               <tr key={s.session_id} className="session-row" onClick={() => handleRowClick(s.session_id)}>
-                <td className="mono">{s.src_ip}</td>
+                <td className="mono">
+                  <Link to={`/ip/${encodeURIComponent(s.src_ip)}`} onClick={(e) => e.stopPropagation()}>
+                    {s.src_ip}
+                  </Link>
+                </td>
                 <td className="mono">{s.connect_time}</td>
                 <td>{formatDuration(s.duration_ms)}</td>
                 <td>{s.login_username || "-"}</td>
