@@ -1,5 +1,18 @@
 # TODO
 
+## Bugs
+
+- [ ] Timestamps affichés bruts en UTC (ex : `2026-08-14T10:18:44.673383Z`
+      au lieu de 12h18 heure locale) — `{c.timestamp}` /
+      `{e.timestamp}` non formatés dans `SessionDetailPanel.tsx:87` et
+      `IpDetailPage.tsx:178/222`. Formater partout avec `toLocaleString`
+      (fuseau navigateur ou forcé `Europe/Paris`).
+- [ ] Replay session : le texte du terminal s'affiche mais décalé dans le
+      temps par rapport à la vidéo/frappe réelle. À investiguer côté
+      `app/ttyplayer.py` (`_select_events`, concaténation des ttylogs
+      multi-fichiers sur la timeline globale) plutôt que côté player JS —
+      suivre systematic-debugging.
+
 ## Frontend / refonte visuelle
 
 - [ ] Vérifier le libellé "Tentatives port 50022" (page Corrélation) — c'est un
@@ -40,9 +53,21 @@
 - [ ] Sélecteur de période partagé entre toutes les pages au lieu d'un état
       indépendant par page (Overview, Carte ont chacun le leur aujourd'hui).
 - [ ] Export CSV/JSON des sessions ou de l'historique d'une IP.
-- [ ] Carte interactive : mode heatmap/densité en plus du mode points,
-      scrubber temporel pour rejouer l'historique, choropleth par pays
-      cliquable pour drill-down.
+- [ ] Carte interactive : zoom/pan (`ZoomableGroup` de react-simple-maps,
+      absent actuellement de `AttackMap.tsx` — scroll-zoom + drag-pan +
+      double-clic), mini popup au clic sur un marker (IP/pays/nb sessions)
+      avant d'ouvrir le détail, mode heatmap/densité en plus du mode
+      points, scrubber temporel pour rejouer l'historique, choropleth par
+      pays cliquable pour drill-down.
+- [ ] Dashboard Overview plus riche : top identifiants/mots de passe
+      testés, durée moyenne de session, IP uniques (jour/semaine),
+      leaderboard "top offenders" (IP, pays, nb sessions, dernière vue)
+      cliquable vers la page IP.
+- [ ] Page IP détail : enrichir avec ASN/organisation, reverse DNS, lien
+      vers AbuseIPDB.
+- [ ] `TimelineChart` : brush/zoom sur une plage de dates (au lieu du
+      sélecteur de période uniquement), clic sur un point → filtre la
+      table sessions.
 - [ ] Flux d'activité en direct — journal chronologique de tous les
       événements (sessions, bans, tentatives sshd) façon SIEM light.
 - [ ] Page Alertes — seuils configurables (ex : notifier si >N attaques/heure).
