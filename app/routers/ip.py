@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 
 router = APIRouter()
 
@@ -57,3 +57,29 @@ async def get_ip_summary(request: Request, ip: str):
         "total_commands": total_commands,
         "currently_banned": currently_banned,
     }
+
+
+@router.get("/api/ip/{ip}/fail2ban")
+async def get_ip_fail2ban(
+    request: Request, ip: str, limit: int = Query(25, ge=1, le=500), offset: int = Query(0, ge=0)
+):
+    db = request.app.state.db
+    total = db.execute("SELECT COUNT(*) AS n FROM fail2ban_events WHERE ip = ?", (ip,)).fetchone()["n"]
+    rows = db.execute(
+        "SELECT action, jail, timestamp FROM fail2ban_events WHERE ip = ? ORDER BY timestamp DESC LIMIT ? OFFSET ?",
+        (ip, limit, offset),
+    ).fetchall()
+    return {"items": [dict(r) for r in rows], "total": total}
+
+
+@router.get("/api/ip/{ip}/sshd-auth")
+async def get_ip_sshd_auth(
+    request: Request, ip: str, limit: int = Query(25, ge=1, le=500), offset: int = Query(0, ge=0)
+):
+    db = request.app.state.db
+    total = db.execute("SELECT COUNT(*) AS n FROM sshd_auth_events WHERE ip = ?", (ip,)).fetchone()["n"]
+    rows = db.execute(
+        "SELECT result, timestamp FROM sshd_auth_events WHERE ip = ? ORDER BY timestamp DESC LIMIT ? OFFSET ?",
+        (ip, limit, offset),
+    ).fetchall()
+    return {"items": [dict(r) for r in rows], "total": total}

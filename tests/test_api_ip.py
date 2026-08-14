@@ -92,3 +92,57 @@ def test_ip_summary_returns_data_for_ip_with_only_fail2ban_events_and_no_session
     assert body["total_sessions"] == 0
     assert body["first_seen"] is None
     assert body["last_seen"] is None
+
+
+def test_ip_fail2ban_paginates_and_orders_desc(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    db.executescript(
+        """
+        INSERT INTO fail2ban_events (ip, action, jail, timestamp) VALUES ('1.2.3.4', 'Ban', 'sshd', '2026-08-01T10:00:00Z');
+        INSERT INTO fail2ban_events (ip, action, jail, timestamp) VALUES ('1.2.3.4', 'Unban', 'sshd', '2026-08-02T10:00:00Z');
+        INSERT INTO fail2ban_events (ip, action, jail, timestamp) VALUES ('1.2.3.4', 'Restore Ban', 'sshd', '2026-08-03T10:00:00Z');
+        """
+    )
+    db.commit()
+
+    app = create_app(db=db, start_background_tasks=False)
+    client = TestClient(app)
+
+    response = client.get("/api/ip/1.2.3.4/fail2ban", params={"limit": 2, "offset": 0})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 3
+    assert len(body["items"]) == 2
+    assert body["items"][0]["action"] == "Restore Ban"
+    assert body["items"][1]["action"] == "Unban"
+
+
+def test_ip_fail2ban_empty_for_ip_with_no_events(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    app = create_app(db=db, start_background_tasks=False)
+    client = TestClient(app)
+
+    response = client.get("/api/ip/1.2.3.4/fail2ban")
+    assert response.status_code == 200
+    assert response.json() == {"items": [], "total": 0}
+
+
+def test_ip_sshd_auth_paginates_and_orders_desc(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    db.executescript(
+        """
+        INSERT INTO sshd_auth_events (ip, result, timestamp) VALUES ('1.2.3.4', 'invalid_user', '2026-08-01T10:00:00Z');
+        INSERT INTO sshd_auth_events (ip, result, timestamp) VALUES ('1.2.3.4', 'failed_password', '2026-08-02T10:00:00Z');
+        """
+    )
+    db.commit()
+
+    app = create_app(db=db, start_background_tasks=False)
+    client = TestClient(app)
+
+    response = client.get("/api/ip/1.2.3.4/sshd-auth")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 2
+    assert body["items"][0]["result"] == "failed_password"
+    assert body["items"][1]["result"] == "invalid_user"
