@@ -1,10 +1,11 @@
 import { NavLink } from "react-router-dom";
-import { Shield, BarChart2, List, Link2 } from "lucide-react";
+import { Shield, BarChart2, List, Link2, Globe } from "lucide-react";
 
 const NAV_ITEMS = [
   { to: "/overview", label: "Overview", Icon: BarChart2 },
   { to: "/sessions", label: "Sessions", Icon: List },
   { to: "/correlation", label: "Corrélation", Icon: Link2 },
+  { to: "/map", label: "Carte", Icon: Globe },
 ];
 
 export function Sidebar() {

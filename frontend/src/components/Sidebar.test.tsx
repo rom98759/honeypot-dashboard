@@ -12,5 +12,6 @@ describe("Sidebar", () => {
     );
     expect(screen.getByText("Sessions").closest("a")).toHaveClass("active");
     expect(screen.getByText("Overview").closest("a")).not.toHaveClass("active");
+    expect(screen.getByText("Carte").closest("a")).not.toHaveClass("active");
   });
 });

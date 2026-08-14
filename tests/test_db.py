@@ -28,3 +28,17 @@ def test_connect_enables_wal_mode(tmp_path):
     db = connect(tmp_path / "test.sqlite3")
     mode = db.execute("PRAGMA journal_mode").fetchone()[0]
     assert mode.lower() == "wal"
+
+
+def test_connect_adds_geo_cache_coordinate_columns(tmp_path):
+    db = connect(tmp_path / "test.sqlite3")
+    columns = {row["name"] for row in db.execute("PRAGMA table_info(geo_cache)").fetchall()}
+    assert {"latitude", "longitude"}.issubset(columns)
+
+
+def test_connect_migration_is_idempotent_on_existing_db(tmp_path):
+    db_path = tmp_path / "test.sqlite3"
+    connect(db_path).close()
+    db = connect(db_path)  # second connect() on the same file must not raise
+    columns = {row["name"] for row in db.execute("PRAGMA table_info(geo_cache)").fetchall()}
+    assert {"latitude", "longitude"}.issubset(columns)

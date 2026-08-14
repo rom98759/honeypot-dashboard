@@ -1,4 +1,5 @@
 import asyncio
+import math
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -11,7 +12,7 @@ from app.correlation import FailbanIngester, SshdAuthIngester
 from app.db import connect
 from app.geoip import GeoLookup
 from app.ingester import CowrieIngester
-from app.routers import correlation, overview, sessions
+from app.routers import correlation, map as map_router, overview, sessions
 
 POLL_INTERVAL_SECONDS = 5
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
@@ -45,21 +46,61 @@ def _open_geoip_reader(geoip_db_path: str | None):
         return None
 
 
+def _parse_optional_float(value: str | None) -> float | None:
+    if value is None:
+        return None
+    try:
+        parsed = float(value)
+    except ValueError:
+        return None
+    if not math.isfinite(parsed):
+        return None
+    return parsed
+
+
 def _backfill_geo_cache(db, geo_lookup: GeoLookup) -> None:
     """
-    Populates geo_cache for sessions ingested before GeoLookup was wired up
-    (or before geoip-update.sh had produced an .mmdb file). Runs once at
-    startup; cheap since it's a local mmdb lookup per IP, and only touches
-    IPs geo_cache doesn't already have — a rerun is a no-op.
+    Two passes. First: populate geo_cache for sessions ingested before GeoLookup
+    was wired up (or before geoip-update.sh had produced an .mmdb file) — a
+    rerun is a no-op since it only touches IPs geo_cache doesn't already have.
+    Second: re-resolve rows already in geo_cache but missing coordinates (added
+    after GeoLookup started extracting them). This queries the reader directly
+    and only writes on a successful response — unlike deleting the row first
+    and calling geo_lookup.lookup() again, this never destroys a previously
+    correct country/city if the IP no longer resolves under the current mmdb
+    (GeoLite2-City's coverage shifts release to release). The `country IS NOT
+    NULL` guard on the SELECT skips IPs that already failed to resolve entirely
+    (private IPs, etc.) — retrying those every startup would be wasted work.
     """
     if geo_lookup.reader is None:
         return
-    rows = db.execute(
+
+    missing_entirely = db.execute(
         "SELECT DISTINCT s.src_ip FROM sessions s "
         "LEFT JOIN geo_cache g ON g.ip = s.src_ip WHERE g.ip IS NULL"
     ).fetchall()
-    for row in rows:
+    for row in missing_entirely:
         geo_lookup.lookup(row["src_ip"])
+
+    missing_coordinates = db.execute(
+        "SELECT ip FROM geo_cache WHERE latitude IS NULL AND country IS NOT NULL"
+    ).fetchall()
+    for row in missing_coordinates:
+        try:
+            response = geo_lookup.reader.city(row["ip"])
+        except Exception:
+            continue  # keep the existing country/city rather than nulling it
+        db.execute(
+            "UPDATE geo_cache SET latitude = ?, longitude = ?, country = ?, city = ? WHERE ip = ?",
+            (
+                response.location.latitude,
+                response.location.longitude,
+                response.country.name,
+                response.city.name,
+                row["ip"],
+            ),
+        )
+    db.commit()
 
 
 async def _poll_loop(app: FastAPI) -> None:
@@ -90,6 +131,8 @@ def create_app(db=None, start_background_tasks: bool = True) -> FastAPI:
     fail2ban_log_path = Path(os.environ.get("FAIL2BAN_LOG_PATH", "/var/log/fail2ban.log"))
     sshd_auth_log_path = Path(os.environ.get("SSHD_AUTH_LOG_PATH", "/var/log/sshd-auth.log"))
     geoip_db_path = os.environ.get("GEOIP_DB_PATH")
+    vps_latitude = _parse_optional_float(os.environ.get("VPS_LATITUDE"))
+    vps_longitude = _parse_optional_float(os.environ.get("VPS_LONGITUDE"))
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -103,6 +146,8 @@ def create_app(db=None, start_background_tasks: bool = True) -> FastAPI:
     app = FastAPI(lifespan=lifespan)
     app.state.db = db if db is not None else connect(db_path)
     app.state.cowrie_var_path = cowrie_var_path
+    app.state.vps_latitude = vps_latitude
+    app.state.vps_longitude = vps_longitude
     app.state.geo_lookup = GeoLookup(app.state.db, _open_geoip_reader(geoip_db_path))
     _backfill_geo_cache(app.state.db, app.state.geo_lookup)
     app.state.cowrie_ingester = CowrieIngester(app.state.db, cowrie_json_path, app.state.geo_lookup)
@@ -112,6 +157,7 @@ def create_app(db=None, start_background_tasks: bool = True) -> FastAPI:
     app.include_router(overview.router)
     app.include_router(sessions.router)
     app.include_router(correlation.router)
+    app.include_router(map_router.router)
     if STATIC_DIR.exists():
         app.mount("/", NoCacheStaticFiles(directory=STATIC_DIR, html=True), name="static")
     return app

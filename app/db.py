@@ -71,5 +71,19 @@ def connect(db_path: Path) -> sqlite3.Connection:
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA busy_timeout=5000")
     conn.executescript(SCHEMA)
+    _migrate_geo_cache_coordinates(conn)
     conn.commit()
     return conn
+
+
+def _migrate_geo_cache_coordinates(conn: sqlite3.Connection) -> None:
+    """
+    SQLite has no ALTER TABLE ... ADD COLUMN IF NOT EXISTS, so check first. Runs
+    on every connect() call — idempotent, and a PRAGMA plus at most two ALTER
+    statements is cheap next to the 5s ingestion polling this app already does.
+    """
+    existing_columns = {row["name"] for row in conn.execute("PRAGMA table_info(geo_cache)").fetchall()}
+    if "latitude" not in existing_columns:
+        conn.execute("ALTER TABLE geo_cache ADD COLUMN latitude REAL")
+    if "longitude" not in existing_columns:
+        conn.execute("ALTER TABLE geo_cache ADD COLUMN longitude REAL")
