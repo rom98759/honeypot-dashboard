@@ -11,7 +11,7 @@ from app.correlation import FailbanIngester, SshdAuthIngester
 from app.db import connect
 from app.geoip import GeoLookup
 from app.ingester import CowrieIngester
-from app.routers import correlation, overview, sessions
+from app.routers import correlation, map as map_router, overview, sessions
 
 POLL_INTERVAL_SECONDS = 5
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
@@ -42,6 +42,15 @@ def _open_geoip_reader(geoip_db_path: str | None):
     try:
         return geoip2.database.Reader(geoip_db_path)
     except Exception:
+        return None
+
+
+def _parse_optional_float(value: str | None) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except ValueError:
         return None
 
 
@@ -105,6 +114,8 @@ def create_app(db=None, start_background_tasks: bool = True) -> FastAPI:
     fail2ban_log_path = Path(os.environ.get("FAIL2BAN_LOG_PATH", "/var/log/fail2ban.log"))
     sshd_auth_log_path = Path(os.environ.get("SSHD_AUTH_LOG_PATH", "/var/log/sshd-auth.log"))
     geoip_db_path = os.environ.get("GEOIP_DB_PATH")
+    vps_latitude = _parse_optional_float(os.environ.get("VPS_LATITUDE"))
+    vps_longitude = _parse_optional_float(os.environ.get("VPS_LONGITUDE"))
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -118,6 +129,8 @@ def create_app(db=None, start_background_tasks: bool = True) -> FastAPI:
     app = FastAPI(lifespan=lifespan)
     app.state.db = db if db is not None else connect(db_path)
     app.state.cowrie_var_path = cowrie_var_path
+    app.state.vps_latitude = vps_latitude
+    app.state.vps_longitude = vps_longitude
     app.state.geo_lookup = GeoLookup(app.state.db, _open_geoip_reader(geoip_db_path))
     _backfill_geo_cache(app.state.db, app.state.geo_lookup)
     app.state.cowrie_ingester = CowrieIngester(app.state.db, cowrie_json_path, app.state.geo_lookup)
@@ -127,6 +140,7 @@ def create_app(db=None, start_background_tasks: bool = True) -> FastAPI:
     app.include_router(overview.router)
     app.include_router(sessions.router)
     app.include_router(correlation.router)
+    app.include_router(map_router.router)
     if STATIC_DIR.exists():
         app.mount("/", NoCacheStaticFiles(directory=STATIC_DIR, html=True), name="static")
     return app
