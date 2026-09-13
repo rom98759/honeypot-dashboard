@@ -7,6 +7,14 @@ _STRUCT_SIZE = struct.calcsize(TTYSTRUCT)
 OP_OPEN, OP_CLOSE, OP_WRITE, OP_EXEC = 1, 2, 3, 4
 TYPE_INPUT, TYPE_OUTPUT, TYPE_INTERACT = 1, 2, 3
 
+# A single WRITE frame can carry many KB of text in one instant timestamp (e.g. a
+# bot's whole exec payload echoed back as one blob). Rendering that as one asciinema
+# event forces the player to paint it synchronously, which can eat into the delay
+# before the next event and make playback look time-shifted. Splitting it into
+# fixed-size chunks spread a hair apart gives the player room to paint incrementally.
+CHUNK_SIZE = 400
+CHUNK_STEP_SECONDS = 0.01
+
 
 class TTYLogError(Exception):
     """Raised when a Cowrie TTY log is empty, truncated, or malformed."""
@@ -82,6 +90,11 @@ def ttylogs_to_asciicast(ttylog_blobs: list[bytes], width: int = 80, height: int
     lines = [json.dumps(header)]
     for timestamp, text in all_events:
         elapsed = round(timestamp - start_time, 6)
-        lines.append(json.dumps([elapsed, "o", text]))
+        for chunk_index, chunk in enumerate(_chunk_text(text)):
+            lines.append(json.dumps([round(elapsed + chunk_index * CHUNK_STEP_SECONDS, 6), "o", chunk]))
 
     return "\n".join(lines) + "\n"
+
+
+def _chunk_text(text: str, chunk_size: int = CHUNK_SIZE) -> list[str]:
+    return [text[i : i + chunk_size] for i in range(0, len(text), chunk_size)] or [text]

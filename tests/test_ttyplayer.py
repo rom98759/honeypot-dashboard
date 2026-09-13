@@ -37,6 +37,28 @@ def test_concatenates_multiple_ttylogs_on_one_global_timeline():
     assert events[4][0] > events[3][0]
 
 
+def test_splits_large_single_event_into_smaller_chunks():
+    import struct
+
+    from app.ttyplayer import OP_CLOSE, OP_OPEN, OP_WRITE, TTYSTRUCT, TYPE_INTERACT
+
+    big_text = ("x" * 500).encode()  # exceeds the chunk size, no newlines
+    frames = b""
+    frames += struct.pack(TTYSTRUCT, OP_OPEN, 0, 0, 0, 1000, 0)
+    frames += struct.pack(TTYSTRUCT, OP_WRITE, 0, len(big_text), TYPE_INTERACT, 1000, 0) + big_text
+    frames += struct.pack(TTYSTRUCT, OP_CLOSE, 0, 0, 0, 1001, 0)
+
+    cast = ttylogs_to_asciicast([frames])
+    lines = cast.strip().split("\n")
+    events = [json.loads(line) for line in lines[1:]]
+
+    assert len(events) > 1
+    assert "".join(e[2] for e in events) == big_text.decode()
+    timestamps = [e[0] for e in events]
+    assert timestamps == sorted(timestamps)
+    assert len(set(timestamps)) == len(timestamps)
+
+
 def test_empty_list_raises():
     with pytest.raises(TTYLogError):
         ttylogs_to_asciicast([])
