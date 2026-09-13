@@ -8,6 +8,7 @@ import { EmptyState } from "../../components/EmptyState";
 import { SortableTableHeader, type Column } from "../../components/SortableTableHeader";
 import { Pagination } from "../../components/Pagination";
 import { SessionDetailPanel } from "./SessionDetailPanel";
+import { formatTimestamp } from "../../utils/formatDate";
 
 const COLUMNS: Column[] = [
   { key: "src_ip", label: "IP" },
@@ -122,7 +123,7 @@ export function SessionsPage() {
                     {s.src_ip}
                   </Link>
                 </td>
-                <td className="mono">{s.connect_time}</td>
+                <td className="mono">{formatTimestamp(s.connect_time)}</td>
                 <td>{formatDuration(s.duration_ms)}</td>
                 <td>{s.login_username || "-"}</td>
               </tr>

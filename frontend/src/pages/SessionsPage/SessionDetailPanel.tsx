@@ -7,6 +7,7 @@ import { ErrorState } from "../../components/ErrorState";
 import { Badge } from "../../components/Badge";
 import { ReplayPlayer } from "../../components/ReplayPlayer";
 import type { Session } from "../../api/types";
+import { formatTimestamp } from "../../utils/formatDate";
 
 function formatDuration(ms: number | null): string {
   return ms ? `${Math.round(ms / 1000)}s` : "-";
@@ -35,9 +36,9 @@ function SessionMeta({ session }: { session: Session }) {
       <dt>Authentification</dt>
       <dd>{authBadge}</dd>
       <dt>Connexion</dt>
-      <dd className="mono">{session.connect_time}</dd>
+      <dd className="mono">{formatTimestamp(session.connect_time)}</dd>
       <dt>Déconnexion</dt>
-      <dd className="mono">{session.close_time || "-"}</dd>
+      <dd className="mono">{session.close_time ? formatTimestamp(session.close_time) : "-"}</dd>
       <dt>Durée</dt>
       <dd>{formatDuration(session.duration_ms)}</dd>
     </dl>
@@ -84,7 +85,7 @@ export function SessionDetailPanel({
               {data.commands.length ? (
                 data.commands.map((c, i) => (
                   <li key={i}>
-                    <span className="mono">{c.timestamp}</span>
+                    <span className="mono">{formatTimestamp(c.timestamp)}</span>
                     <code>{c.input_text}</code>
                   </li>
                 ))

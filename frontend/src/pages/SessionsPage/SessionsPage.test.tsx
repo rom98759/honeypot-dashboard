@@ -141,7 +141,7 @@ describe("SessionsPage", () => {
     renderWithProviders(<SessionsPage />, { route: "/sessions" });
     await waitFor(() => expect(screen.getByText("1.2.3.4")).toBeInTheDocument());
 
-    await userEvent.click(screen.getByText("2026-08-13T10:00:00"));
+    await userEvent.click(screen.getByText("root"));
     await waitFor(() => expect(screen.getByRole("heading", { name: "s1" })).toBeInTheDocument());
     expect(document.body.querySelector(".session-panel")).not.toBeNull();
 
@@ -165,7 +165,7 @@ describe("SessionsPage", () => {
     vi.stubGlobal("fetch", fetchMock);
     renderWithProviders(<SessionsPage />, { route: "/sessions" });
     await waitFor(() => expect(screen.getByText("1.2.3.4")).toBeInTheDocument());
-    await userEvent.click(screen.getByText("2026-08-13T10:00:00"));
+    await userEvent.click(screen.getByText("root"));
     await waitFor(() => expect(document.body.querySelector(".session-panel")).not.toBeNull());
 
     const backdrop = document.body.querySelector(".panel-backdrop") as HTMLElement;

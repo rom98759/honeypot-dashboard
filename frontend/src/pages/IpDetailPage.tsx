@@ -9,6 +9,7 @@ import { EmptyState } from "../components/EmptyState";
 import { SortableTableHeader, type Column } from "../components/SortableTableHeader";
 import { Pagination } from "../components/Pagination";
 import { SessionDetailPanel } from "./SessionsPage/SessionDetailPanel";
+import { formatTimestamp } from "../utils/formatDate";
 
 const SESSION_COLUMNS: Column[] = [
   { key: "connect_time", label: "Début" },
@@ -123,7 +124,7 @@ export function IpDetailPage() {
                 {sessions.data.items.length ? (
                   sessions.data.items.map((s) => (
                     <tr key={s.session_id} className="session-row" onClick={() => handleRowClick(s.session_id)}>
-                      <td className="mono">{s.connect_time}</td>
+                      <td className="mono">{formatTimestamp(s.connect_time)}</td>
                       <td>{formatDuration(s.duration_ms)}</td>
                       <td>{s.login_username || "-"}</td>
                     </tr>
@@ -175,7 +176,7 @@ export function IpDetailPage() {
                         )}
                       </td>
                       <td>{e.jail}</td>
-                      <td className="mono">{e.timestamp}</td>
+                      <td className="mono">{formatTimestamp(e.timestamp)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -219,7 +220,7 @@ export function IpDetailPage() {
                           <Badge label={SSHD_RESULT_LABELS[e.result] ?? e.result} tone="neutral" />
                         )}
                       </td>
-                      <td className="mono">{e.timestamp}</td>
+                      <td className="mono">{formatTimestamp(e.timestamp)}</td>
                     </tr>
                   ))}
                 </tbody>

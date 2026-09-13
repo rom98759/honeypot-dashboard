@@ -2,16 +2,20 @@
 
 ## Bugs
 
-- [ ] Timestamps affichés bruts en UTC (ex : `2026-08-14T10:18:44.673383Z`
-      au lieu de 12h18 heure locale) — `{c.timestamp}` /
-      `{e.timestamp}` non formatés dans `SessionDetailPanel.tsx:87` et
-      `IpDetailPage.tsx:178/222`. Formater partout avec `toLocaleString`
-      (fuseau navigateur ou forcé `Europe/Paris`).
+- [x] Timestamps affichés bruts en UTC — corrigé via `frontend/src/utils/formatDate.ts`
+      (`formatTimestamp`), appliqué dans `SessionDetailPanel.tsx`, `SessionsPage.tsx`
+      et `IpDetailPage.tsx`.
 - [ ] Replay session : le texte du terminal s'affiche mais décalé dans le
       temps par rapport à la vidéo/frappe réelle. À investiguer côté
       `app/ttyplayer.py` (`_select_events`, concaténation des ttylogs
       multi-fichiers sur la timeline globale) plutôt que côté player JS —
-      suivre systematic-debugging.
+      suivre systematic-debugging. Investigation démarrée (2026-09-13) :
+      hypothèse — `_select_events`/`session_start` ne filtrent pas par
+      numéro de `tty` et prennent le premier `OP_OPEN`/`OP_CLOSE` du
+      fichier, ce qui peut fausser le timeline si un ttylog contient
+      plusieurs flux tty imbriqués (sudo, sous-shell). Pas encore
+      confirmé faute d'un ttylog reproduisant le décalage — fournir un
+      `session_id` concret pour poursuivre.
 
 ## Frontend / refonte visuelle
 
