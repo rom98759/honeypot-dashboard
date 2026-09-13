@@ -5,17 +5,15 @@
 - [x] Timestamps affichés bruts en UTC — corrigé via `frontend/src/utils/formatDate.ts`
       (`formatTimestamp`), appliqué dans `SessionDetailPanel.tsx`, `SessionsPage.tsx`
       et `IpDetailPage.tsx`.
-- [ ] Replay session : le texte du terminal s'affiche mais décalé dans le
-      temps par rapport à la vidéo/frappe réelle. À investiguer côté
-      `app/ttyplayer.py` (`_select_events`, concaténation des ttylogs
-      multi-fichiers sur la timeline globale) plutôt que côté player JS —
-      suivre systematic-debugging. Investigation démarrée (2026-09-13) :
-      hypothèse — `_select_events`/`session_start` ne filtrent pas par
-      numéro de `tty` et prennent le premier `OP_OPEN`/`OP_CLOSE` du
-      fichier, ce qui peut fausser le timeline si un ttylog contient
-      plusieurs flux tty imbriqués (sudo, sous-shell). Pas encore
-      confirmé faute d'un ttylog reproduisant le décalage — fournir un
-      `session_id` concret pour poursuivre.
+- [x] Replay session : décalage temporel constaté quand une commande envoie un
+      gros pavé de texte en un seul coup (ex : payload exec de bot en une
+      requête, > 10 Ko sur une poignée de lignes). Cause racine confirmée
+      sur une vraie session VPS (`00c6de75932e`) : les timestamps calculés
+      par `ttyplayer.py` étaient corrects, mais un seul évènement asciinema
+      géant forçait le player JS à peindre tout le texte en un bloc
+      synchrone, grignotant le délai avant l'évènement suivant. Corrigé en
+      découpant les évènements > `CHUNK_SIZE` en plusieurs évènements
+      espacés de `CHUNK_STEP_SECONDS` (`app/ttyplayer.py`).
 
 ## Frontend / refonte visuelle
 
