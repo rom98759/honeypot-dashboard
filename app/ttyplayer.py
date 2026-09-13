@@ -15,6 +15,13 @@ TYPE_INPUT, TYPE_OUTPUT, TYPE_INTERACT = 1, 2, 3
 CHUNK_SIZE = 400
 CHUNK_STEP_SECONDS = 0.01
 
+# One-shot exec commands (TYPE_INTERACT) are echoed back as a single raw blob with no
+# terminal-echoed Enter keystroke, so they can run straight into the next OUTPUT frame
+# with no newline in between. Color the command green (like a shell prompt) and make
+# sure it ends with a newline before the response follows.
+_COLOR_COMMAND = "\x1b[32m"
+_COLOR_RESET = "\x1b[0m"
+
 
 class TTYLogError(Exception):
     """Raised when a Cowrie TTY log is empty, truncated, or malformed."""
@@ -49,7 +56,7 @@ def _select_events(frames):
         if prefdir == 0 and direction != TYPE_INTERACT:
             prefdir = direction
         if direction == prefdir or direction == TYPE_INTERACT:
-            events.append((timestamp, payload.decode("utf-8", errors="replace")))
+            events.append((timestamp, direction, payload.decode("utf-8", errors="replace")))
     return events
 
 
@@ -88,9 +95,17 @@ def ttylogs_to_asciicast(ttylog_blobs: list[bytes], width: int = 80, height: int
 
     header = {"version": 2, "width": width, "height": height, "timestamp": int(start_time)}
     lines = [json.dumps(header)]
-    for timestamp, text in all_events:
+    for timestamp, direction, text in all_events:
         elapsed = round(timestamp - start_time, 6)
-        for chunk_index, chunk in enumerate(_chunk_text(text)):
+        if direction == TYPE_INTERACT and not text.endswith("\n"):
+            text += "\n"
+        chunks = _chunk_text(text)
+        for chunk_index, chunk in enumerate(chunks):
+            if direction == TYPE_INTERACT:
+                if chunk_index == 0:
+                    chunk = _COLOR_COMMAND + chunk
+                if chunk_index == len(chunks) - 1:
+                    chunk += _COLOR_RESET
             lines.append(json.dumps([round(elapsed + chunk_index * CHUNK_STEP_SECONDS, 6), "o", chunk]))
 
     return "\n".join(lines) + "\n"
