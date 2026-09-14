@@ -1,5 +1,5 @@
 import { useParams, useSearchParams } from "react-router-dom";
-import { useIpSummary, useIpFail2ban, useIpSshdAuth, IP_PAGE_SIZE } from "../api/ip";
+import { useIpSummary, useIpFail2ban, useIpSshdAuth, useBanIp, useUnbanIp, IP_PAGE_SIZE } from "../api/ip";
 import { useSessions, PAGE_SIZE } from "../api/sessions";
 import { StatCard } from "../components/StatCard";
 import { Badge } from "../components/Badge";
@@ -49,6 +49,9 @@ export function IpDetailPage() {
   const sessions = useSessions({ ip, sort, order, page });
   const fail2ban = useIpFail2ban(ip, f2bPage);
   const sshdAuth = useIpSshdAuth(ip, sshdPage);
+  const banMutation = useBanIp(ip);
+  const unbanMutation = useUnbanIp(ip);
+  const banActionError = banMutation.isError || unbanMutation.isError;
 
   function updateParams(next: Record<string, string>) {
     const params = new URLSearchParams(searchParams);
@@ -88,7 +91,26 @@ export function IpDetailPage() {
         ) : (
           <Badge label="Non banni" tone="neutral" />
         )}
+        {data.currently_banned ? (
+          <button
+            className="btn"
+            disabled={unbanMutation.isPending}
+            onClick={() => unbanMutation.mutate()}
+          >
+            Débannir
+          </button>
+        ) : (
+          <button className="btn" disabled={banMutation.isPending} onClick={() => banMutation.mutate()}>
+            Bannir
+          </button>
+        )}
       </div>
+      {banActionError ? (
+        <ErrorState
+          message="Échec de l'action, réessaie."
+          onRetry={() => (data.currently_banned ? unbanMutation.reset() : banMutation.reset())}
+        />
+      ) : null}
       <div className="cards">
         <StatCard
           label="Localisation"

@@ -171,4 +171,71 @@ describe("IpDetailPage", () => {
     renderPage();
     await waitFor(() => expect(screen.getByText("Erreur de chargement, réessaie.")).toBeInTheDocument());
   });
+
+  it("shows an Unban button when banned, calls the unban endpoint, and refreshes the badge", async () => {
+    let banned = true;
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      if (url.includes("/summary")) {
+        return jsonResponse({ ...SUMMARY, currently_banned: banned });
+      }
+      if (url === "/api/ip/1.2.3.4/unban" && init?.method === "POST") {
+        banned = false;
+        return jsonResponse({ currently_banned: false });
+      }
+      if (url.includes("/fail2ban")) return jsonResponse(FAIL2BAN);
+      if (url.includes("/sshd-auth")) return jsonResponse(SSHD_AUTH);
+      if (url.startsWith("/api/sessions")) return jsonResponse(SESSIONS);
+      return jsonResponse({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText("Banni")).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: "Débannir" }));
+
+    await waitFor(() => expect(screen.getByText("Non banni")).toBeInTheDocument());
+    expect(fetchMock).toHaveBeenCalledWith("/api/ip/1.2.3.4/unban", expect.objectContaining({ method: "POST" }));
+  });
+
+  it("shows a Ban button when not banned and calls the ban endpoint", async () => {
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      if (url.includes("/summary")) return jsonResponse({ ...SUMMARY, currently_banned: false });
+      if (url === "/api/ip/1.2.3.4/ban" && init?.method === "POST") {
+        return jsonResponse({ currently_banned: true });
+      }
+      if (url.includes("/fail2ban")) return jsonResponse(FAIL2BAN);
+      if (url.includes("/sshd-auth")) return jsonResponse(SSHD_AUTH);
+      if (url.startsWith("/api/sessions")) return jsonResponse(SESSIONS);
+      return jsonResponse({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText("Non banni")).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: "Bannir" }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith("/api/ip/1.2.3.4/ban", expect.objectContaining({ method: "POST" }))
+    );
+  });
+
+  it("shows an inline error if the ban action fails", async () => {
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      if (url.includes("/summary")) return jsonResponse({ ...SUMMARY, currently_banned: false });
+      if (url === "/api/ip/1.2.3.4/ban" && init?.method === "POST") {
+        return Promise.resolve({ ok: false, status: 503 } as Response);
+      }
+      if (url.includes("/fail2ban")) return jsonResponse(FAIL2BAN);
+      if (url.includes("/sshd-auth")) return jsonResponse(SSHD_AUTH);
+      if (url.startsWith("/api/sessions")) return jsonResponse(SESSIONS);
+      return jsonResponse({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText("Non banni")).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: "Bannir" }));
+
+    await waitFor(() => expect(screen.getByText("Échec de l'action, réessaie.")).toBeInTheDocument());
+  });
 });
