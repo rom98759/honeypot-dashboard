@@ -4,3 +4,13 @@ Description=Process fail2ban ban/unban/status requests from honeypot-dashboard
 [Service]
 Type=oneshot
 ExecStart=/usr/local/sbin/fban-queue-worker.sh
+# Sandboxing: the script only needs to touch /opt/honeypot (to self-provision and
+# read/write the queue dir) and talk to fail2ban-client over its existing socket/
+# state under /var/run — neither requires write access anywhere else. Left off
+# CapabilityBoundingSet= deliberately: fail2ban-client's exact capability needs
+# aren't verified from here, and getting that wrong would silently break bans.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/opt/honeypot
