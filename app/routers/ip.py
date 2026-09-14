@@ -8,7 +8,7 @@ router = APIRouter()
 
 
 @router.get("/api/ip/{ip}/summary")
-async def get_ip_summary(request: Request, ip: str):
+def get_ip_summary(request: Request, ip: str):
     db = request.app.state.db
 
     has_any_data = db.execute(
@@ -106,22 +106,26 @@ def _verify_dashboard_origin(request: Request) -> None:
 
 
 @router.post("/api/ip/{ip}/ban")
-async def ban_ip(request: Request, ip: str):
+def ban_ip(request: Request, ip: str):
     _verify_dashboard_origin(request)
     fban_control = request.app.state.fban_control
     try:
         fban_control.request_ban(ip)
     except FbanControlError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"currently_banned": fban_control.request_status(ip)}
 
 
 @router.post("/api/ip/{ip}/unban")
-async def unban_ip(request: Request, ip: str):
+def unban_ip(request: Request, ip: str):
     _verify_dashboard_origin(request)
     fban_control = request.app.state.fban_control
     try:
         fban_control.request_unban(ip)
     except FbanControlError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"currently_banned": fban_control.request_status(ip)}

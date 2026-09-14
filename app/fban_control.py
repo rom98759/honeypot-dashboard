@@ -59,8 +59,11 @@ class FbanControl:
         return None
 
     def _request_action(self, verb: str, ip: str, jail: str) -> None:
-        request_id = self._write_request(verb, ip, jail)
-        result = self._await_response(request_id)
+        try:
+            request_id = self._write_request(verb, ip, jail)
+            result = self._await_response(request_id)
+        except OSError as exc:
+            raise FbanControlError(str(exc)) from exc
         if result is None:
             raise FbanTimeout(f"no response for {verb} {ip}")
         if result != "ok":
@@ -74,8 +77,11 @@ class FbanControl:
 
     def request_status(self, ip: str, jail: str = "sshd") -> bool | None:
         _validate(ip, jail)
-        request_id = self._write_request("status", ip, jail)
-        result = self._await_response(request_id)
+        try:
+            request_id = self._write_request("status", ip, jail)
+            result = self._await_response(request_id)
+        except OSError:
+            return None  # queue mechanism unavailable: caller falls back
         if result == "banned":
             return True
         if result == "not_banned":
