@@ -4,8 +4,18 @@ import { describe, expect, it, vi, afterEach } from "vitest";
 import type { ReactNode } from "react";
 import { useIpSummary, useIpFail2ban, useIpSshdAuth, useBanIp, useUnbanIp, IP_PAGE_SIZE } from "./ip";
 
+function makeQueryClient() {
+  return new QueryClient({ defaultOptions: { queries: { retry: false } } });
+}
+
+function wrapperFor(queryClient: QueryClient) {
+  return function wrapper({ children }: { children: ReactNode }) {
+    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  };
+}
+
 function wrapper({ children }: { children: ReactNode }) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const queryClient = makeQueryClient();
   return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 }
 
@@ -57,7 +67,7 @@ describe("useIpSshdAuth", () => {
 describe("useBanIp", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("posts to the ban endpoint and invalidates the ip-summary query", async () => {
+  it("posts to the ban endpoint and writes the fresh status into the ip-summary cache without refetching", async () => {
     const fetchMock = vi.fn((url: string, init?: RequestInit) => {
       if (url === "/api/ip/1.2.3.4/ban" && init?.method === "POST") {
         return Promise.resolve({
@@ -69,18 +79,27 @@ describe("useBanIp", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const { result } = renderHook(() => useBanIp("1.2.3.4"), { wrapper });
+    const queryClient = makeQueryClient();
+    queryClient.setQueryData(["ip-summary", "1.2.3.4"], { ip: "1.2.3.4", currently_banned: false });
+
+    const { result } = renderHook(() => useBanIp("1.2.3.4"), { wrapper: wrapperFor(queryClient) });
     result.current.mutate();
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(fetchMock).toHaveBeenCalledWith("/api/ip/1.2.3.4/ban", { method: "POST" });
+    // No second request to /summary — the cache is updated directly from the mutation's response.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(queryClient.getQueryData(["ip-summary", "1.2.3.4"])).toEqual({
+      ip: "1.2.3.4",
+      currently_banned: true,
+    });
   });
 });
 
 describe("useUnbanIp", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("posts to the unban endpoint and invalidates the ip-summary query", async () => {
+  it("posts to the unban endpoint and writes the fresh status into the ip-summary cache without refetching", async () => {
     const fetchMock = vi.fn((url: string, init?: RequestInit) => {
       if (url === "/api/ip/1.2.3.4/unban" && init?.method === "POST") {
         return Promise.resolve({
@@ -92,10 +111,18 @@ describe("useUnbanIp", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const { result } = renderHook(() => useUnbanIp("1.2.3.4"), { wrapper });
+    const queryClient = makeQueryClient();
+    queryClient.setQueryData(["ip-summary", "1.2.3.4"], { ip: "1.2.3.4", currently_banned: true });
+
+    const { result } = renderHook(() => useUnbanIp("1.2.3.4"), { wrapper: wrapperFor(queryClient) });
     result.current.mutate();
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(fetchMock).toHaveBeenCalledWith("/api/ip/1.2.3.4/unban", { method: "POST" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(queryClient.getQueryData(["ip-summary", "1.2.3.4"])).toEqual({
+      ip: "1.2.3.4",
+      currently_banned: false,
+    });
   });
 });

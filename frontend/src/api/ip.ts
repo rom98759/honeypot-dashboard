@@ -41,7 +41,10 @@ export function useBanIp(ip: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: () => postJSON<BanResponse>(`/api/ip/${encodeURIComponent(ip)}/ban`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["ip-summary", ip] }),
+    onSuccess: (data) =>
+      queryClient.setQueryData<IpSummary>(["ip-summary", ip], (old) =>
+        old ? { ...old, currently_banned: data.currently_banned } : old
+      ),
   });
 }
 
@@ -49,6 +52,9 @@ export function useUnbanIp(ip: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: () => postJSON<BanResponse>(`/api/ip/${encodeURIComponent(ip)}/unban`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["ip-summary", ip] }),
+    onSuccess: (data) =>
+      queryClient.setQueryData<IpSummary>(["ip-summary", ip], (old) =>
+        old ? { ...old, currently_banned: data.currently_banned } : old
+      ),
   });
 }
