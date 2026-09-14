@@ -1,8 +1,12 @@
-import { screen, waitFor, act } from "@testing-library/react";
+import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, afterEach } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router-dom";
 import { renderWithProviders } from "../test-utils";
 import { MapPage } from "./MapPage";
+import { OverviewPage } from "./OverviewPage";
+import { PeriodProvider } from "../theme/PeriodContext";
 
 function jsonResponse(body: unknown): Promise<Response> {
   return Promise.resolve({ ok: true, json: () => Promise.resolve(body) } as Response);
@@ -33,6 +37,7 @@ describe("MapPage", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.useRealTimers();
+    localStorage.clear();
   });
 
   it("shows a skeleton then the map with markers", async () => {
@@ -95,5 +100,51 @@ describe("MapPage", () => {
     await waitFor(() =>
       expect(screen.getByText("Aucune attaque géolocalisée pour cette période")).toBeInTheDocument()
     );
+  });
+
+  it("shares the period with OverviewPage through PeriodContext", async () => {
+    const fetchMock = vi.fn((url: string) =>
+      url.includes("/overview")
+        ? jsonResponse({
+            total_connections: 1,
+            unique_ips: 1,
+            login_attempts: 0,
+            currently_banned: 0,
+            top_ips: [],
+            top_countries: [],
+            timeline: [],
+            protocol_split: [],
+            top_credentials: [],
+            bans_timeline: [],
+          })
+        : jsonResponse({ points: [], destination: null })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <PeriodProvider>
+            <OverviewPage />
+          </PeriodProvider>
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/overview?period=24h"));
+    await userEvent.click(await screen.findByRole("button", { name: "7j" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith("/api/overview?period=7d"));
+
+    fetchMock.mockClear();
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <PeriodProvider>
+            <MapPage />
+          </PeriodProvider>
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/map?period=7d"));
   });
 });

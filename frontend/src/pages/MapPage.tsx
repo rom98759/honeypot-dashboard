@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { X } from "lucide-react";
 import { useMap } from "../api/map";
+import { usePeriod } from "../theme/PeriodContext";
 import { AttackMap, pointKey } from "../components/AttackMap";
 import { SkeletonBlock } from "../components/SkeletonBlock";
 import { ErrorState } from "../components/ErrorState";
@@ -19,8 +20,7 @@ const ARRIVAL_ANIMATION_MS = 2000;
 
 export function MapPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const requestedPeriod = searchParams.get("period");
-  const period = PERIODS.some((p) => p.value === requestedPeriod) ? (requestedPeriod as MapPeriod) : "24h";
+  const [period, setPeriod] = usePeriod();
   const live = searchParams.get("live") === "true";
 
   const [arrivingKeys, setArrivingKeys] = useState<Set<string>>(new Set());
@@ -61,6 +61,7 @@ export function MapPage() {
   useEffect(() => () => clearTimeout(arrivalTimeoutRef.current), []);
 
   function handlePeriodChange(value: MapPeriod) {
+    setPeriod(value);
     setSearchParams({ period: value, live: String(live) });
   }
 
