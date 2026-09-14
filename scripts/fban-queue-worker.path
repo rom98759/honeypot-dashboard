@@ -2,7 +2,7 @@
 Description=Watch the fail2ban queue directory for new requests
 
 [Path]
-PathChanged=/opt/honeypot/fban-queue
+PathExistsGlob=/opt/honeypot/fban-queue/req-*
 
 [Install]
 WantedBy=multi-user.target
