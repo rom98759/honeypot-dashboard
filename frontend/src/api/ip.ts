@@ -1,5 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
-import { fetchJSON } from "./client";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { fetchJSON, postJSON } from "./client";
 import type { IpSummary, PaginatedFail2ban, PaginatedSshdAuth } from "./types";
 
 export const IP_PAGE_SIZE = 25;
@@ -30,5 +30,25 @@ export function useIpSshdAuth(ip: string, page: number) {
       fetchJSON<PaginatedSshdAuth>(
         `/api/ip/${encodeURIComponent(ip)}/sshd-auth?limit=${IP_PAGE_SIZE}&offset=${offset}`
       ),
+  });
+}
+
+interface BanResponse {
+  currently_banned: boolean;
+}
+
+export function useBanIp(ip: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => postJSON<BanResponse>(`/api/ip/${encodeURIComponent(ip)}/ban`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["ip-summary", ip] }),
+  });
+}
+
+export function useUnbanIp(ip: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => postJSON<BanResponse>(`/api/ip/${encodeURIComponent(ip)}/unban`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["ip-summary", ip] }),
   });
 }
