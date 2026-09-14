@@ -87,7 +87,7 @@ export function IpDetailPage() {
       <div className="topbar">
         <h1 className="mono">{ip}</h1>
         {data.currently_banned ? (
-          <Badge label="Banni" tone="danger" />
+          <Badge label="Banni" tone="success" />
         ) : (
           <Badge label="Non banni" tone="neutral" />
         )}
@@ -239,7 +239,7 @@ export function IpDetailPage() {
                         {e.result === "accepted" ? (
                           <Badge label={SSHD_RESULT_LABELS[e.result] ?? e.result} tone="danger" />
                         ) : (
-                          <Badge label={SSHD_RESULT_LABELS[e.result] ?? e.result} tone="neutral" />
+                          <Badge label={SSHD_RESULT_LABELS[e.result] ?? e.result} tone="warning" />
                         )}
                       </td>
                       <td className="mono">{formatTimestamp(e.timestamp)}</td>

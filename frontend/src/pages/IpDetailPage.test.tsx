@@ -97,7 +97,7 @@ describe("IpDetailPage", () => {
     renderPage();
     await waitFor(() => expect(screen.getByRole("heading", { name: "1.2.3.4" })).toBeInTheDocument());
     expect(screen.getByText("Paris, France")).toBeInTheDocument();
-    expect(screen.getByText("Banni")).toHaveClass("badge-danger");
+    expect(screen.getByText("Banni")).toHaveClass("badge-success");
     expect(screen.getByText("3")).toBeInTheDocument();
     expect(screen.getByText("7")).toBeInTheDocument();
   });
@@ -130,6 +130,13 @@ describe("IpDetailPage", () => {
     renderPage();
     await waitFor(() => expect(screen.getByText("Accepté")).toBeInTheDocument());
     expect(screen.getByText("Accepté")).toHaveClass("badge-danger");
+  });
+
+  it("renders the sshd-auth history with a warning badge for a failed attempt", async () => {
+    stubFetch({ sshdAuth: { items: [{ result: "failed_password", timestamp: "t" }], total: 1 } });
+    renderPage();
+    await waitFor(() => expect(screen.getByText("Mot de passe échoué")).toBeInTheDocument());
+    expect(screen.getByText("Mot de passe échoué")).toHaveClass("badge-warning");
   });
 
   it("paginates the fail2ban section independently from the sessions section", async () => {
