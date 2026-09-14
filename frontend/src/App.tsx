@@ -5,22 +5,28 @@ import { SessionsPage } from "./pages/SessionsPage/SessionsPage";
 import { CorrelationPage } from "./pages/CorrelationPage";
 import { MapPage } from "./pages/MapPage";
 import { IpDetailPage } from "./pages/IpDetailPage";
+import { ThemeProvider } from "./theme/ThemeContext";
+import { PeriodProvider } from "./theme/PeriodContext";
 
 export default function App() {
   return (
-    <div className="layout">
-      <Sidebar />
-      <main id="content">
-        <Routes>
-          <Route path="/" element={<Navigate to="/overview" replace />} />
-          <Route path="/overview" element={<OverviewPage />} />
-          <Route path="/sessions" element={<SessionsPage />} />
-          <Route path="/correlation" element={<CorrelationPage />} />
-          <Route path="/map" element={<MapPage />} />
-          <Route path="/ip/:ip" element={<IpDetailPage />} />
-          <Route path="*" element={<Navigate to="/overview" replace />} />
-        </Routes>
-      </main>
-    </div>
+    <ThemeProvider>
+      <PeriodProvider>
+        <div className="layout">
+          <Sidebar />
+          <main id="content">
+            <Routes>
+              <Route path="/" element={<Navigate to="/overview" replace />} />
+              <Route path="/overview" element={<OverviewPage />} />
+              <Route path="/sessions" element={<SessionsPage />} />
+              <Route path="/correlation" element={<CorrelationPage />} />
+              <Route path="/map" element={<MapPage />} />
+              <Route path="/ip/:ip" element={<IpDetailPage />} />
+              <Route path="*" element={<Navigate to="/overview" replace />} />
+            </Routes>
+          </main>
+        </div>
+      </PeriodProvider>
+    </ThemeProvider>
   );
 }
