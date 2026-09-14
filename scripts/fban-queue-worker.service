@@ -1,0 +1,6 @@
+[Unit]
+Description=Process fail2ban ban/unban/status requests from honeypot-dashboard
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/fban-queue-worker.sh
