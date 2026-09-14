@@ -11,7 +11,15 @@
 set -euo pipefail
 
 QUEUE_DIR="/opt/honeypot/fban-queue"
+# Must match the dashboard container's user (Dockerfile: `useradd --uid 1000 dashboard`)
+# so the container can create req-* files and read res-* files in this bind mount.
+DASHBOARD_UID=1000
+DASHBOARD_GID=1000
 LINE_RE='^(ban|unban|status) (sshd) (([0-9]{1,3}\.){3}[0-9]{1,3}|[0-9a-fA-F:]+)$'
+
+# Self-provision the queue directory (mirrors sshd-auth-export.sh provisioning its own
+# output file) so deployment doesn't depend on a manual mkdir/chown step. Idempotent.
+install -d -m 0770 -o "$DASHBOARD_UID" -g "$DASHBOARD_GID" "$QUEUE_DIR"
 
 shopt -s nullglob
 
