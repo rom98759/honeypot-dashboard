@@ -25,4 +25,15 @@ describe("formatTimestamp", () => {
     expect(result).toMatch(/2026/);
     expect(result).toMatch(/\d{2}:\d{2}:\d{2}/);
   });
+
+  it("parses fail2ban's raw log timestamp format (space + comma-decimal) instead of returning Invalid Date", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-15T18:00:00Z"));
+
+    const result = formatTimestamp("2026-08-12 09:44:38,400");
+
+    expect(result).not.toMatch(/Invalid Date/);
+    expect(result).toMatch(/2026/);
+    expect(result).toMatch(/\d{2}:\d{2}:\d{2}/);
+  });
 });
