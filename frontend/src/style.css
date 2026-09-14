@@ -51,6 +51,7 @@ body {
   margin-bottom: var(--space-4);
 }
 .brand svg { width: 20px; height: 20px; color: var(--accent); }
+.theme-toggle { margin-left: auto; }
 .nav-item {
   display: flex; align-items: center; gap: var(--space-3);
   width: 100%; text-align: left;
