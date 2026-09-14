@@ -119,8 +119,8 @@ export function IpDetailPage() {
         />
         <StatCard label="Sessions" value={data.total_sessions} />
         <StatCard label="Commandes" value={data.total_commands} />
-        <StatCard label="Première vue" value={data.first_seen ?? "-"} small />
-        <StatCard label="Dernière vue" value={data.last_seen ?? "-"} small />
+        <StatCard label="Première vue" value={data.first_seen ? formatTimestamp(data.first_seen) : "-"} small />
+        <StatCard label="Dernière vue" value={data.last_seen ? formatTimestamp(data.last_seen) : "-"} small />
       </div>
 
       <div className="panel">
