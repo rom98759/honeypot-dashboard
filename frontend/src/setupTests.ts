@@ -9,7 +9,7 @@ afterEach(() => {
 Object.defineProperty(window, "matchMedia", {
   writable: true,
   value: (query: string) => ({
-    matches: query === "(prefers-color-scheme: dark)" ? false : true,
+    matches: false,
     media: query,
     addEventListener: () => {},
     removeEventListener: () => {},
