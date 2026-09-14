@@ -251,6 +251,31 @@ def test_ban_ip_rejects_cross_origin_request(tmp_path):
     assert fban.calls == []
 
 
+def test_ban_ip_accepts_referer_when_origin_is_missing(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    fban = _RecordingFbanControl(status_after_action=True)
+    app = create_app(db=db, start_background_tasks=False, fban_control=fban)
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/ip/1.2.3.4/ban", headers={"Referer": "http://testserver/some/page"}
+    )
+    assert response.status_code == 200
+    assert response.json() == {"currently_banned": True}
+    assert fban.calls == [("ban", "1.2.3.4")]
+
+
+def test_ban_ip_rejects_request_with_no_origin_and_no_referer(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    fban = _RecordingFbanControl()
+    app = create_app(db=db, start_background_tasks=False, fban_control=fban)
+    client = TestClient(app)
+
+    response = client.post("/api/ip/1.2.3.4/ban")
+    assert response.status_code == 403
+    assert fban.calls == []
+
+
 def test_ban_ip_returns_503_on_timeout(tmp_path):
     from app.fban_control import FbanTimeout
 
