@@ -12,6 +12,7 @@ services:
       - /var/log/fail2ban.log:/var/log/fail2ban.log:ro
       - /var/log/sshd-auth.log:/var/log/sshd-auth.log:ro
       - ./geoip:/geoip:ro
+      - /opt/honeypot/fban-queue:/queue
     group_add:
       - "4" # adm on the VPS host: read access to the two mounted log files
     cap_drop:
@@ -30,6 +31,7 @@ services:
       - FAIL2BAN_LOG_PATH=/var/log/fail2ban.log
       - SSHD_AUTH_LOG_PATH=/var/log/sshd-auth.log
       - GEOIP_DB_PATH=/geoip/GeoLite2-City.mmdb
+      - FBAN_QUEUE_PATH=/queue
       - VPS_LATITUDE=51.0162051
       - VPS_LONGITUDE=2.1556627
 
