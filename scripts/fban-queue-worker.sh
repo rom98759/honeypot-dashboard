@@ -20,8 +20,8 @@ for req in "$QUEUE_DIR"/req-*; do
   line="$(head -n1 "$req" || true)"
 
   if [[ ! "$line" =~ $LINE_RE ]]; then
-    logger -t fban-queue-worker "rejected malformed request in $req: $line"
-    rm -f "$req"
+    logger -t fban-queue-worker "rejected malformed request in $req: $line" || true
+    rm -f "$req" || true
     continue
   fi
 
@@ -53,5 +53,5 @@ for req in "$QUEUE_DIR"/req-*; do
       ;;
   esac
 
-  rm -f "$req"
+  rm -f "$req" || true
 done
