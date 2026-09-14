@@ -27,6 +27,17 @@ describe("PeriodContext", () => {
     expect(result.current[0]).toBe("24h");
   });
 
+  it("reads the period from the URL on initial mount, taking priority over localStorage", () => {
+    const originalHash = window.location.hash;
+    window.location.hash = "#/overview?period=30d";
+    try {
+      const { result } = renderPeriod();
+      expect(result.current[0]).toBe("30d");
+    } finally {
+      window.location.hash = originalHash;
+    }
+  });
+
   it("setPeriod updates state and persists", () => {
     const { result } = renderPeriod();
     act(() => result.current[1]("30d"));

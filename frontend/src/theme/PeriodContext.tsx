@@ -10,6 +10,9 @@ function isPeriod(value: string | null): value is Period {
 }
 
 function getInitialPeriod(): Period {
+  // HashRouter puts the query string after the '#', not in window.location.search
+  const fromUrl = new URLSearchParams(window.location.hash.split("?")[1] ?? "").get("period");
+  if (isPeriod(fromUrl)) return fromUrl;
   const stored = localStorage.getItem(STORAGE_KEY);
   return isPeriod(stored) ? stored : "24h";
 }
