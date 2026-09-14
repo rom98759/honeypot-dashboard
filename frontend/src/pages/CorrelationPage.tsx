@@ -69,7 +69,7 @@ export function CorrelationPage() {
                 <td>{r.honeypot_sessions}</td>
                 <td>
                   {r.fail2ban_banned ? (
-                    <Badge label="Banni" tone="danger" />
+                    <Badge label="Banni" tone="success" />
                   ) : (
                     <Badge label="Non banni" tone="neutral" />
                   )}

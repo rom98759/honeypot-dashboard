@@ -20,7 +20,7 @@ describe("CorrelationPage", () => {
     vi.stubGlobal("fetch", vi.fn(() => jsonResponse(ROWS)));
     renderWithProviders(<CorrelationPage />, { route: "/correlation" });
     await waitFor(() => expect(screen.getByText("1.2.3.4")).toBeInTheDocument());
-    expect(screen.getByText("Banni")).toHaveClass("badge-danger");
+    expect(screen.getByText("Banni")).toHaveClass("badge-success");
     expect(screen.getByText("Non banni")).toHaveClass("badge-neutral");
     expect(screen.getByText("3 tentatives")).toHaveClass("badge-warning");
     expect(screen.getByText("Aucune")).toHaveClass("badge-neutral");
