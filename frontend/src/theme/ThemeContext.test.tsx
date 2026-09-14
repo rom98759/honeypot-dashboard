@@ -30,7 +30,7 @@ describe("ThemeContext", () => {
       media: query,
       addEventListener: () => {},
       removeEventListener: () => {},
-    })) as typeof window.matchMedia;
+    })) as unknown as typeof window.matchMedia;
 
     const { result } = renderTheme();
     expect(result.current[0]).toBe("dark");
