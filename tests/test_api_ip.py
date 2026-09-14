@@ -188,3 +188,78 @@ def test_ip_sshd_auth_paginates_and_orders_desc(tmp_path):
     assert body["total"] == 2
     assert body["items"][0]["result"] == "failed_password"
     assert body["items"][1]["result"] == "invalid_user"
+
+
+class _RecordingFbanControl:
+    def __init__(self, status_after_action=True, raise_on_action=None):
+        self.calls = []
+        self._status_after_action = status_after_action
+        self._raise_on_action = raise_on_action
+
+    def request_ban(self, ip, jail="sshd"):
+        self.calls.append(("ban", ip))
+        if self._raise_on_action:
+            raise self._raise_on_action
+
+    def request_unban(self, ip, jail="sshd"):
+        self.calls.append(("unban", ip))
+        if self._raise_on_action:
+            raise self._raise_on_action
+
+    def request_status(self, ip, jail="sshd"):
+        return self._status_after_action
+
+
+def test_ban_ip_calls_fban_control_and_returns_fresh_status(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    fban = _RecordingFbanControl(status_after_action=True)
+    app = create_app(db=db, start_background_tasks=False, fban_control=fban)
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/ip/1.2.3.4/ban", headers={"Origin": "http://testserver"}
+    )
+    assert response.status_code == 200
+    assert response.json() == {"currently_banned": True}
+    assert fban.calls == [("ban", "1.2.3.4")]
+
+
+def test_unban_ip_calls_fban_control_and_returns_fresh_status(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    fban = _RecordingFbanControl(status_after_action=False)
+    app = create_app(db=db, start_background_tasks=False, fban_control=fban)
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/ip/1.2.3.4/unban", headers={"Origin": "http://testserver"}
+    )
+    assert response.status_code == 200
+    assert response.json() == {"currently_banned": False}
+    assert fban.calls == [("unban", "1.2.3.4")]
+
+
+def test_ban_ip_rejects_cross_origin_request(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    fban = _RecordingFbanControl()
+    app = create_app(db=db, start_background_tasks=False, fban_control=fban)
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/ip/1.2.3.4/ban", headers={"Origin": "http://evil.example"}
+    )
+    assert response.status_code == 403
+    assert fban.calls == []
+
+
+def test_ban_ip_returns_503_on_timeout(tmp_path):
+    from app.fban_control import FbanTimeout
+
+    db = connect(tmp_path / "db.sqlite3")
+    fban = _RecordingFbanControl(raise_on_action=FbanTimeout("no response"))
+    app = create_app(db=db, start_background_tasks=False, fban_control=fban)
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/ip/1.2.3.4/ban", headers={"Origin": "http://testserver"}
+    )
+    assert response.status_code == 503

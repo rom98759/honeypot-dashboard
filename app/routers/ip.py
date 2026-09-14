@@ -1,4 +1,8 @@
+from urllib.parse import urlparse
+
 from fastapi import APIRouter, HTTPException, Query, Request
+
+from app.fban_control import FbanControlError
 
 router = APIRouter()
 
@@ -85,3 +89,39 @@ async def get_ip_sshd_auth(
         (ip, limit, offset),
     ).fetchall()
     return {"items": [dict(r) for r in rows], "total": total}
+
+
+def _verify_dashboard_origin(request: Request) -> None:
+    """
+    NPM Basic Auth in front of this app is vulnerable to CSRF on write
+    endpoints (browsers auto-attach cached credentials to same-origin
+    requests regardless of the initiating page). Reject anything whose
+    Origin/Referer doesn't match this request's own host.
+    """
+    header = request.headers.get("origin") or request.headers.get("referer")
+    if not header:
+        raise HTTPException(status_code=403, detail="missing Origin/Referer header")
+    if urlparse(header).netloc != request.url.netloc:
+        raise HTTPException(status_code=403, detail="cross-origin request rejected")
+
+
+@router.post("/api/ip/{ip}/ban")
+async def ban_ip(request: Request, ip: str):
+    _verify_dashboard_origin(request)
+    fban_control = request.app.state.fban_control
+    try:
+        fban_control.request_ban(ip)
+    except FbanControlError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return {"currently_banned": fban_control.request_status(ip)}
+
+
+@router.post("/api/ip/{ip}/unban")
+async def unban_ip(request: Request, ip: str):
+    _verify_dashboard_origin(request)
+    fban_control = request.app.state.fban_control
+    try:
+        fban_control.request_unban(ip)
+    except FbanControlError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return {"currently_banned": fban_control.request_status(ip)}
