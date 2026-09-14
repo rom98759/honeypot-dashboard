@@ -32,7 +32,7 @@ async def get_ip_summary(request: Request, ip: str):
         (ip,),
     ).fetchone()["n"]
 
-    currently_banned = bool(
+    log_derived_banned = bool(
         db.execute(
             "SELECT EXISTS ("
             "  SELECT 1 FROM fail2ban_events f1 WHERE f1.ip = ? AND f1.action IN ('Ban', 'Restore Ban') "
@@ -44,6 +44,8 @@ async def get_ip_summary(request: Request, ip: str):
             (ip,),
         ).fetchone()["banned"]
     )
+    live_banned = request.app.state.fban_control.request_status(ip)
+    currently_banned = live_banned if live_banned is not None else log_derived_banned
 
     return {
         "ip": ip,

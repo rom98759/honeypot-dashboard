@@ -75,6 +75,48 @@ def test_ip_summary_currently_banned_false_after_later_unban(tmp_path):
     assert response.json()["currently_banned"] is False
 
 
+class _FakeFbanControl:
+    def __init__(self, status):
+        self._status = status
+
+    def request_status(self, ip, jail="sshd"):
+        return self._status
+
+
+def test_ip_summary_currently_banned_uses_live_status_over_log(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    db.executescript(
+        """
+        INSERT INTO fail2ban_events (ip, action, jail, timestamp) VALUES ('1.2.3.4', 'Ban', 'sshd', '2026-08-14T08:00:00Z');
+        INSERT INTO fail2ban_events (ip, action, jail, timestamp) VALUES ('1.2.3.4', 'Unban', 'sshd', '2026-08-14T09:00:00Z');
+        """
+    )
+    db.commit()
+
+    app = create_app(db=db, start_background_tasks=False, fban_control=_FakeFbanControl(True))
+    client = TestClient(app)
+
+    response = client.get("/api/ip/1.2.3.4/summary")
+    # log says unbanned, but the live worker says banned -> live wins
+    assert response.json()["currently_banned"] is True
+
+
+def test_ip_summary_currently_banned_falls_back_to_log_when_worker_times_out(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    db.execute(
+        "INSERT INTO fail2ban_events (ip, action, jail, timestamp) "
+        "VALUES ('1.2.3.4', 'Ban', 'sshd', '2026-08-14T08:00:00Z')"
+    )
+    db.commit()
+
+    app = create_app(db=db, start_background_tasks=False, fban_control=_FakeFbanControl(None))
+    client = TestClient(app)
+
+    response = client.get("/api/ip/1.2.3.4/summary")
+    # worker timed out (None) -> falls back to log-derived heuristic, which says banned
+    assert response.json()["currently_banned"] is True
+
+
 def test_ip_summary_returns_data_for_ip_with_only_fail2ban_events_and_no_sessions(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
     db.execute(
