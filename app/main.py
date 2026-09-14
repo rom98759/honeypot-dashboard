@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.correlation import FailbanIngester, SshdAuthIngester
 from app.db import connect
+from app.fban_control import FbanControl
 from app.geoip import GeoLookup
 from app.ingester import CowrieIngester
 from app.routers import correlation, ip, map as map_router, overview, sessions
@@ -111,7 +112,9 @@ async def _poll_loop(app: FastAPI) -> None:
         await asyncio.sleep(POLL_INTERVAL_SECONDS)
 
 
-def create_app(db=None, start_background_tasks: bool = True) -> FastAPI:
+def create_app(
+    db=None, start_background_tasks: bool = True, fban_control: FbanControl | None = None
+) -> FastAPI:
     """
     Build the FastAPI app. `db` and `start_background_tasks=False` let tests
     inject an in-memory/tmp DB without spinning up the polling loop.
@@ -130,6 +133,8 @@ def create_app(db=None, start_background_tasks: bool = True) -> FastAPI:
     cowrie_var_path = Path(os.environ.get("COWRIE_VAR_PATH", "/cowrie-var"))
     fail2ban_log_path = Path(os.environ.get("FAIL2BAN_LOG_PATH", "/var/log/fail2ban.log"))
     sshd_auth_log_path = Path(os.environ.get("SSHD_AUTH_LOG_PATH", "/var/log/sshd-auth.log"))
+    fban_queue_path = Path(os.environ.get("FBAN_QUEUE_PATH", "/queue"))
+    fban_timeout_seconds = float(os.environ.get("FBAN_TIMEOUT_SECONDS", "2.0"))
     geoip_db_path = os.environ.get("GEOIP_DB_PATH")
     vps_latitude = _parse_optional_float(os.environ.get("VPS_LATITUDE"))
     vps_longitude = _parse_optional_float(os.environ.get("VPS_LONGITUDE"))
@@ -145,6 +150,9 @@ def create_app(db=None, start_background_tasks: bool = True) -> FastAPI:
 
     app = FastAPI(lifespan=lifespan)
     app.state.db = db if db is not None else connect(db_path)
+    app.state.fban_control = (
+        fban_control if fban_control is not None else FbanControl(fban_queue_path, timeout=fban_timeout_seconds)
+    )
     app.state.cowrie_var_path = cowrie_var_path
     app.state.vps_latitude = vps_latitude
     app.state.vps_longitude = vps_longitude
