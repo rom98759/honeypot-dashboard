@@ -74,7 +74,7 @@ ttylog paths relative to its own root (`var/lib/cowrie/tty/...`); the mount poin
 (backed by `app/attack_map.py`) serves `/api/map`, aggregating sessions by geo_cache coordinates into
 points for the attack map, plus the optional VPS destination point. `app/routers/ip.py` serves the IP
 detail page's data: `/api/ip/{ip}/summary` (session/command counts, geo, ban status), `/fail2ban`, and
-`/sshd-auth` (paginated per-IP event history for each source).
+`/sshd-auth` (paginated per-IP event history for each source), plus `POST /ban` and `/unban` to act on fail2ban's `sshd` jail. Ban status and the ban/unban actions go through `app/fban_control.py`, which talks to a host-side systemd worker (`scripts/fban-queue-worker.sh`) via a bind-mounted queue directory rather than giving the container any fail2ban socket or capability — `currently_banned` prefers that live answer and falls back to the log-derived heuristic if the worker doesn't respond in time. `/ban` and `/unban` reject cross-origin requests (Origin/Referer check) since NPM Basic Auth alone is CSRF-able on write endpoints.
 
 **`app/ttyplayer.py`** parses Cowrie's binary ttylog frame format (struct `<iLiiLL`) and mirrors
 upstream `playlog`'s stream-direction selection logic (`_select_events`) to pick one I/O direction plus
@@ -118,4 +118,4 @@ Runs via `docker-compose.yml` on the user's OVH VPS behind Nginx Proxy Manager, 
 `no-new-privileges`, mounts the honeypot's log volume and GeoIP DB read-only. `scripts/` holds VPS-side
 helpers (log export, firewall, backups) that run outside the container — see `scripts/*.sh` headers for
 per-script details, and `docs/superpowers/specs/2026-08-12-honeypot-dashboard.md` for the original
-design spec if deeper deployment rationale is needed.
+design spec if deeper deployment rationale is needed. The `dashboard` container also gets one RW bind mount (`/opt/honeypot/fban-queue:/queue`) for the fail2ban ban/unban/status queue described above — every other hardening setting is unchanged.
