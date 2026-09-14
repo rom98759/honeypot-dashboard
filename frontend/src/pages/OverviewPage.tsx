@@ -1,5 +1,6 @@
 import { RefreshCw } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
+import { usePeriod } from "../theme/PeriodContext";
 import { useOverview } from "../api/overview";
 import { StatCard } from "../components/StatCard";
 import { ProportionList } from "../components/ProportionList";
@@ -19,15 +20,13 @@ const PERIODS: { value: OverviewPeriod; label: string }[] = [
 ];
 
 export function OverviewPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const requestedPeriod = searchParams.get("period");
-  const period = PERIODS.some((p) => p.value === requestedPeriod)
-    ? (requestedPeriod as OverviewPeriod)
-    : "24h";
+  const [, setSearchParams] = useSearchParams();
+  const [period, setPeriod] = usePeriod();
 
   const { data, isPending, isError, refetch } = useOverview(period);
 
   function handlePeriodChange(value: OverviewPeriod) {
+    setPeriod(value);
     setSearchParams({ period: value });
   }
 

@@ -1,7 +1,10 @@
-import { screen, waitFor, act } from "@testing-library/react";
+import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, afterEach } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router-dom";
 import { renderWithProviders } from "../test-utils";
+import { PeriodProvider } from "../theme/PeriodContext";
 import { OverviewPage } from "./OverviewPage";
 
 vi.mock("../components/TimelineChart", () => ({
@@ -146,5 +149,22 @@ describe("OverviewPage", () => {
     });
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(document.querySelector(".skeleton-block")).toBeNull();
+  });
+
+  it("reads the initial period from a pre-set PeriodContext value, not just the default", async () => {
+    localStorage.setItem("period", "7d");
+    const fetchMock = vi.fn(() => jsonResponse(FULL_OVERVIEW));
+    vi.stubGlobal("fetch", fetchMock);
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <PeriodProvider>
+            <OverviewPage />
+          </PeriodProvider>
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/overview?period=7d"));
+    localStorage.clear();
   });
 });
