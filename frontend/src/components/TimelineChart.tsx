@@ -9,6 +9,7 @@ import {
   Filler,
 } from "chart.js";
 import { Line } from "react-chartjs-2";
+import { useTheme } from "../theme/ThemeContext";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler);
 
@@ -33,6 +34,13 @@ export class ChartErrorBoundary extends Component<{ children: ReactNode }, { has
 }
 
 export function TimelineChart({ timeline }: { timeline: TimelinePoint[] }) {
+  const [theme] = useTheme();
+  // Re-read the theme's CSS custom properties on every theme toggle so the chart
+  // stays in sync with dark/light mode instead of hardcoding light-mode colors.
+  const styles = getComputedStyle(document.documentElement);
+  const borderColor = styles.getPropertyValue("--border").trim();
+  const textSecondary = styles.getPropertyValue("--text-secondary").trim();
+  void theme;
   const data = {
     labels: timeline.map((t) => t.bucket),
     datasets: [
@@ -52,8 +60,8 @@ export function TimelineChart({ timeline }: { timeline: TimelinePoint[] }) {
     maintainAspectRatio: false,
     plugins: { legend: { display: false } },
     scales: {
-      x: { grid: { display: false } },
-      y: { beginAtZero: true, grid: { color: "#e5e7eb" } },
+      x: { grid: { display: false }, ticks: { color: textSecondary } },
+      y: { beginAtZero: true, grid: { color: borderColor }, ticks: { color: textSecondary } },
     },
   };
   return (

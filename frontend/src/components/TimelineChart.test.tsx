@@ -8,18 +8,32 @@ vi.mock("react-chartjs-2", () => ({
 }));
 
 import { TimelineChart, ChartErrorBoundary } from "./TimelineChart";
+import { ThemeProvider } from "../theme/ThemeContext";
 
 describe("TimelineChart", () => {
   it("passes the timeline's counts to the underlying chart", () => {
     render(
-      <TimelineChart
-        timeline={[
-          { bucket: "2026-08-13T10", n: 5 },
-          { bucket: "2026-08-13T11", n: 8 },
-        ]}
-      />
+      <ThemeProvider>
+        <TimelineChart
+          timeline={[
+            { bucket: "2026-08-13T10", n: 5 },
+            { bucket: "2026-08-13T11", n: 8 },
+          ]}
+        />
+      </ThemeProvider>
     );
     expect(screen.getByTestId("line-chart")).toHaveTextContent("[5,8]");
+  });
+
+  it("renders without crashing in dark mode", () => {
+    document.documentElement.setAttribute("data-theme", "dark");
+    render(
+      <ThemeProvider>
+        <TimelineChart timeline={[{ bucket: "2026-08-13T10", n: 5 }]} />
+      </ThemeProvider>
+    );
+    expect(screen.getByTestId("line-chart")).toBeInTheDocument();
+    document.documentElement.removeAttribute("data-theme");
   });
 });
 

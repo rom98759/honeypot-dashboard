@@ -11,16 +11,19 @@ vi.mock("react-chartjs-2", () => ({
 }));
 
 import { BansBarChart } from "./BansBarChart";
+import { ThemeProvider } from "../theme/ThemeContext";
 
 describe("BansBarChart", () => {
   it("maps bucket/n pairs to chart labels and data", () => {
     render(
-      <BansBarChart
-        bansTimeline={[
-          { bucket: "2026-08-13", n: 4 },
-          { bucket: "2026-08-14", n: 1 },
-        ]}
-      />
+      <ThemeProvider>
+        <BansBarChart
+          bansTimeline={[
+            { bucket: "2026-08-13", n: 4 },
+            { bucket: "2026-08-14", n: 1 },
+          ]}
+        />
+      </ThemeProvider>
     );
     expect(screen.getByTestId("bar-stub")).toBeInTheDocument();
     const props = barSpy.mock.calls[0][0] as {
@@ -31,7 +34,11 @@ describe("BansBarChart", () => {
   });
 
   it("renders with an empty bansTimeline without throwing", () => {
-    render(<BansBarChart bansTimeline={[]} />);
+    render(
+      <ThemeProvider>
+        <BansBarChart bansTimeline={[]} />
+      </ThemeProvider>
+    );
     expect(screen.getByTestId("bar-stub")).toBeInTheDocument();
   });
 });

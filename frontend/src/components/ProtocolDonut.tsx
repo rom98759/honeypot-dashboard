@@ -1,6 +1,7 @@
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 import { Doughnut } from "react-chartjs-2";
 import { ChartErrorBoundary } from "./TimelineChart";
+import { useTheme } from "../theme/ThemeContext";
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -20,6 +21,12 @@ const PROTOCOL_COLORS: Record<string, string> = {
 };
 
 export function ProtocolDonut({ protocolSplit }: { protocolSplit: ProtocolCount[] }) {
+  const [theme] = useTheme();
+  // Re-read the theme's CSS custom properties on every theme toggle so the chart
+  // stays in sync with dark/light mode instead of using Chart.js's low-contrast defaults.
+  const styles = getComputedStyle(document.documentElement);
+  const textSecondary = styles.getPropertyValue("--text-secondary").trim();
+  void theme;
   const data = {
     labels: protocolSplit.map((p) => PROTOCOL_LABELS[p.protocol] ?? p.protocol),
     datasets: [
@@ -32,7 +39,9 @@ export function ProtocolDonut({ protocolSplit }: { protocolSplit: ProtocolCount[
   const options = {
     responsive: true,
     maintainAspectRatio: false,
-    plugins: { legend: { position: "bottom" as const } },
+    plugins: {
+      legend: { position: "bottom" as const, labels: { color: textSecondary } },
+    },
   };
   return (
     <ChartErrorBoundary>

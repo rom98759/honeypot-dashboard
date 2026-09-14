@@ -11,16 +11,19 @@ vi.mock("react-chartjs-2", () => ({
 }));
 
 import { ProtocolDonut } from "./ProtocolDonut";
+import { ThemeProvider } from "../theme/ThemeContext";
 
 describe("ProtocolDonut", () => {
   it("maps protocol codes to French labels and known colors", () => {
     render(
-      <ProtocolDonut
-        protocolSplit={[
-          { protocol: "ssh", n: 8 },
-          { protocol: "telnet", n: 2 },
-        ]}
-      />
+      <ThemeProvider>
+        <ProtocolDonut
+          protocolSplit={[
+            { protocol: "ssh", n: 8 },
+            { protocol: "telnet", n: 2 },
+          ]}
+        />
+      </ThemeProvider>
     );
     expect(screen.getByTestId("doughnut-stub")).toBeInTheDocument();
     const props = doughnutSpy.mock.calls[0][0] as {
@@ -32,10 +35,26 @@ describe("ProtocolDonut", () => {
   });
 
   it("falls back to the raw protocol string for an unrecognized value", () => {
-    render(<ProtocolDonut protocolSplit={[{ protocol: "rdp", n: 1 }]} />);
+    render(
+      <ThemeProvider>
+        <ProtocolDonut protocolSplit={[{ protocol: "rdp", n: 1 }]} />
+      </ThemeProvider>
+    );
     const lastCall = doughnutSpy.mock.calls[doughnutSpy.mock.calls.length - 1][0] as {
       data: { labels: string[] };
     };
     expect(lastCall.data.labels).toEqual(["rdp"]);
+  });
+
+  it("reads legend label color from CSS custom properties and doesn't crash", () => {
+    render(
+      <ThemeProvider>
+        <ProtocolDonut protocolSplit={[{ protocol: "ssh", n: 1 }]} />
+      </ThemeProvider>
+    );
+    const props = doughnutSpy.mock.calls[doughnutSpy.mock.calls.length - 1][0] as {
+      options: { plugins: { legend: { labels: { color: string } } } };
+    };
+    expect(typeof props.options.plugins.legend.labels.color).toBe("string");
   });
 });
