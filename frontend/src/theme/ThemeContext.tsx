@@ -17,11 +17,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
-    localStorage.setItem(STORAGE_KEY, theme);
   }, [theme]);
 
   function toggleTheme() {
-    setTheme((current) => (current === "light" ? "dark" : "light"));
+    setTheme((current) => {
+      const next = current === "light" ? "dark" : "light";
+      localStorage.setItem(STORAGE_KEY, next);
+      return next;
+    });
   }
 
   return <ThemeContext.Provider value={[theme, toggleTheme]}>{children}</ThemeContext.Provider>;

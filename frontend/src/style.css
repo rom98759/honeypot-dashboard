@@ -13,6 +13,8 @@
   --success: #16a34a;
   --success-subtle: #dcfce7;
   --neutral-subtle: #f3f4f6;
+  --skeleton-highlight: #e9ebef;
+  color-scheme: light;
   --font-sans: Inter, system-ui, -apple-system, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Consolas, monospace;
   --text-xs: 12px;
@@ -179,7 +181,7 @@ td { padding: var(--space-3); border-top: 1px solid var(--border); }
 .skeleton-block { display: flex; flex-direction: column; gap: var(--space-3); }
 .skeleton-line {
   height: 16px; border-radius: 4px;
-  background: linear-gradient(90deg, var(--neutral-subtle) 25%, #e9ebef 37%, var(--neutral-subtle) 63%);
+  background: linear-gradient(90deg, var(--neutral-subtle) 25%, var(--skeleton-highlight) 37%, var(--neutral-subtle) 63%);
   background-size: 400% 100%;
   animation: skeleton-pulse 1.4s ease infinite;
 }
@@ -257,4 +259,6 @@ td { padding: var(--space-3); border-top: 1px solid var(--border); }
   --success: #4ade80;
   --success-subtle: #163a26;
   --neutral-subtle: #262a32;
+  --skeleton-highlight: #2f333c;
+  color-scheme: dark;
 }
