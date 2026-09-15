@@ -23,9 +23,11 @@ def get_overview_stats(db: sqlite3.Connection, period: str) -> dict:
         ")"
     ).fetchone()["n"]
 
-    top_ips = db.execute(
-        "SELECT src_ip, COUNT(*) AS n FROM sessions s WHERE 1=1" + where + " "
-        "GROUP BY src_ip ORDER BY n DESC LIMIT 10",
+    top_offenders = db.execute(
+        "SELECT s.src_ip, COUNT(*) AS n, MAX(s.connect_time) AS last_seen, g.country "
+        "FROM sessions s LEFT JOIN geo_cache g ON g.ip = s.src_ip "
+        "WHERE 1=1" + where + " "
+        "GROUP BY s.src_ip ORDER BY n DESC LIMIT 10",
         params,
     ).fetchall()
 
@@ -56,6 +58,26 @@ def get_overview_stats(db: sqlite3.Connection, period: str) -> dict:
         params,
     ).fetchall()
 
+    DURATION_BUCKETS = ["<10s", "10-60s", "1-5min", "5-30min", ">30min"]
+    duration_rows = db.execute(
+        "SELECT "
+        "  CASE "
+        "    WHEN duration_ms < 10000 THEN '<10s' "
+        "    WHEN duration_ms < 60000 THEN '10-60s' "
+        "    WHEN duration_ms < 300000 THEN '1-5min' "
+        "    WHEN duration_ms < 1800000 THEN '5-30min' "
+        "    ELSE '>30min' "
+        "  END AS bucket, "
+        "  COUNT(*) AS n "
+        "FROM sessions s WHERE duration_ms IS NOT NULL" + where + " "
+        "GROUP BY bucket",
+        params,
+    ).fetchall()
+    duration_counts = {r["bucket"]: r["n"] for r in duration_rows}
+    duration_distribution = [
+        {"bucket": b, "n": duration_counts.get(b, 0)} for b in DURATION_BUCKETS
+    ]
+
     bans_bucket = bucket_expr(period, "timestamp")
     ban_where = " AND timestamp >= ?" if cutoff else ""
     ban_params = [cutoff] if cutoff else []
@@ -71,10 +93,11 @@ def get_overview_stats(db: sqlite3.Connection, period: str) -> dict:
         "unique_ips": stats["unique_ips"],
         "login_attempts": stats["login_attempts"] or 0,
         "currently_banned": currently_banned,
-        "top_ips": [dict(r) for r in top_ips],
+        "top_offenders": [dict(r) for r in top_offenders],
         "top_countries": [dict(r) for r in top_countries],
         "timeline": [{"bucket": r["bucket"], "n": r["n"]} for r in timeline],
         "protocol_split": [dict(r) for r in protocol_split],
         "top_credentials": [dict(r) for r in top_credentials],
+        "duration_distribution": duration_distribution,
         "bans_timeline": [{"bucket": r["bucket"], "n": r["n"]} for r in bans_timeline],
     }

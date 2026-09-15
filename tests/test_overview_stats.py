@@ -149,3 +149,91 @@ def test_bans_timeline_is_period_scoped(tmp_path):
     bans_all = get_overview_stats(db, "all")["bans_timeline"]
     assert sum(bucket["n"] for bucket in bans_24h) == 1
     assert sum(bucket["n"] for bucket in bans_all) == 2
+
+
+def test_top_offenders_includes_country_and_last_seen(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    now = datetime.now(timezone.utc)
+    earlier = now - timedelta(hours=2)
+    db.execute(
+        "INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('s1', '1.2.3.4', ?)",
+        (_iso(earlier),),
+    )
+    db.execute(
+        "INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('s2', '1.2.3.4', ?)",
+        (_iso(now),),
+    )
+    db.execute(
+        "INSERT INTO geo_cache (ip, country, looked_up_at) VALUES ('1.2.3.4', 'France', ?)",
+        (_iso(now),),
+    )
+    db.commit()
+
+    top_offenders = get_overview_stats(db, "all")["top_offenders"]
+    assert top_offenders == [
+        {"src_ip": "1.2.3.4", "n": 2, "last_seen": _iso(now), "country": "France"}
+    ]
+
+
+def test_top_offenders_has_null_country_when_ungeolocated(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    now = datetime.now(timezone.utc)
+    db.execute(
+        "INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('s1', '9.9.9.9', ?)",
+        (_iso(now),),
+    )
+    db.commit()
+
+    top_offenders = get_overview_stats(db, "all")["top_offenders"]
+    assert top_offenders == [
+        {"src_ip": "9.9.9.9", "n": 1, "last_seen": _iso(now), "country": None}
+    ]
+
+
+def test_duration_distribution_buckets_and_zero_fills(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    now = datetime.now(timezone.utc)
+    db.executemany(
+        "INSERT INTO sessions (session_id, src_ip, connect_time, duration_ms) VALUES (?, '1.2.3.4', ?, ?)",
+        [
+            ("s1", _iso(now), 5_000),       # <10s
+            ("s2", _iso(now), 45_000),      # 10-60s
+            ("s3", _iso(now), 200_000),     # 1-5min
+            ("s4", _iso(now), 1_000_000),   # 5-30min
+            ("s5", _iso(now), 2_000_000),   # >30min
+            ("s6", _iso(now), 2_100_000),   # >30min (second in same bucket)
+        ],
+    )
+    db.execute(
+        "INSERT INTO sessions (session_id, src_ip, connect_time, duration_ms) VALUES ('s7', '1.2.3.4', ?, NULL)",
+        (_iso(now),),
+    )
+    db.commit()
+
+    duration_distribution = get_overview_stats(db, "all")["duration_distribution"]
+    assert duration_distribution == [
+        {"bucket": "<10s", "n": 1},
+        {"bucket": "10-60s", "n": 1},
+        {"bucket": "1-5min", "n": 1},
+        {"bucket": "5-30min", "n": 1},
+        {"bucket": ">30min", "n": 2},
+    ]
+
+
+def test_duration_distribution_all_zero_when_no_closed_sessions(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    now = datetime.now(timezone.utc)
+    db.execute(
+        "INSERT INTO sessions (session_id, src_ip, connect_time, duration_ms) VALUES ('s1', '1.2.3.4', ?, NULL)",
+        (_iso(now),),
+    )
+    db.commit()
+
+    duration_distribution = get_overview_stats(db, "all")["duration_distribution"]
+    assert duration_distribution == [
+        {"bucket": "<10s", "n": 0},
+        {"bucket": "10-60s", "n": 0},
+        {"bucket": "1-5min", "n": 0},
+        {"bucket": "5-30min", "n": 0},
+        {"bucket": ">30min", "n": 0},
+    ]
