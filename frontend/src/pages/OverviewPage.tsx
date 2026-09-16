@@ -1,12 +1,15 @@
 import { RefreshCw } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { usePeriod } from "../theme/PeriodContext";
-import { useOverview } from "../api/overview";
+import { useOverview, useOverviewHeatmap } from "../api/overview";
 import { StatCard } from "../components/StatCard";
 import { ProportionList } from "../components/ProportionList";
 import { TimelineChart } from "../components/TimelineChart";
 import { ProtocolDonut } from "../components/ProtocolDonut";
 import { BansBarChart } from "../components/BansBarChart";
+import { OffendersLeaderboard } from "../components/OffendersLeaderboard";
+import { AttackHeatmap } from "../components/AttackHeatmap";
+import { DurationDistributionChart } from "../components/DurationDistributionChart";
 import { SkeletonBlock } from "../components/SkeletonBlock";
 import { ErrorState } from "../components/ErrorState";
 import { EmptyState } from "../components/EmptyState";
@@ -24,6 +27,7 @@ export function OverviewPage() {
   const [period, setPeriod] = usePeriod();
 
   const { data, isPending, isError, refetch } = useOverview(period);
+  const heatmap = useOverviewHeatmap();
 
   function handlePeriodChange(value: OverviewPeriod) {
     setPeriod(value);
@@ -101,12 +105,9 @@ export function OverviewPage() {
           )}
         </div>
         <div className="panel">
-          <h3>Top IP</h3>
-          {data.top_ips.length ? (
-            <ProportionList
-              items={data.top_ips.map((i) => ({ label: i.src_ip, n: i.n }))}
-              linkPrefix="/ip/"
-            />
+          <h3>Top offenders</h3>
+          {data.top_offenders.length ? (
+            <OffendersLeaderboard offenders={data.top_offenders} />
           ) : (
             <EmptyState message="Aucune donnée" />
           )}
@@ -133,6 +134,28 @@ export function OverviewPage() {
               ))}
             </tbody>
           </table>
+        ) : (
+          <EmptyState message="Aucune donnée" />
+        )}
+      </div>
+      <div className="panel">
+        <h3>Durée des sessions</h3>
+        {data.duration_distribution.length ? (
+          <div className="chart-container">
+            <DurationDistributionChart distribution={data.duration_distribution} />
+          </div>
+        ) : (
+          <EmptyState message="Aucune donnée" />
+        )}
+      </div>
+      <div className="panel">
+        <h3>Répartition horaire des attaques</h3>
+        {heatmap.isPending ? (
+          <SkeletonBlock rows={4} />
+        ) : heatmap.isError ? (
+          <ErrorState message="Erreur de chargement, réessaie." onRetry={() => heatmap.refetch()} />
+        ) : heatmap.data.cells.length ? (
+          <AttackHeatmap cells={heatmap.data.cells} />
         ) : (
           <EmptyState message="Aucune donnée" />
         )}

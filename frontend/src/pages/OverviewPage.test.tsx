@@ -25,8 +25,28 @@ vi.mock("../components/BansBarChart", () => ({
   ),
 }));
 
+vi.mock("../components/AttackHeatmap", () => ({
+  AttackHeatmap: ({ cells }: { cells: { n: number }[] }) => (
+    <div data-testid="attack-heatmap-stub">{cells.length}</div>
+  ),
+}));
+
+vi.mock("../components/DurationDistributionChart", () => ({
+  DurationDistributionChart: ({ distribution }: { distribution: { n: number }[] }) => (
+    <div data-testid="duration-chart-stub">{distribution.length}</div>
+  ),
+}));
+
 function jsonResponse(body: unknown): Promise<Response> {
   return Promise.resolve({ ok: true, json: () => Promise.resolve(body) } as Response);
+}
+
+const EMPTY_HEATMAP = { cells: [] };
+
+function stubOverviewFetch(overviewBody: unknown, heatmapBody: unknown = EMPTY_HEATMAP) {
+  return vi.fn((url: string) =>
+    url.includes("/heatmap") ? jsonResponse(heatmapBody) : jsonResponse(overviewBody)
+  );
 }
 
 const FULL_OVERVIEW = {
@@ -34,7 +54,14 @@ const FULL_OVERVIEW = {
   unique_ips: 4,
   login_attempts: 3,
   currently_banned: 1,
-  top_ips: [{ src_ip: "1.2.3.4", n: 6 }],
+  top_offenders: [{ src_ip: "1.2.3.4", n: 6, country: "France", last_seen: "2026-08-13T10:00:00Z" }],
+  duration_distribution: [
+    { bucket: "<10s", n: 1 },
+    { bucket: "10-60s", n: 2 },
+    { bucket: "1-5min", n: 3 },
+    { bucket: "5-30min", n: 4 },
+    { bucket: ">30min", n: 5 },
+  ],
   top_countries: [{ country: "France", n: 6 }],
   timeline: [{ bucket: "2026-08-13T10", n: 6 }],
   protocol_split: [
@@ -55,7 +82,11 @@ describe("OverviewPage", () => {
     let resolveFetch: (value: Response) => void = () => {};
     vi.stubGlobal(
       "fetch",
-      vi.fn(() => new Promise<Response>((resolve) => (resolveFetch = resolve)))
+      vi.fn((url: string) =>
+        url.includes("/heatmap")
+          ? Promise.resolve({ ok: true, json: async () => EMPTY_HEATMAP } as Response)
+          : new Promise<Response>((resolve) => (resolveFetch = resolve))
+      )
     );
     const { container } = renderWithProviders(<OverviewPage />);
     expect(container.querySelector(".skeleton-block")).not.toBeNull();
@@ -66,7 +97,7 @@ describe("OverviewPage", () => {
   });
 
   it("fetches with the default 24h period and switches period on click", async () => {
-    const fetchMock = vi.fn(() => jsonResponse(FULL_OVERVIEW));
+    const fetchMock = stubOverviewFetch(FULL_OVERVIEW);
     vi.stubGlobal("fetch", fetchMock);
     renderWithProviders(<OverviewPage />);
     await waitFor(() => expect(screen.getByText("12")).toBeInTheDocument());
@@ -77,7 +108,7 @@ describe("OverviewPage", () => {
   });
 
   it("renders the protocol donut, bans chart, and top credentials table", async () => {
-    vi.stubGlobal("fetch", vi.fn(() => jsonResponse(FULL_OVERVIEW)));
+    vi.stubGlobal("fetch", stubOverviewFetch(FULL_OVERVIEW));
     renderWithProviders(<OverviewPage />);
     await waitFor(() => expect(screen.getByTestId("protocol-donut-stub")).toBeInTheDocument());
     expect(screen.getByTestId("bans-bar-chart-stub")).toBeInTheDocument();
@@ -88,19 +119,17 @@ describe("OverviewPage", () => {
   it("shows (vide) for a null attempted password", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(() =>
-        jsonResponse({
-          ...FULL_OVERVIEW,
-          top_credentials: [{ login_username: "admin", login_password: null, n: 2 }],
-        })
-      )
+      stubOverviewFetch({
+        ...FULL_OVERVIEW,
+        top_credentials: [{ login_username: "admin", login_password: null, n: 2 }],
+      })
     );
     renderWithProviders(<OverviewPage />);
     await waitFor(() => expect(screen.getByText("(vide)")).toBeInTheDocument());
   });
 
-  it("links the Top IP row to its IP detail page", async () => {
-    vi.stubGlobal("fetch", vi.fn(() => jsonResponse(FULL_OVERVIEW)));
+  it("links the offender row to its IP detail page", async () => {
+    vi.stubGlobal("fetch", stubOverviewFetch(FULL_OVERVIEW));
     renderWithProviders(<OverviewPage />);
     await waitFor(() => expect(screen.getByRole("link", { name: "1.2.3.4" })).toBeInTheDocument());
     expect(screen.getByRole("link", { name: "1.2.3.4" })).toHaveAttribute("href", "/ip/1.2.3.4");
@@ -109,24 +138,27 @@ describe("OverviewPage", () => {
   it("renders empty states and skips charts when there is no data", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(() =>
-        jsonResponse({
-          ...FULL_OVERVIEW,
-          top_countries: [],
-          top_ips: [],
-          protocol_split: [],
-          bans_timeline: [],
-          top_credentials: [],
-        })
-      )
+      stubOverviewFetch({
+        ...FULL_OVERVIEW,
+        top_countries: [],
+        top_offenders: [],
+        protocol_split: [],
+        bans_timeline: [],
+        top_credentials: [],
+        duration_distribution: [],
+      })
     );
     renderWithProviders(<OverviewPage />);
-    await waitFor(() => expect(screen.getAllByText("Aucune donnée")).toHaveLength(5));
+    await waitFor(() => expect(screen.getAllByText("Aucune donnée")).toHaveLength(7));
     expect(screen.getByTestId("timeline-chart-stub")).toBeInTheDocument();
   });
 
   it("shows an error state and recovers via the retry button", async () => {
-    const fetchMock = vi.fn(() => Promise.resolve({ ok: false, status: 500 } as Response));
+    const fetchMock = vi.fn((url: string) =>
+      url.includes("/heatmap")
+        ? jsonResponse(EMPTY_HEATMAP)
+        : Promise.resolve({ ok: false, status: 500 } as Response)
+    );
     vi.stubGlobal("fetch", fetchMock);
     renderWithProviders(<OverviewPage />);
     await waitFor(() => expect(screen.getByText("Erreur de chargement, réessaie.")).toBeInTheDocument());
@@ -138,22 +170,22 @@ describe("OverviewPage", () => {
 
   it("auto-refreshes every 10s without flashing the skeleton again", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    const fetchMock = vi.fn(() => jsonResponse(FULL_OVERVIEW));
+    const fetchMock = stubOverviewFetch(FULL_OVERVIEW);
     vi.stubGlobal("fetch", fetchMock);
     renderWithProviders(<OverviewPage />);
     await waitFor(() => expect(screen.getByText("12")).toBeInTheDocument());
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(10_000);
     });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(document.querySelector(".skeleton-block")).toBeNull();
   });
 
   it("reads the initial period from a pre-set PeriodContext value, not just the default", async () => {
     localStorage.setItem("period", "7d");
-    const fetchMock = vi.fn(() => jsonResponse(FULL_OVERVIEW));
+    const fetchMock = stubOverviewFetch(FULL_OVERVIEW);
     vi.stubGlobal("fetch", fetchMock);
     render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
