@@ -11,18 +11,22 @@ beforeEach(() => {
   vi.stubGlobal(
     "fetch",
     vi.fn((url: string) => {
+      if (url.startsWith("/api/overview/heatmap")) {
+        return jsonResponse({ cells: [] });
+      }
       if (url.startsWith("/api/overview")) {
         return jsonResponse({
           total_connections: 0,
           unique_ips: 0,
           login_attempts: 0,
           currently_banned: 0,
-          top_ips: [],
+          top_offenders: [],
           top_countries: [],
           timeline: [],
           protocol_split: [],
           top_credentials: [],
           bans_timeline: [],
+          duration_distribution: [],
         });
       }
       if (url.includes("/summary")) {

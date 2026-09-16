@@ -103,22 +103,25 @@ describe("MapPage", () => {
   });
 
   it("shares the period with OverviewPage through PeriodContext", async () => {
-    const fetchMock = vi.fn((url: string) =>
-      url.includes("/overview")
-        ? jsonResponse({
-            total_connections: 1,
-            unique_ips: 1,
-            login_attempts: 0,
-            currently_banned: 0,
-            top_ips: [],
-            top_countries: [],
-            timeline: [],
-            protocol_split: [],
-            top_credentials: [],
-            bans_timeline: [],
-          })
-        : jsonResponse({ points: [], destination: null })
-    );
+    const fetchMock = vi.fn((url: string) => {
+      if (url.includes("/overview/heatmap")) return jsonResponse({ cells: [] });
+      if (url.includes("/overview")) {
+        return jsonResponse({
+          total_connections: 1,
+          unique_ips: 1,
+          login_attempts: 0,
+          currently_banned: 0,
+          top_offenders: [],
+          top_countries: [],
+          timeline: [],
+          protocol_split: [],
+          top_credentials: [],
+          bans_timeline: [],
+          duration_distribution: [],
+        });
+      }
+      return jsonResponse({ points: [], destination: null });
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
