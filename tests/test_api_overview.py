@@ -88,3 +88,29 @@ def test_overview_new_fields_present(tmp_path):
     assert body["protocol_split"] == [{"protocol": "telnet", "n": 1}]
     assert body["top_credentials"] == [{"login_username": "root", "login_password": "123456", "n": 1}]
     assert body["bans_timeline"] == []
+
+
+def test_overview_heatmap_endpoint(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    db.execute(
+        "INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('s1', '1.2.3.4', ?)",
+        ("2026-08-16T03:15:00Z",),
+    )
+    db.commit()
+
+    app = create_app(db=db, start_background_tasks=False)
+    client = TestClient(app)
+
+    response = client.get("/api/overview/heatmap")
+    assert response.status_code == 200
+    assert response.json() == {"cells": [{"day_of_week": 0, "hour": 3, "n": 1}]}
+
+
+def test_overview_heatmap_endpoint_empty(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    app = create_app(db=db, start_background_tasks=False)
+    client = TestClient(app)
+
+    response = client.get("/api/overview/heatmap")
+    assert response.status_code == 200
+    assert response.json() == {"cells": []}
