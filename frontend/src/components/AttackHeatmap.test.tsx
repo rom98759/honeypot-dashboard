@@ -1,4 +1,3 @@
-// frontend/src/components/AttackHeatmap.test.tsx
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { AttackHeatmap } from "./AttackHeatmap";

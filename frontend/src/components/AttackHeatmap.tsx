@@ -1,4 +1,3 @@
-// frontend/src/components/AttackHeatmap.tsx
 export interface HeatmapCell {
   day_of_week: number;
   hour: number;
