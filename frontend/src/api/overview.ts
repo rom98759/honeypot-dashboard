@@ -15,5 +15,6 @@ export function useOverviewHeatmap() {
   return useQuery({
     queryKey: ["overview", "heatmap"],
     queryFn: () => fetchJSON<HeatmapData>("/api/overview/heatmap"),
+    staleTime: 5 * 60_000,
   });
 }

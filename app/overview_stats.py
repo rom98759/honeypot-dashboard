@@ -2,6 +2,8 @@ import sqlite3
 
 from app.periods import bucket_expr, period_cutoff
 
+DURATION_BUCKETS = ["<10s", "10-60s", "1-5min", "5-30min", ">30min"]
+
 
 def get_overview_stats(db: sqlite3.Connection, period: str) -> dict:
     cutoff = period_cutoff(period)
@@ -58,7 +60,6 @@ def get_overview_stats(db: sqlite3.Connection, period: str) -> dict:
         params,
     ).fetchall()
 
-    DURATION_BUCKETS = ["<10s", "10-60s", "1-5min", "5-30min", ">30min"]
     duration_rows = db.execute(
         "SELECT "
         "  CASE "
