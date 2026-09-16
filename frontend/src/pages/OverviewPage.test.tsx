@@ -145,7 +145,13 @@ describe("OverviewPage", () => {
         protocol_split: [],
         bans_timeline: [],
         top_credentials: [],
-        duration_distribution: [],
+        duration_distribution: [
+          { bucket: "<10s", n: 0 },
+          { bucket: "10-60s", n: 0 },
+          { bucket: "1-5min", n: 0 },
+          { bucket: "5-30min", n: 0 },
+          { bucket: ">30min", n: 0 },
+        ],
       })
     );
     renderWithProviders(<OverviewPage />);

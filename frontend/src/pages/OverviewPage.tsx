@@ -140,7 +140,7 @@ export function OverviewPage() {
       </div>
       <div className="panel">
         <h3>Durée des sessions</h3>
-        {data.duration_distribution.length ? (
+        {data.duration_distribution.some((d) => d.n > 0) ? (
           <div className="chart-container">
             <DurationDistributionChart distribution={data.duration_distribution} />
           </div>
@@ -149,7 +149,7 @@ export function OverviewPage() {
         )}
       </div>
       <div className="panel">
-        <h3>Répartition horaire des attaques</h3>
+        <h3>Répartition horaire des attaques (tout l'historique)</h3>
         {heatmap.isPending ? (
           <SkeletonBlock rows={4} />
         ) : heatmap.isError ? (
