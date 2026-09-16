@@ -262,3 +262,16 @@ td { padding: var(--space-3); border-top: 1px solid var(--border); }
   --skeleton-highlight: #2f333c;
   color-scheme: dark;
 }
+
+.heatmap { display: flex; flex-direction: column; gap: 2px; }
+.heatmap-hour-labels {
+  display: grid; grid-template-columns: repeat(24, 1fr); margin-left: 40px;
+  font-size: var(--text-xs); color: var(--text-secondary);
+}
+.heatmap-row { display: flex; align-items: center; gap: var(--space-2); }
+.heatmap-day-label { width: 32px; font-size: var(--text-xs); color: var(--text-secondary); }
+.heatmap-row-cells { display: grid; grid-template-columns: repeat(24, 1fr); gap: 2px; flex: 1; }
+.heatmap-cell {
+  aspect-ratio: 1; border-radius: 2px; background-color: var(--accent);
+  background-clip: padding-box; border: 1px solid var(--border);
+}
