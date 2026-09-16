@@ -2,7 +2,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi, afterEach } from "vitest";
 import type { ReactNode } from "react";
-import { useOverview } from "./overview";
+import { useOverview, useOverviewHeatmap } from "./overview";
 
 function wrapper({ children }: { children: ReactNode }) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -14,12 +14,13 @@ const EMPTY_OVERVIEW = {
   unique_ips: 2,
   login_attempts: 1,
   currently_banned: 0,
-  top_ips: [],
+  top_offenders: [],
   top_countries: [],
   timeline: [],
   protocol_split: [],
   top_credentials: [],
   bans_timeline: [],
+  duration_distribution: [],
 };
 
 describe("useOverview", () => {
@@ -44,5 +45,23 @@ describe("useOverview", () => {
     const { result } = renderHook(() => useOverview("30d"), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(fetchMock).toHaveBeenCalledWith("/api/overview?period=30d");
+  });
+});
+
+describe("useOverviewHeatmap", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("fetches /api/overview/heatmap with no query params", async () => {
+    const fetchMock = vi.fn(
+      async () => ({ ok: true, json: async () => ({ cells: [{ day_of_week: 0, hour: 3, n: 2 }] }) }) as Response
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result } = renderHook(() => useOverviewHeatmap(), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(fetchMock).toHaveBeenCalledWith("/api/overview/heatmap");
+    expect(result.current.data?.cells).toEqual([{ day_of_week: 0, hour: 3, n: 2 }]);
   });
 });

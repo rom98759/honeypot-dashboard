@@ -31,15 +31,26 @@ export interface OverviewData {
   unique_ips: number;
   login_attempts: number;
   currently_banned: number;
-  top_ips: { src_ip: string; n: number }[];
+  top_offenders: { src_ip: string; n: number; country: string | null; last_seen: string }[];
   top_countries: { country: string; n: number }[];
   timeline: { bucket: string; n: number }[];
   protocol_split: { protocol: string; n: number }[];
   top_credentials: { login_username: string; login_password: string | null; n: number }[];
   bans_timeline: { bucket: string; n: number }[];
+  duration_distribution: { bucket: string; n: number }[];
 }
 
 export type OverviewPeriod = "24h" | "7d" | "30d" | "all";
+
+export interface HeatmapCell {
+  day_of_week: number;
+  hour: number;
+  n: number;
+}
+
+export interface HeatmapData {
+  cells: HeatmapCell[];
+}
 
 export interface CorrelationRow {
   ip: string;

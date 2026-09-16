@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { fetchJSON } from "./client";
-import type { OverviewData, OverviewPeriod } from "./types";
+import type { HeatmapData, OverviewData, OverviewPeriod } from "./types";
 
 export function useOverview(period: OverviewPeriod = "24h") {
   return useQuery({
@@ -8,5 +8,12 @@ export function useOverview(period: OverviewPeriod = "24h") {
     queryFn: () => fetchJSON<OverviewData>(`/api/overview?period=${period}`),
     refetchInterval: 10_000,
     refetchIntervalInBackground: false,
+  });
+}
+
+export function useOverviewHeatmap() {
+  return useQuery({
+    queryKey: ["overview", "heatmap"],
+    queryFn: () => fetchJSON<HeatmapData>("/api/overview/heatmap"),
   });
 }
