@@ -57,4 +57,52 @@ describe("ProtocolDonut", () => {
     };
     expect(typeof props.options.plugins.legend.labels.color).toBe("string");
   });
+
+  it("wires onClick to resolve the clicked arc back to its protocol code", () => {
+    const onSliceClick = vi.fn();
+    render(
+      <ThemeProvider>
+        <ProtocolDonut
+          protocolSplit={[
+            { protocol: "ssh", n: 8 },
+            { protocol: "telnet", n: 2 },
+          ]}
+          onSliceClick={onSliceClick}
+        />
+      </ThemeProvider>
+    );
+    const props = doughnutSpy.mock.calls[doughnutSpy.mock.calls.length - 1][0] as {
+      options: { onClick: (event: unknown, elements: unknown, chart: unknown) => void };
+    };
+    const fakeChart = { getElementsAtEventForMode: vi.fn(() => [{ index: 1 }]) };
+    props.options.onClick({ native: {} }, [], fakeChart);
+    expect(onSliceClick).toHaveBeenCalledWith("telnet");
+  });
+
+  it("does not call onSliceClick or throw when the click resolves to no element", () => {
+    const onSliceClick = vi.fn();
+    render(
+      <ThemeProvider>
+        <ProtocolDonut protocolSplit={[{ protocol: "ssh", n: 8 }]} onSliceClick={onSliceClick} />
+      </ThemeProvider>
+    );
+    const props = doughnutSpy.mock.calls[doughnutSpy.mock.calls.length - 1][0] as {
+      options: { onClick: (event: unknown, elements: unknown, chart: unknown) => void };
+    };
+    const fakeChart = { getElementsAtEventForMode: vi.fn(() => []) };
+    expect(() => props.options.onClick({ native: {} }, [], fakeChart)).not.toThrow();
+    expect(onSliceClick).not.toHaveBeenCalled();
+  });
+
+  it("has no onClick option when onSliceClick is not provided", () => {
+    render(
+      <ThemeProvider>
+        <ProtocolDonut protocolSplit={[{ protocol: "ssh", n: 8 }]} />
+      </ThemeProvider>
+    );
+    const props = doughnutSpy.mock.calls[doughnutSpy.mock.calls.length - 1][0] as {
+      options: { onClick?: unknown };
+    };
+    expect(props.options.onClick).toBeUndefined();
+  });
 });

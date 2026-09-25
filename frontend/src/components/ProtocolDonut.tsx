@@ -1,4 +1,4 @@
-import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
+import { Chart as ChartJS, ArcElement, Tooltip, Legend, type ChartEvent, type ActiveElement } from "chart.js";
 import { Doughnut } from "react-chartjs-2";
 import { ChartErrorBoundary } from "./TimelineChart";
 import { useTheme } from "../theme/ThemeContext";
@@ -20,7 +20,13 @@ const PROTOCOL_COLORS: Record<string, string> = {
   telnet: "#d97706",
 };
 
-export function ProtocolDonut({ protocolSplit }: { protocolSplit: ProtocolCount[] }) {
+export function ProtocolDonut({
+  protocolSplit,
+  onSliceClick,
+}: {
+  protocolSplit: ProtocolCount[];
+  onSliceClick?: (protocol: string) => void;
+}) {
   const [theme] = useTheme();
   // Re-read the theme's CSS custom properties on every theme toggle so the chart
   // stays in sync with dark/light mode instead of using Chart.js's low-contrast defaults.
@@ -42,6 +48,17 @@ export function ProtocolDonut({ protocolSplit }: { protocolSplit: ProtocolCount[
     plugins: {
       legend: { position: "bottom" as const, labels: { color: textSecondary } },
     },
+    onClick: onSliceClick
+      ? (event: ChartEvent, _elements: ActiveElement[], chart: ChartJS) => {
+          const hits = chart.getElementsAtEventForMode(
+            event.native as MouseEvent,
+            "nearest",
+            { intersect: true },
+            true
+          );
+          if (hits.length) onSliceClick(protocolSplit[hits[0].index].protocol);
+        }
+      : undefined,
   };
   return (
     <ChartErrorBoundary>
