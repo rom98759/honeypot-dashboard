@@ -93,6 +93,7 @@ main#content { flex: 1; padding: var(--space-8); overflow-x: auto; max-width: 12
 }
 .btn:hover { background: var(--neutral-subtle); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn.active { background: var(--accent-subtle); color: var(--accent); border-color: var(--accent); font-weight: 500; }
 .btn svg { width: 14px; height: 14px; }
 .btn-icon {
   display: inline-flex; align-items: center; justify-content: center;
@@ -157,7 +158,9 @@ td { padding: var(--space-3); border-top: 1px solid var(--border); }
 .session-row:hover { background: var(--accent-subtle); }
 
 .command-cell { max-width: 0; width: 60%; }
-.command-cell code { display: block; overflow-wrap: anywhere; white-space: pre-wrap; }
+.command-cell code {
+  display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
 
 .filter-bar {
   display: flex; align-items: center; gap: var(--space-2);

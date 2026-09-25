@@ -98,7 +98,7 @@ export function CommandsPage() {
             data.items.map((c) => (
               <tr key={c.input_text}>
                 <td className="mono command-cell">
-                  <code>{c.input_text}</code>
+                  <code title={c.input_text}>{c.input_text}</code>
                 </td>
                 <td>{c.n}</td>
                 <td className="mono">{formatTimestamp(c.last_seen)}</td>
