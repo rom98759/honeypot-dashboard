@@ -113,3 +113,14 @@ export interface PaginatedSshdAuth {
   items: SshdAuthEvent[];
   total: number;
 }
+
+export interface CommandRow {
+  input_text: string;
+  n: number;
+  last_seen: string;
+}
+
+export interface PaginatedCommands {
+  items: CommandRow[];
+  total: number;
+}
