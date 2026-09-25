@@ -250,4 +250,18 @@ describe("SessionsPage", () => {
     await waitFor(() => expect(screen.getByText("1.2.3.4")).toBeInTheDocument());
     expect(screen.queryByRole("link", { name: "Effacer" })).not.toBeInTheDocument();
   });
+
+  it("keeps the command filter in the URL after an in-page interaction (pagination)", async () => {
+    const fetchMock = vi.fn(() => jsonResponse(SESSIONS_PAGE_1));
+    vi.stubGlobal("fetch", fetchMock);
+    renderWithProviders(<SessionsPage />, { route: "/sessions?command=whoami" });
+    await waitFor(() => expect(screen.getByText("1.2.3.4")).toBeInTheDocument());
+    expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("command=whoami"));
+
+    await userEvent.click(screen.getByRole("button", { name: "Suivant" }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("offset=25"))
+    );
+    expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("command=whoami"));
+  });
 });

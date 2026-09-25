@@ -23,6 +23,7 @@ function formatDuration(ms: number | null): string {
 
 interface ParamUpdate {
   ip?: string;
+  command?: string;
   sort: string;
   order: string;
   page?: string;
@@ -53,6 +54,7 @@ export function SessionsPage() {
     clearTimeout(debounceRef.current);
     const params = new URLSearchParams();
     if (next.ip) params.set("ip", next.ip);
+    if (next.command) params.set("command", next.command);
     params.set("sort", next.sort);
     params.set("order", next.order);
     if (next.page) params.set("page", next.page);
@@ -64,21 +66,21 @@ export function SessionsPage() {
     setIpInput(value);
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      updateParams({ ip: value, sort, order });
+      updateParams({ ip: value, command, sort, order });
     }, 300);
   }
 
   function handleSort(col: string) {
     const nextOrder = sort === col && order === "asc" ? "desc" : "asc";
-    updateParams({ ip, sort: col, order: nextOrder });
+    updateParams({ ip, command, sort: col, order: nextOrder });
   }
 
   function handleRowClick(id: string) {
-    updateParams({ ip, sort, order, page: String(page), session: id });
+    updateParams({ ip, command, sort, order, page: String(page), session: id });
   }
 
   function closePanel() {
-    updateParams({ ip, sort, order, page: String(page) });
+    updateParams({ ip, command, sort, order, page: String(page) });
   }
 
   if (isPending) return <SkeletonBlock rows={8} />;
@@ -146,8 +148,8 @@ export function SessionsPage() {
       <Pagination
         page={page}
         totalPages={totalPages}
-        onPrev={() => updateParams({ ip, sort, order, page: String(page - 1) })}
-        onNext={() => updateParams({ ip, sort, order, page: String(page + 1) })}
+        onPrev={() => updateParams({ ip, command, sort, order, page: String(page - 1) })}
+        onNext={() => updateParams({ ip, command, sort, order, page: String(page + 1) })}
       />
       {sessionId ? <SessionDetailPanel sessionId={sessionId} onClose={closePanel} /> : null}
     </>
