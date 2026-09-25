@@ -41,4 +41,40 @@ describe("BansBarChart", () => {
     );
     expect(screen.getByTestId("bar-stub")).toBeInTheDocument();
   });
+
+  it("wires onClick to resolve the clicked bar back to its bucket label", () => {
+    const onBarClick = vi.fn();
+    render(
+      <ThemeProvider>
+        <BansBarChart
+          bansTimeline={[
+            { bucket: "2026-08-13", n: 4 },
+            { bucket: "2026-08-14", n: 1 },
+          ]}
+          onBarClick={onBarClick}
+        />
+      </ThemeProvider>
+    );
+    const props = barSpy.mock.calls[barSpy.mock.calls.length - 1][0] as {
+      options: { onClick: (event: unknown, elements: unknown, chart: unknown) => void };
+    };
+    const fakeChart = { getElementsAtEventForMode: vi.fn(() => [{ index: 1 }]) };
+    props.options.onClick({ native: {} }, [], fakeChart);
+    expect(onBarClick).toHaveBeenCalledWith("2026-08-14");
+  });
+
+  it("does not call onBarClick or throw when the click resolves to no element", () => {
+    const onBarClick = vi.fn();
+    render(
+      <ThemeProvider>
+        <BansBarChart bansTimeline={[{ bucket: "2026-08-13", n: 4 }]} onBarClick={onBarClick} />
+      </ThemeProvider>
+    );
+    const props = barSpy.mock.calls[barSpy.mock.calls.length - 1][0] as {
+      options: { onClick: (event: unknown, elements: unknown, chart: unknown) => void };
+    };
+    const fakeChart = { getElementsAtEventForMode: vi.fn(() => []) };
+    expect(() => props.options.onClick({ native: {} }, [], fakeChart)).not.toThrow();
+    expect(onBarClick).not.toHaveBeenCalled();
+  });
 });

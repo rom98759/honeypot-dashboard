@@ -1,4 +1,4 @@
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip } from "chart.js";
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip, type ChartEvent, type ActiveElement } from "chart.js";
 import { Bar } from "react-chartjs-2";
 import { ChartErrorBoundary } from "./TimelineChart";
 import { useTheme } from "../theme/ThemeContext";
@@ -10,7 +10,13 @@ export interface BansBucket {
   n: number;
 }
 
-export function BansBarChart({ bansTimeline }: { bansTimeline: BansBucket[] }) {
+export function BansBarChart({
+  bansTimeline,
+  onBarClick,
+}: {
+  bansTimeline: BansBucket[];
+  onBarClick?: (bucket: string) => void;
+}) {
   const [theme] = useTheme();
   // Re-read the theme's CSS custom properties on every theme toggle so the chart
   // stays in sync with dark/light mode instead of hardcoding light-mode colors.
@@ -40,6 +46,17 @@ export function BansBarChart({ bansTimeline }: { bansTimeline: BansBucket[] }) {
         ticks: { precision: 0, color: textSecondary },
       },
     },
+    onClick: onBarClick
+      ? (event: ChartEvent, _elements: ActiveElement[], chart: ChartJS) => {
+          const hits = chart.getElementsAtEventForMode(
+            event.native as MouseEvent,
+            "nearest",
+            { intersect: true },
+            true
+          );
+          if (hits.length) onBarClick(bansTimeline[hits[0].index].bucket);
+        }
+      : undefined,
   };
   return (
     <ChartErrorBoundary>
