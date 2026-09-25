@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -317,3 +318,132 @@ def test_list_sessions_combines_ip_and_command_filters(tmp_path):
 
     mismatched = client.get("/api/sessions", params={"ip": "5.6.7.8", "command": "whoami"})
     assert mismatched.json()["total"] == 0
+
+
+def test_list_sessions_filters_by_protocol(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    db.executescript(
+        """
+        INSERT INTO sessions (session_id, src_ip, protocol, connect_time) VALUES ('s1', '1.2.3.4', 'ssh', '2026-08-12T10:00:00Z');
+        INSERT INTO sessions (session_id, src_ip, protocol, connect_time) VALUES ('s2', '5.6.7.8', 'telnet', '2026-08-12T11:00:00Z');
+        """
+    )
+    db.commit()
+    app = create_app(db=db, start_background_tasks=False)
+    client = TestClient(app)
+
+    response = client.get("/api/sessions", params={"protocol": "ssh"})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 1
+    assert body["items"][0]["session_id"] == "s1"
+
+
+def test_list_sessions_filters_by_country_via_geo_cache(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    db.executescript(
+        """
+        INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('s1', '1.2.3.4', '2026-08-12T10:00:00Z');
+        INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('s2', '5.6.7.8', '2026-08-12T11:00:00Z');
+        INSERT INTO geo_cache (ip, country, looked_up_at) VALUES ('1.2.3.4', 'France', '2026-08-12T09:00:00Z');
+        """
+    )
+    db.commit()
+    app = create_app(db=db, start_background_tasks=False)
+    client = TestClient(app)
+
+    response = client.get("/api/sessions", params={"country": "France"})
+    assert response.status_code == 200
+    body = response.json()
+    # s2 has no geo_cache row at all and must NOT match — an IP with unknown country is not a
+    # wildcard, it simply never matches any specific country filter.
+    assert body["total"] == 1
+    assert body["items"][0]["session_id"] == "s1"
+
+
+def test_list_sessions_filters_by_period(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    now = datetime.now(timezone.utc)
+    old = (now - timedelta(days=10)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    recent = (now - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    db.executescript(
+        f"""
+        INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('old', '1.2.3.4', '{old}');
+        INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('recent', '5.6.7.8', '{recent}');
+        """
+    )
+    db.commit()
+    app = create_app(db=db, start_background_tasks=False)
+    client = TestClient(app)
+
+    response = client.get("/api/sessions", params={"period": "24h"})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 1
+    assert body["items"][0]["session_id"] == "recent"
+
+
+def test_list_sessions_period_all_adds_no_filter(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    db.execute(
+        "INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('s1', '1.2.3.4', '2020-01-01T00:00:00Z')"
+    )
+    db.commit()
+    app = create_app(db=db, start_background_tasks=False)
+    client = TestClient(app)
+
+    response = client.get("/api/sessions", params={"period": "all"})
+    assert response.status_code == 200
+    assert response.json()["total"] == 1
+
+
+def test_list_sessions_rejects_invalid_period(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    app = create_app(db=db, start_background_tasks=False)
+    client = TestClient(app)
+
+    response = client.get("/api/sessions", params={"period": "nonsense"})
+    assert response.status_code == 400
+
+
+def test_list_sessions_date_range_lower_bound_inclusive_upper_bound_exclusive(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    db.executescript(
+        """
+        INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('before', '1.1.1.1', '2026-08-12T09:59:59Z');
+        INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('at_lower', '2.2.2.2', '2026-08-12T10:00:00Z');
+        INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('inside', '3.3.3.3', '2026-08-12T10:30:00Z');
+        INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('at_upper', '4.4.4.4', '2026-08-12T11:00:00Z');
+        """
+    )
+    db.commit()
+    app = create_app(db=db, start_background_tasks=False)
+    client = TestClient(app)
+
+    response = client.get(
+        "/api/sessions", params={"date_from": "2026-08-12T10:00:00Z", "date_to": "2026-08-12T11:00:00Z"}
+    )
+    assert response.status_code == 200
+    ids = {item["session_id"] for item in response.json()["items"]}
+    # 'at_upper' sits exactly on date_to and must be excluded — the upper bound is exclusive.
+    assert ids == {"at_lower", "inside"}
+
+
+def test_list_sessions_combines_protocol_and_country_filters(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    db.executescript(
+        """
+        INSERT INTO sessions (session_id, src_ip, protocol, connect_time) VALUES ('s1', '1.2.3.4', 'ssh', '2026-08-12T10:00:00Z');
+        INSERT INTO sessions (session_id, src_ip, protocol, connect_time) VALUES ('s2', '1.2.3.4', 'telnet', '2026-08-12T11:00:00Z');
+        INSERT INTO geo_cache (ip, country, looked_up_at) VALUES ('1.2.3.4', 'France', '2026-08-12T09:00:00Z');
+        """
+    )
+    db.commit()
+    app = create_app(db=db, start_background_tasks=False)
+    client = TestClient(app)
+
+    response = client.get("/api/sessions", params={"protocol": "ssh", "country": "France"})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 1
+    assert body["items"][0]["session_id"] == "s1"

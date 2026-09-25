@@ -2,6 +2,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 
+from app.periods import VALID_PERIODS, period_cutoff
 from app.ttyplayer import TTYLogError, ttylogs_to_asciicast
 
 router = APIRouter()
@@ -14,6 +15,11 @@ async def list_sessions(
     request: Request,
     ip: str | None = None,
     command: str | None = None,
+    protocol: str | None = None,
+    country: str | None = None,
+    period: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
     sort: str = "connect_time",
@@ -23,6 +29,8 @@ async def list_sessions(
         raise HTTPException(status_code=400, detail=f"invalid sort column: {sort}")
     if order not in ("asc", "desc"):
         raise HTTPException(status_code=400, detail=f"invalid order: {order}")
+    if period is not None and period not in VALID_PERIODS:
+        raise HTTPException(status_code=400, detail=f"invalid period: {period}")
 
     db = request.app.state.db
     where_clauses = []
@@ -33,6 +41,23 @@ async def list_sessions(
     if command:
         where_clauses.append("session_id IN (SELECT session_id FROM commands WHERE input_text = ?)")
         where_params.append(command)
+    if protocol:
+        where_clauses.append("protocol = ?")
+        where_params.append(protocol)
+    if country:
+        where_clauses.append("src_ip IN (SELECT ip FROM geo_cache WHERE country = ?)")
+        where_params.append(country)
+    if period:
+        cutoff = period_cutoff(period)
+        if cutoff:
+            where_clauses.append("connect_time >= ?")
+            where_params.append(cutoff)
+    if date_from:
+        where_clauses.append("connect_time >= ?")
+        where_params.append(date_from)
+    if date_to:
+        where_clauses.append("connect_time < ?")
+        where_params.append(date_to)
     where_clause = (" WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
 
     total = db.execute(
