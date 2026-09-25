@@ -1,10 +1,11 @@
 import { NavLink } from "react-router-dom";
-import { Shield, BarChart2, List, Link2, Globe, Sun, Moon } from "lucide-react";
+import { Shield, BarChart2, List, Terminal, Link2, Globe, Sun, Moon } from "lucide-react";
 import { useTheme } from "../theme/ThemeContext";
 
 const NAV_ITEMS = [
   { to: "/overview", label: "Overview", Icon: BarChart2 },
   { to: "/sessions", label: "Sessions", Icon: List },
+  { to: "/commands", label: "Commandes", Icon: Terminal },
   { to: "/correlation", label: "Corrélation", Icon: Link2 },
   { to: "/map", label: "Carte", Icon: Globe },
 ];
