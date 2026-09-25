@@ -93,7 +93,6 @@ main#content { flex: 1; padding: var(--space-8); overflow-x: auto; max-width: 12
 }
 .btn:hover { background: var(--neutral-subtle); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn.active { background: var(--accent-subtle); color: var(--accent); border-color: var(--accent); font-weight: 500; }
 .btn svg { width: 14px; height: 14px; }
 .btn-icon {
   display: inline-flex; align-items: center; justify-content: center;
@@ -236,7 +235,19 @@ td { padding: var(--space-3); border-top: 1px solid var(--border); }
 }
 
 .map-controls { display: flex; align-items: center; gap: var(--space-4); }
-.period-selector { display: flex; gap: var(--space-1); }
+.period-selector {
+  display: inline-flex; gap: 2px; padding: 2px;
+  background: var(--neutral-subtle); border: 1px solid var(--border); border-radius: var(--radius);
+}
+.period-selector .btn {
+  border: none; background: none; color: var(--text-secondary);
+  border-radius: calc(var(--radius) - 2px);
+}
+.period-selector .btn:hover { background: var(--bg-surface); color: var(--text-primary); }
+.period-selector .btn.active {
+  background: var(--accent); color: #fff; font-weight: 500;
+}
+.period-selector .btn.active:hover { background: var(--accent); }
 .map-tooltip {
   position: absolute; top: var(--space-4); right: var(--space-4);
   background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
