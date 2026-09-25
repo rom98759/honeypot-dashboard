@@ -13,6 +13,7 @@ SORTABLE_COLUMNS = {"src_ip", "connect_time", "duration_ms", "login_username"}
 async def list_sessions(
     request: Request,
     ip: str | None = None,
+    command: str | None = None,
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
     sort: str = "connect_time",
@@ -24,8 +25,15 @@ async def list_sessions(
         raise HTTPException(status_code=400, detail=f"invalid order: {order}")
 
     db = request.app.state.db
-    where_clause = " WHERE src_ip = ?" if ip else ""
-    where_params: list = [ip] if ip else []
+    where_clauses = []
+    where_params: list = []
+    if ip:
+        where_clauses.append("src_ip = ?")
+        where_params.append(ip)
+    if command:
+        where_clauses.append("session_id IN (SELECT session_id FROM commands WHERE input_text = ?)")
+        where_params.append(command)
+    where_clause = (" WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
 
     total = db.execute(
         f"SELECT COUNT(*) AS n FROM sessions{where_clause}", where_params

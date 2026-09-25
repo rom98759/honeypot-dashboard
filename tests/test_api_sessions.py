@@ -280,3 +280,40 @@ def test_replay_404_when_ttylog_corrupted(tmp_path):
 
     response = client.get("/api/sessions/s4/replay")
     assert response.status_code == 404
+
+
+def test_list_sessions_filters_by_exact_command(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    _seed(db, tmp_path)
+    app = create_app(db=db, start_background_tasks=False)
+    client = TestClient(app)
+
+    response = client.get("/api/sessions", params={"command": "whoami"})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 1
+    assert body["items"][0]["session_id"] == "s1"
+
+
+def test_list_sessions_command_filter_is_exact_not_substring(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    _seed(db, tmp_path)
+    app = create_app(db=db, start_background_tasks=False)
+    client = TestClient(app)
+
+    response = client.get("/api/sessions", params={"command": "who"})
+    assert response.status_code == 200
+    assert response.json()["total"] == 0
+
+
+def test_list_sessions_combines_ip_and_command_filters(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    _seed(db, tmp_path)
+    app = create_app(db=db, start_background_tasks=False)
+    client = TestClient(app)
+
+    matching = client.get("/api/sessions", params={"ip": "1.2.3.4", "command": "whoami"})
+    assert matching.json()["total"] == 1
+
+    mismatched = client.get("/api/sessions", params={"ip": "5.6.7.8", "command": "whoami"})
+    assert mismatched.json()["total"] == 0
