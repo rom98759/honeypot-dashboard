@@ -97,7 +97,7 @@ export function CommandsPage() {
           {data.items.length ? (
             data.items.map((c) => (
               <tr key={c.input_text}>
-                <td className="mono">
+                <td className="mono command-cell">
                   <code>{c.input_text}</code>
                 </td>
                 <td>{c.n}</td>
