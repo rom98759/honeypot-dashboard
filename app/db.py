@@ -65,6 +65,7 @@ CREATE INDEX IF NOT EXISTS idx_fail2ban_events_ip_timestamp ON fail2ban_events(i
 CREATE INDEX IF NOT EXISTS idx_fail2ban_events_timestamp ON fail2ban_events(timestamp);
 CREATE INDEX IF NOT EXISTS idx_sshd_auth_events_ip ON sshd_auth_events(ip);
 CREATE INDEX IF NOT EXISTS idx_commands_session_id ON commands(session_id);
+CREATE INDEX IF NOT EXISTS idx_commands_input_text ON commands(input_text);
 """
 
 
