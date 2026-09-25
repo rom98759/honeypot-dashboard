@@ -30,11 +30,12 @@ export function CommandsPage() {
 
   const { data, isPending, isError, refetch } = useCommands({ period, q, page });
 
-  function updateParams(next: { q: string; page?: string }) {
+  function updateParams(next: { q: string; page?: string; period: Period }) {
     clearTimeout(debounceRef.current);
     const params = new URLSearchParams();
     if (next.q.trim()) params.set("q", next.q.trim());
     params.set("page", next.page ?? "1");
+    params.set("period", next.period);
     setSearchParams(params);
   }
 
@@ -42,13 +43,13 @@ export function CommandsPage() {
     setQInput(value);
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      updateParams({ q: value });
+      updateParams({ q: value, period });
     }, 300);
   }
 
   function handlePeriodChange(value: Period) {
     setPeriod(value);
-    updateParams({ q, page: "1" });
+    updateParams({ q, page: "1", period: value });
   }
 
   if (isPending) return <SkeletonBlock rows={8} />;
@@ -120,8 +121,8 @@ export function CommandsPage() {
       <Pagination
         page={page}
         totalPages={totalPages}
-        onPrev={() => updateParams({ q, page: String(page - 1) })}
-        onNext={() => updateParams({ q, page: String(page + 1) })}
+        onPrev={() => updateParams({ q, page: String(page - 1), period })}
+        onNext={() => updateParams({ q, page: String(page + 1), period })}
       />
     </>
   );

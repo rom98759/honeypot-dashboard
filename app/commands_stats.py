@@ -25,7 +25,7 @@ def get_commands_stats(db: sqlite3.Connection, period: str, q: str, limit: int, 
         "SELECT c.input_text, COUNT(*) AS n, MAX(c.timestamp) AS last_seen "
         "FROM commands c JOIN sessions s ON s.session_id = c.session_id "
         "WHERE 1=1" + where + " "
-        "GROUP BY c.input_text ORDER BY n DESC LIMIT ? OFFSET ?",
+        "GROUP BY c.input_text ORDER BY n DESC, c.input_text ASC LIMIT ? OFFSET ?",
         [*params, limit, offset],
     ).fetchall()
 
