@@ -32,6 +32,7 @@ interface ParamUpdate {
 export function SessionsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const ip = searchParams.get("ip") ?? "";
+  const command = searchParams.get("command") ?? "";
   const sort = searchParams.get("sort") ?? "connect_time";
   const order = searchParams.get("order") === "asc" ? "asc" : "desc";
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
@@ -46,7 +47,7 @@ export function SessionsPage() {
 
   useEffect(() => () => clearTimeout(debounceRef.current), []);
 
-  const { data, isPending, isError, refetch } = useSessions({ ip, sort, order, page });
+  const { data, isPending, isError, refetch } = useSessions({ ip, command, sort, order, page });
 
   function updateParams(next: ParamUpdate) {
     clearTimeout(debounceRef.current);
@@ -95,6 +96,11 @@ export function SessionsPage() {
           {data.total} résultat{data.total > 1 ? "s" : ""}
         </span>
       </div>
+      {command ? (
+        <p>
+          Filtré par commande : <code>{command}</code> <Link to="/sessions">Effacer</Link>
+        </p>
+      ) : null}
       <div className="filter-bar">
         <Search />
         <input

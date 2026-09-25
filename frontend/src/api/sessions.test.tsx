@@ -41,4 +41,26 @@ describe("useSessions", () => {
       `/api/sessions?limit=${PAGE_SIZE}&offset=${PAGE_SIZE}&sort=src_ip&order=asc&ip=1.2.3.4`
     );
   });
+
+  it("includes command when set, alongside ip", async () => {
+    const fetchMock = vi.fn(
+      async () => ({ ok: true, json: async () => ({ items: [], total: 0 }) }) as Response
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const { result } = renderHook(
+      () =>
+        useSessions({
+          ip: "1.2.3.4",
+          command: "whoami",
+          sort: "connect_time",
+          order: "desc",
+          page: 1,
+        }),
+      { wrapper }
+    );
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/sessions?limit=${PAGE_SIZE}&offset=0&sort=connect_time&order=desc&ip=1.2.3.4&command=whoami`
+    );
+  });
 });

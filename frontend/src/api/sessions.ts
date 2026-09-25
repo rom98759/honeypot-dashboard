@@ -6,15 +6,16 @@ export const PAGE_SIZE = 25;
 
 export interface SessionsQuery {
   ip: string;
+  command?: string;
   sort: string;
   order: "asc" | "desc";
   page: number;
 }
 
-export function useSessions({ ip, sort, order, page }: SessionsQuery) {
+export function useSessions({ ip, command, sort, order, page }: SessionsQuery) {
   const offset = (page - 1) * PAGE_SIZE;
   return useQuery({
-    queryKey: ["sessions", { ip, sort, order, page }],
+    queryKey: ["sessions", { ip, command, sort, order, page }],
     queryFn: () => {
       const query = new URLSearchParams({
         limit: String(PAGE_SIZE),
@@ -23,6 +24,7 @@ export function useSessions({ ip, sort, order, page }: SessionsQuery) {
         order,
       });
       if (ip) query.set("ip", ip);
+      if (command) query.set("command", command);
       return fetchJSON<PaginatedSessions>(`/api/sessions?${query.toString()}`);
     },
     placeholderData: keepPreviousData,

@@ -227,4 +227,27 @@ describe("SessionsPage", () => {
     await waitFor(() => expect(screen.getByText("IP detail stub")).toBeInTheDocument());
     expect(document.body.querySelector(".session-panel")).toBeNull();
   });
+
+  it("shows a command-filter indicator when ?command= is set, with a link to clear it", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => jsonResponse(SESSIONS_PAGE_1)));
+    renderWithProviders(<SessionsPage />, { route: "/sessions?command=whoami" });
+    await waitFor(() => expect(screen.getByText("1.2.3.4")).toBeInTheDocument());
+    expect(screen.getByText("whoami")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Effacer" })).toHaveAttribute("href", "/sessions");
+  });
+
+  it("passes the command param through to the sessions request", async () => {
+    const fetchMock = vi.fn(() => jsonResponse(SESSIONS_PAGE_1));
+    vi.stubGlobal("fetch", fetchMock);
+    renderWithProviders(<SessionsPage />, { route: "/sessions?command=whoami" });
+    await waitFor(() => expect(screen.getByText("1.2.3.4")).toBeInTheDocument());
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("command=whoami"));
+  });
+
+  it("does not show the command-filter indicator when ?command= is absent", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => jsonResponse(SESSIONS_PAGE_1)));
+    renderWithProviders(<SessionsPage />, { route: "/sessions" });
+    await waitFor(() => expect(screen.getByText("1.2.3.4")).toBeInTheDocument());
+    expect(screen.queryByRole("link", { name: "Effacer" })).not.toBeInTheDocument();
+  });
 });
