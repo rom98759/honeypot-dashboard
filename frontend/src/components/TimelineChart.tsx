@@ -1,5 +1,4 @@
-import { forwardRef, type ForwardedRef } from "react";
-import { Component, type ReactNode } from "react";
+import { Component, forwardRef, useMemo, useRef, type ForwardedRef, type ReactNode } from "react";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -52,52 +51,78 @@ export const TimelineChart = forwardRef(function TimelineChart(
   const textSecondary = styles.getPropertyValue("--text-secondary").trim();
   void theme;
 
-  function reportRange(chart: { scales: { x: { min: number; max: number } } }) {
-    if (!onRangeChange) return;
-    const { min, max } = chart.scales.x;
-    const isFullRange = min <= 0 && max >= timeline.length - 1;
+  // Keep the latest onRangeChange in a ref so the memoized `options` object's
+  // identity doesn't change just because the parent passed a new function
+  // reference on every render (OverviewPage re-renders every 10s).
+  const onRangeChangeRef = useRef(onRangeChange);
+  onRangeChangeRef.current = onRangeChange;
+
+  const timelineRef = useRef(timeline);
+  timelineRef.current = timeline;
+
+  function reportRange(chart: ChartJS) {
+    const cb = onRangeChangeRef.current;
+    if (!cb) return;
+    const currentTimeline = timelineRef.current;
+    const min = chart.scales.x.min as number;
+    const max = chart.scales.x.max as number;
+    const isFullRange = min <= 0 && max >= currentTimeline.length - 1;
     if (isFullRange) {
-      onRangeChange(null);
+      cb(null);
       return;
     }
-    const start = timeline[Math.max(0, Math.round(min))]?.bucket;
-    const end = timeline[Math.min(timeline.length - 1, Math.round(max))]?.bucket;
-    if (start && end) onRangeChange({ start, end });
+    const start = currentTimeline[Math.max(0, Math.round(min))]?.bucket;
+    const end = currentTimeline[Math.min(currentTimeline.length - 1, Math.round(max))]?.bucket;
+    if (start && end) cb({ start, end });
   }
 
-  const data = {
-    labels: timeline.map((t) => t.bucket),
-    datasets: [
-      {
-        label: "Connexions",
-        data: timeline.map((t) => t.n),
-        borderColor: "#2563eb",
-        backgroundColor: "rgba(37, 99, 235, 0.1)",
-        fill: true,
-        tension: 0.3,
-        pointRadius: 0,
+  const data = useMemo(
+    () => ({
+      labels: timeline.map((t) => t.bucket),
+      datasets: [
+        {
+          label: "Connexions",
+          data: timeline.map((t) => t.n),
+          borderColor: "#2563eb",
+          backgroundColor: "rgba(37, 99, 235, 0.1)",
+          fill: true,
+          tension: 0.3,
+          pointRadius: 0,
+        },
+      ],
+    }),
+    [timeline]
+  );
+
+  const options = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        zoom: {
+          pan: {
+            enabled: true,
+            mode: "x" as const,
+            modifierKey: "ctrl" as const,
+            onPanComplete: ({ chart }: { chart: ChartJS }) => reportRange(chart),
+          },
+          zoom: {
+            drag: { enabled: true },
+            mode: "x" as const,
+            onZoomComplete: ({ chart }: { chart: ChartJS }) => reportRange(chart),
+          },
+        },
       },
-    ],
-  };
-  const options = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { display: false },
-      zoom: {
-        pan: { enabled: true, mode: "x" as const },
-        zoom: { drag: { enabled: true }, mode: "x" as const },
-        onZoomComplete: ({ chart }: { chart: { scales: { x: { min: number; max: number } } } }) =>
-          reportRange(chart),
-        onPanComplete: ({ chart }: { chart: { scales: { x: { min: number; max: number } } } }) =>
-          reportRange(chart),
+      scales: {
+        x: { grid: { display: false }, ticks: { color: textSecondary } },
+        y: { beginAtZero: true, grid: { color: borderColor }, ticks: { color: textSecondary } },
       },
-    },
-    scales: {
-      x: { grid: { display: false }, ticks: { color: textSecondary } },
-      y: { beginAtZero: true, grid: { color: borderColor }, ticks: { color: textSecondary } },
-    },
-  };
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [borderColor, textSecondary]
+  );
+
   return (
     <ChartErrorBoundary>
       <Line ref={ref} data={data} options={options} />

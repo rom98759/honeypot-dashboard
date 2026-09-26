@@ -52,10 +52,37 @@ describe("TimelineChart", () => {
       </ThemeProvider>
     );
     const props = lineSpy.mock.calls[lineSpy.mock.calls.length - 1][0] as {
-      options: { plugins: { zoom: { onZoomComplete: (ctx: unknown) => void } } };
+      options: { plugins: { zoom: { zoom: { onZoomComplete: (ctx: unknown) => void } } } };
     };
     const fakeChart = { scales: { x: { min: 1, max: 2 } } };
-    props.options.plugins.zoom.onZoomComplete({ chart: fakeChart });
+    props.options.plugins.zoom.zoom.onZoomComplete({ chart: fakeChart });
+    expect(onRangeChange).toHaveBeenCalledWith({ start: "2026-08-13T11", end: "2026-08-13T12" });
+  });
+
+  it("configures ctrl-modified panning and reports the visible range via onRangeChange", () => {
+    const onRangeChange = vi.fn();
+    render(
+      <ThemeProvider>
+        <TimelineChart
+          timeline={[
+            { bucket: "2026-08-13T10", n: 5 },
+            { bucket: "2026-08-13T11", n: 8 },
+            { bucket: "2026-08-13T12", n: 2 },
+          ]}
+          onRangeChange={onRangeChange}
+        />
+      </ThemeProvider>
+    );
+    const props = lineSpy.mock.calls[lineSpy.mock.calls.length - 1][0] as {
+      options: {
+        plugins: {
+          zoom: { pan: { modifierKey: string; onPanComplete: (ctx: unknown) => void } };
+        };
+      };
+    };
+    expect(props.options.plugins.zoom.pan.modifierKey).toBe("ctrl");
+    const fakeChart = { scales: { x: { min: 1, max: 2 } } };
+    props.options.plugins.zoom.pan.onPanComplete({ chart: fakeChart });
     expect(onRangeChange).toHaveBeenCalledWith({ start: "2026-08-13T11", end: "2026-08-13T12" });
   });
 
@@ -70,10 +97,10 @@ describe("TimelineChart", () => {
       </ThemeProvider>
     );
     const props = lineSpy.mock.calls[lineSpy.mock.calls.length - 1][0] as {
-      options: { plugins: { zoom: { onZoomComplete: (ctx: unknown) => void } } };
+      options: { plugins: { zoom: { zoom: { onZoomComplete: (ctx: unknown) => void } } } };
     };
     const fakeChart = { scales: { x: { min: 0, max: 1 } } };
-    props.options.plugins.zoom.onZoomComplete({ chart: fakeChart });
+    props.options.plugins.zoom.zoom.onZoomComplete({ chart: fakeChart });
     expect(onRangeChange).toHaveBeenCalledWith(null);
   });
 });

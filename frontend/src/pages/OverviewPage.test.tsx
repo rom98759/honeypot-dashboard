@@ -2,7 +2,7 @@ import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter, Routes, Route } from "react-router-dom";
+import { MemoryRouter, Routes, Route, useLocation } from "react-router-dom";
 import { renderWithProviders } from "../test-utils";
 import { PeriodProvider } from "../theme/PeriodContext";
 import { OverviewPage } from "./OverviewPage";
@@ -72,6 +72,11 @@ function jsonResponse(body: unknown): Promise<Response> {
 }
 
 const EMPTY_HEATMAP = { cells: [] };
+
+function SessionsStub() {
+  const location = useLocation();
+  return <div>Sessions stub: {location.search}</div>;
+}
 
 function stubOverviewFetch(overviewBody: unknown, heatmapBody: unknown = EMPTY_HEATMAP) {
   return vi.fn((url: string) =>
@@ -242,7 +247,7 @@ describe("OverviewPage", () => {
       return (
         <Routes>
           <Route path="/overview" element={<OverviewPage />} />
-          <Route path="/sessions" element={<div>Sessions stub</div>} />
+          <Route path="/sessions" element={<SessionsStub />} />
         </Routes>
       );
     }
@@ -250,7 +255,8 @@ describe("OverviewPage", () => {
     await waitFor(() => expect(screen.getByTestId("protocol-donut-stub")).toBeInTheDocument());
 
     await userEvent.click(screen.getByRole("button", { name: "Simulate protocol click" }));
-    await waitFor(() => expect(screen.getByText("Sessions stub")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/protocol=ssh/)).toBeInTheDocument());
+    expect(screen.getByText(/period=24h/)).toBeInTheDocument();
   });
 
   it("navigates to a country-filtered Sessions view when a top-country row is clicked", async () => {
@@ -259,7 +265,7 @@ describe("OverviewPage", () => {
       return (
         <Routes>
           <Route path="/overview" element={<OverviewPage />} />
-          <Route path="/sessions" element={<div>Sessions stub</div>} />
+          <Route path="/sessions" element={<SessionsStub />} />
         </Routes>
       );
     }
@@ -267,7 +273,8 @@ describe("OverviewPage", () => {
     await waitFor(() => expect(screen.getByRole("link", { name: "France" })).toBeInTheDocument());
 
     await userEvent.click(screen.getByRole("link", { name: "France" }));
-    await waitFor(() => expect(screen.getByText("Sessions stub")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/country=France/)).toBeInTheDocument());
+    expect(screen.getByText(/period=24h/)).toBeInTheDocument();
   });
 
   it("navigates to a date-range-filtered Sessions view when a bans bar is clicked", async () => {
@@ -276,7 +283,7 @@ describe("OverviewPage", () => {
       return (
         <Routes>
           <Route path="/overview" element={<OverviewPage />} />
-          <Route path="/sessions" element={<div>Sessions stub</div>} />
+          <Route path="/sessions" element={<SessionsStub />} />
         </Routes>
       );
     }
@@ -284,7 +291,10 @@ describe("OverviewPage", () => {
     await waitFor(() => expect(screen.getByTestId("bans-bar-chart-stub")).toBeInTheDocument());
 
     await userEvent.click(screen.getByRole("button", { name: "Simulate bar click" }));
-    await waitFor(() => expect(screen.getByText("Sessions stub")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText(/date_from=2026-08-13.*date_to=2026-08-14/)).toBeInTheDocument()
+    );
+    expect(screen.queryByText(/period=/)).not.toBeInTheDocument();
   });
 
   it("shows a 'view these sessions' action only while the timeline is zoomed, and clears it on reset", async () => {
@@ -306,7 +316,7 @@ describe("OverviewPage", () => {
       return (
         <Routes>
           <Route path="/overview" element={<OverviewPage />} />
-          <Route path="/sessions" element={<div>Sessions stub</div>} />
+          <Route path="/sessions" element={<SessionsStub />} />
         </Routes>
       );
     }
@@ -315,6 +325,11 @@ describe("OverviewPage", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Simulate zoom" }));
     await userEvent.click(screen.getByRole("button", { name: "Voir les sessions de cette période" }));
-    await waitFor(() => expect(screen.getByText("Sessions stub")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(
+        screen.getByText(/date_from=2026-08-13T10.*date_to=2026-08-13T12/)
+      ).toBeInTheDocument()
+    );
+    expect(screen.queryByText(/period=/)).not.toBeInTheDocument();
   });
 });
