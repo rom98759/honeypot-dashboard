@@ -228,12 +228,14 @@ describe("SessionsPage", () => {
     expect(document.body.querySelector(".session-panel")).toBeNull();
   });
 
-  it("shows a command-filter indicator when ?command= is set, with a link to clear it", async () => {
+  it("shows a command-filter chip when ?command= is set, with a way to clear it", async () => {
     vi.stubGlobal("fetch", vi.fn(() => jsonResponse(SESSIONS_PAGE_1)));
     renderWithProviders(<SessionsPage />, { route: "/sessions?command=whoami" });
     await waitFor(() => expect(screen.getByText("1.2.3.4")).toBeInTheDocument());
-    expect(screen.getByText("whoami")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Effacer" })).toHaveAttribute("href", "/sessions");
+    expect(screen.getByText(/Commande : whoami/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /Effacer : Commande : whoami/ }));
+    await waitFor(() => expect(screen.queryByText(/Commande : whoami/)).not.toBeInTheDocument());
   });
 
   it("passes the command param through to the sessions request", async () => {
@@ -244,11 +246,11 @@ describe("SessionsPage", () => {
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("command=whoami"));
   });
 
-  it("does not show the command-filter indicator when ?command= is absent", async () => {
+  it("does not show a command-filter chip when ?command= is absent", async () => {
     vi.stubGlobal("fetch", vi.fn(() => jsonResponse(SESSIONS_PAGE_1)));
     renderWithProviders(<SessionsPage />, { route: "/sessions" });
     await waitFor(() => expect(screen.getByText("1.2.3.4")).toBeInTheDocument());
-    expect(screen.queryByRole("link", { name: "Effacer" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Commande :/)).not.toBeInTheDocument();
   });
 
   it("keeps the command filter in the URL after an in-page interaction (pagination)", async () => {
@@ -263,5 +265,48 @@ describe("SessionsPage", () => {
       expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("offset=25"))
     );
     expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("command=whoami"));
+  });
+
+  it("passes protocol, country, period, and date range params through to the sessions request", async () => {
+    const fetchMock = vi.fn((_url: string) => jsonResponse(SESSIONS_PAGE_1));
+    vi.stubGlobal("fetch", fetchMock);
+    renderWithProviders(<SessionsPage />, {
+      route: "/sessions?protocol=ssh&country=France&period=7d&date_from=2026-08-12T10&date_to=2026-08-12T13",
+    });
+    await waitFor(() => expect(screen.getByText("1.2.3.4")).toBeInTheDocument());
+    const url = fetchMock.mock.calls[fetchMock.mock.calls.length - 1][0] as string;
+    expect(url).toContain("protocol=ssh");
+    expect(url).toContain("country=France");
+    expect(url).toContain("period=7d");
+    expect(url).toContain("date_from=2026-08-12T10");
+    expect(url).toContain("date_to=2026-08-12T13");
+  });
+
+  it("shows a filter chip for each active URL filter and clears only the one whose button is clicked", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => jsonResponse(SESSIONS_PAGE_1)));
+    renderWithProviders(<SessionsPage />, { route: "/sessions?protocol=ssh&country=France" });
+    await waitFor(() => expect(screen.getByText("1.2.3.4")).toBeInTheDocument());
+    expect(screen.getByText(/Protocole : ssh/)).toBeInTheDocument();
+    expect(screen.getByText(/Pays : France/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /Effacer : Protocole : ssh/ }));
+    await waitFor(() => expect(screen.queryByText(/Protocole : ssh/)).not.toBeInTheDocument());
+    expect(screen.getByText(/Pays : France/)).toBeInTheDocument();
+  });
+
+  it("keeps every active filter in the URL after an in-page interaction (pagination) with several set at once", async () => {
+    const fetchMock = vi.fn((_url: string) => jsonResponse(SESSIONS_PAGE_1));
+    vi.stubGlobal("fetch", fetchMock);
+    renderWithProviders(<SessionsPage />, {
+      route: "/sessions?command=whoami&protocol=ssh&country=France",
+    });
+    await waitFor(() => expect(screen.getByText("1.2.3.4")).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole("button", { name: "Suivant" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("offset=25")));
+    const url = fetchMock.mock.calls[fetchMock.mock.calls.length - 1][0] as string;
+    expect(url).toContain("command=whoami");
+    expect(url).toContain("protocol=ssh");
+    expect(url).toContain("country=France");
   });
 });
