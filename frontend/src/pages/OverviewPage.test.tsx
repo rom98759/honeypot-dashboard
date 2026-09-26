@@ -2,26 +2,56 @@ import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { renderWithProviders } from "../test-utils";
 import { PeriodProvider } from "../theme/PeriodContext";
 import { OverviewPage } from "./OverviewPage";
 
 vi.mock("../components/TimelineChart", () => ({
-  TimelineChart: ({ timeline }: { timeline: { bucket: string; n: number }[] }) => (
-    <div data-testid="timeline-chart-stub">{timeline.length}</div>
+  TimelineChart: ({
+    timeline,
+    onRangeChange,
+  }: {
+    timeline: { bucket: string; n: number }[];
+    onRangeChange?: (range: { start: string; end: string } | null) => void;
+  }) => (
+    <div data-testid="timeline-chart-stub">
+      {timeline.length}
+      <button onClick={() => onRangeChange?.({ start: "2026-08-13T10", end: "2026-08-13T11" })}>
+        Simulate zoom
+      </button>
+      <button onClick={() => onRangeChange?.(null)}>Simulate reset</button>
+    </div>
   ),
 }));
 
 vi.mock("../components/ProtocolDonut", () => ({
-  ProtocolDonut: ({ protocolSplit }: { protocolSplit: { protocol: string; n: number }[] }) => (
-    <div data-testid="protocol-donut-stub">{protocolSplit.length}</div>
+  ProtocolDonut: ({
+    protocolSplit,
+    onSliceClick,
+  }: {
+    protocolSplit: { protocol: string; n: number }[];
+    onSliceClick?: (protocol: string) => void;
+  }) => (
+    <div data-testid="protocol-donut-stub">
+      {protocolSplit.length}
+      <button onClick={() => onSliceClick?.("ssh")}>Simulate protocol click</button>
+    </div>
   ),
 }));
 
 vi.mock("../components/BansBarChart", () => ({
-  BansBarChart: ({ bansTimeline }: { bansTimeline: { bucket: string; n: number }[] }) => (
-    <div data-testid="bans-bar-chart-stub">{bansTimeline.length}</div>
+  BansBarChart: ({
+    bansTimeline,
+    onBarClick,
+  }: {
+    bansTimeline: { bucket: string; n: number }[];
+    onBarClick?: (bucket: string) => void;
+  }) => (
+    <div data-testid="bans-bar-chart-stub">
+      {bansTimeline.length}
+      <button onClick={() => onBarClick?.("2026-08-13")}>Simulate bar click</button>
+    </div>
   ),
 }));
 
@@ -204,5 +234,87 @@ describe("OverviewPage", () => {
     );
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/overview?period=7d"));
     localStorage.clear();
+  });
+
+  it("navigates to a protocol-filtered Sessions view when a donut slice is clicked", async () => {
+    vi.stubGlobal("fetch", stubOverviewFetch(FULL_OVERVIEW));
+    function Harness() {
+      return (
+        <Routes>
+          <Route path="/overview" element={<OverviewPage />} />
+          <Route path="/sessions" element={<div>Sessions stub</div>} />
+        </Routes>
+      );
+    }
+    renderWithProviders(<Harness />, { route: "/overview" });
+    await waitFor(() => expect(screen.getByTestId("protocol-donut-stub")).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole("button", { name: "Simulate protocol click" }));
+    await waitFor(() => expect(screen.getByText("Sessions stub")).toBeInTheDocument());
+  });
+
+  it("navigates to a country-filtered Sessions view when a top-country row is clicked", async () => {
+    vi.stubGlobal("fetch", stubOverviewFetch(FULL_OVERVIEW));
+    function Harness() {
+      return (
+        <Routes>
+          <Route path="/overview" element={<OverviewPage />} />
+          <Route path="/sessions" element={<div>Sessions stub</div>} />
+        </Routes>
+      );
+    }
+    renderWithProviders(<Harness />, { route: "/overview" });
+    await waitFor(() => expect(screen.getByRole("link", { name: "France" })).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole("link", { name: "France" }));
+    await waitFor(() => expect(screen.getByText("Sessions stub")).toBeInTheDocument());
+  });
+
+  it("navigates to a date-range-filtered Sessions view when a bans bar is clicked", async () => {
+    vi.stubGlobal("fetch", stubOverviewFetch(FULL_OVERVIEW));
+    function Harness() {
+      return (
+        <Routes>
+          <Route path="/overview" element={<OverviewPage />} />
+          <Route path="/sessions" element={<div>Sessions stub</div>} />
+        </Routes>
+      );
+    }
+    renderWithProviders(<Harness />, { route: "/overview" });
+    await waitFor(() => expect(screen.getByTestId("bans-bar-chart-stub")).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole("button", { name: "Simulate bar click" }));
+    await waitFor(() => expect(screen.getByText("Sessions stub")).toBeInTheDocument());
+  });
+
+  it("shows a 'view these sessions' action only while the timeline is zoomed, and clears it on reset", async () => {
+    vi.stubGlobal("fetch", stubOverviewFetch(FULL_OVERVIEW));
+    renderWithProviders(<OverviewPage />);
+    await waitFor(() => expect(screen.getByTestId("timeline-chart-stub")).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: "Voir les sessions de cette période" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Simulate zoom" }));
+    expect(screen.getByRole("button", { name: "Voir les sessions de cette période" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Simulate reset" }));
+    expect(screen.queryByRole("button", { name: "Voir les sessions de cette période" })).not.toBeInTheDocument();
+  });
+
+  it("navigates to a date-range-filtered Sessions view from the zoomed timeline action", async () => {
+    vi.stubGlobal("fetch", stubOverviewFetch(FULL_OVERVIEW));
+    function Harness() {
+      return (
+        <Routes>
+          <Route path="/overview" element={<OverviewPage />} />
+          <Route path="/sessions" element={<div>Sessions stub</div>} />
+        </Routes>
+      );
+    }
+    renderWithProviders(<Harness />, { route: "/overview" });
+    await waitFor(() => expect(screen.getByTestId("timeline-chart-stub")).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole("button", { name: "Simulate zoom" }));
+    await userEvent.click(screen.getByRole("button", { name: "Voir les sessions de cette période" }));
+    await waitFor(() => expect(screen.getByText("Sessions stub")).toBeInTheDocument());
   });
 });

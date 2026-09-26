@@ -1,5 +1,7 @@
+import { useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
+import type { Chart as ChartJS } from "chart.js";
 import { usePeriod } from "../theme/PeriodContext";
 import { useOverview, useOverviewHeatmap } from "../api/overview";
 import { StatCard } from "../components/StatCard";
@@ -13,6 +15,7 @@ import { DurationDistributionChart } from "../components/DurationDistributionCha
 import { SkeletonBlock } from "../components/SkeletonBlock";
 import { ErrorState } from "../components/ErrorState";
 import { EmptyState } from "../components/EmptyState";
+import { bucketRangeToDates } from "../utils/bucket";
 import type { OverviewPeriod } from "../api/types";
 
 const PERIODS: { value: OverviewPeriod; label: string }[] = [
@@ -25,6 +28,9 @@ const PERIODS: { value: OverviewPeriod; label: string }[] = [
 export function OverviewPage() {
   const [, setSearchParams] = useSearchParams();
   const [period, setPeriod] = usePeriod();
+  const navigate = useNavigate();
+  const chartRef = useRef<ChartJS<"line"> | undefined>(undefined);
+  const [zoomRange, setZoomRange] = useState<{ start: string; end: string } | null>(null);
 
   const { data, isPending, isError, refetch } = useOverview(period);
   const heatmap = useOverviewHeatmap();
@@ -32,6 +38,10 @@ export function OverviewPage() {
   function handlePeriodChange(value: OverviewPeriod) {
     setPeriod(value);
     setSearchParams({ period: value });
+  }
+
+  function goToSessions(params: Record<string, string>) {
+    navigate(`/sessions?${new URLSearchParams(params).toString()}`);
   }
 
   if (isPending) return <SkeletonBlock rows={6} />;
@@ -70,15 +80,39 @@ export function OverviewPage() {
       <div className="panel timeline-panel">
         <h3>Timeline</h3>
         <div className="chart-container">
-          {data.timeline.length ? <TimelineChart timeline={data.timeline} /> : null}
+          {data.timeline.length ? (
+            <TimelineChart timeline={data.timeline} ref={chartRef} onRangeChange={setZoomRange} />
+          ) : null}
         </div>
+        {zoomRange ? (
+          <div className="chart-actions">
+            <button
+              className="btn"
+              onClick={() => goToSessions({ ...bucketRangeToDates(zoomRange.start, zoomRange.end), period })}
+            >
+              Voir les sessions de cette période
+            </button>
+            <button
+              className="btn"
+              onClick={() => {
+                chartRef.current?.resetZoom();
+                setZoomRange(null);
+              }}
+            >
+              Réinitialiser le zoom
+            </button>
+          </div>
+        ) : null}
       </div>
       <div className="panels">
         <div className="panel">
           <h3>Protocole</h3>
           {data.protocol_split.length ? (
             <div className="chart-container">
-              <ProtocolDonut protocolSplit={data.protocol_split} />
+              <ProtocolDonut
+                protocolSplit={data.protocol_split}
+                onSliceClick={(p) => goToSessions({ protocol: p, period })}
+              />
             </div>
           ) : (
             <EmptyState message="Aucune donnée" />
@@ -88,7 +122,10 @@ export function OverviewPage() {
           <h3>Bans dans le temps</h3>
           {data.bans_timeline.length ? (
             <div className="chart-container">
-              <BansBarChart bansTimeline={data.bans_timeline} />
+              <BansBarChart
+                bansTimeline={data.bans_timeline}
+                onBarClick={(bucket) => goToSessions(bucketRangeToDates(bucket, bucket))}
+              />
             </div>
           ) : (
             <EmptyState message="Aucune donnée" />
@@ -99,7 +136,10 @@ export function OverviewPage() {
         <div className="panel">
           <h3>Top pays</h3>
           {data.top_countries.length ? (
-            <ProportionList items={data.top_countries.map((c) => ({ label: c.country, n: c.n }))} />
+            <ProportionList
+              items={data.top_countries.map((c) => ({ label: c.country, n: c.n }))}
+              linkTo={(item) => `/sessions?country=${encodeURIComponent(item.label)}&period=${period}`}
+            />
           ) : (
             <EmptyState message="Aucune donnée" />
           )}
