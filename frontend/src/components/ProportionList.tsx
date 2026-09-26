@@ -5,15 +5,21 @@ export interface ProportionItem {
   n: number;
 }
 
-export function ProportionList({ items, linkPrefix }: { items: ProportionItem[]; linkPrefix?: string }) {
+export function ProportionList({
+  items,
+  linkTo,
+}: {
+  items: ProportionItem[];
+  linkTo?: (item: ProportionItem) => string;
+}) {
   const max = Math.max(...items.map((i) => i.n), 1);
   return (
     <>
       {items.map((item) => (
         <div className="proportion-row" key={item.label}>
           <span className="proportion-label">
-            {linkPrefix ? (
-              <Link to={`${linkPrefix}${encodeURIComponent(item.label)}`} className="ip-link">
+            {linkTo ? (
+              <Link to={linkTo(item)} className="ip-link">
                 {item.label}
               </Link>
             ) : (

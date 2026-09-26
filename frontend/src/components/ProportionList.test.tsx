@@ -20,12 +20,18 @@ describe("ProportionList", () => {
     expect(fills[1]).toHaveStyle({ width: "50%" });
   });
 
-  it("renders labels as links to linkPrefix + label when linkPrefix is set", () => {
+  it("renders labels as links built by linkTo when linkTo is set", () => {
     render(
       <MemoryRouter>
-        <ProportionList items={[{ label: "1.2.3.4", n: 3 }]} linkPrefix="/ip/" />
+        <ProportionList items={[{ label: "France", n: 3 }]} linkTo={(item) => `/sessions?country=${item.label}`} />
       </MemoryRouter>
     );
-    expect(screen.getByRole("link", { name: "1.2.3.4" })).toHaveAttribute("href", "/ip/1.2.3.4");
+    expect(screen.getByRole("link", { name: "France" })).toHaveAttribute("href", "/sessions?country=France");
+  });
+
+  it("renders plain text (no link) when linkTo is not set", () => {
+    render(<ProportionList items={[{ label: "France", n: 3 }]} />);
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.getByText("France")).toBeInTheDocument();
   });
 });
