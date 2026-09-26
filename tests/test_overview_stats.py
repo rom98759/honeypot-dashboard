@@ -132,6 +132,33 @@ def test_bans_timeline_bucket_is_hourly_for_24h_and_daily_for_30d(tmp_path):
     assert len(bucket_30d) == 10
 
 
+def test_bans_timeline_bucket_is_t_separated_for_real_fail2ban_timestamps(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    db.execute(
+        "INSERT INTO fail2ban_events (ip, action, jail, timestamp) VALUES "
+        "('1.2.3.4', 'Ban', 'sshd', '2026-08-12 09:44:38,400')",
+    )
+    db.commit()
+
+    bans_timeline = get_overview_stats(db, "all")["bans_timeline"]
+    assert bans_timeline == [{"bucket": "2026-08-12", "n": 1}]
+
+
+def test_bans_timeline_bucket_is_t_separated_hourly_for_24h(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    now = datetime.now(timezone.utc)
+    real_format_timestamp = now.strftime("%Y-%m-%d %H:%M:%S,000")
+    db.execute(
+        "INSERT INTO fail2ban_events (ip, action, jail, timestamp) VALUES ('1.2.3.4', 'Ban', 'sshd', ?)",
+        (real_format_timestamp,),
+    )
+    db.commit()
+
+    bucket = get_overview_stats(db, "24h")["bans_timeline"][0]["bucket"]
+    assert " " not in bucket
+    assert "T" in bucket
+
+
 def test_bans_timeline_is_period_scoped(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
     now = datetime.now(timezone.utc)

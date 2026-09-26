@@ -79,7 +79,7 @@ def get_overview_stats(db: sqlite3.Connection, period: str) -> dict:
         {"bucket": b, "n": duration_counts.get(b, 0)} for b in DURATION_BUCKETS
     ]
 
-    bans_bucket = bucket_expr(period, "timestamp")
+    bans_bucket = bucket_expr(period, "REPLACE(timestamp, ' ', 'T')")
     ban_where = " AND timestamp >= ?" if cutoff else ""
     ban_params = [cutoff] if cutoff else []
     bans_timeline = db.execute(
