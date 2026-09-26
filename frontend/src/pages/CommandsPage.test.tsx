@@ -70,11 +70,21 @@ describe("CommandsPage", () => {
     renderWithProviders(<CommandsPage />, { route: "/commands" });
     await waitFor(() => expect(screen.getByText("whoami")).toBeInTheDocument());
     const links = screen.getAllByRole("link", { name: "Voir les sessions" });
-    expect(links[0]).toHaveAttribute("href", "/sessions?command=whoami");
+    expect(links[0]).toHaveAttribute("href", "/sessions?command=whoami&period=24h");
     expect(links[1]).toHaveAttribute(
       "href",
-      `/sessions?command=${encodeURIComponent("cat /etc/passwd | grep root")}`
+      `/sessions?command=${encodeURIComponent("cat /etc/passwd | grep root")}&period=24h`
     );
+  });
+
+  it("includes the active period on the 'Voir les sessions' link", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => jsonResponse(COMMANDS_PAGE_1)));
+    renderWithProviders(<CommandsPage />, { route: "/commands" });
+    await waitFor(() => expect(screen.getAllByRole("link", { name: "Voir les sessions" })[0]).toBeInTheDocument());
+    const links = screen.getAllByRole("link", { name: "Voir les sessions" });
+    links.forEach((link) => {
+      expect(link).toHaveAttribute("href", expect.stringContaining("period=24h"));
+    });
   });
 
   it("renders an empty state and valid pagination when there are no commands", async () => {

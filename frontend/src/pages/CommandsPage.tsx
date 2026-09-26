@@ -103,7 +103,7 @@ export function CommandsPage() {
                 <td>{c.n}</td>
                 <td className="mono">{formatTimestamp(c.last_seen)}</td>
                 <td>
-                  <Link to={`/sessions?command=${encodeURIComponent(c.input_text)}`}>
+                  <Link to={`/sessions?command=${encodeURIComponent(c.input_text)}&period=${period}`}>
                     Voir les sessions
                   </Link>
                 </td>
