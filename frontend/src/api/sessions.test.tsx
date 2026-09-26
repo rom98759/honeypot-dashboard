@@ -66,7 +66,7 @@ describe("useSessions", () => {
 
   it("includes protocol, country, period, and date range in the query string when set", async () => {
     const fetchMock = vi.fn(
-      async () => ({ ok: true, json: async () => ({ items: [], total: 0 }) }) as Response
+      async (_url: string) => ({ ok: true, json: async () => ({ items: [], total: 0 }) }) as Response
     );
     vi.stubGlobal("fetch", fetchMock);
     const { result } = renderHook(
@@ -95,7 +95,7 @@ describe("useSessions", () => {
 
   it("omits protocol, country, period, and date range from the query string when unset", async () => {
     const fetchMock = vi.fn(
-      async () => ({ ok: true, json: async () => ({ items: [], total: 0 }) }) as Response
+      async (_url: string) => ({ ok: true, json: async () => ({ items: [], total: 0 }) }) as Response
     );
     vi.stubGlobal("fetch", fetchMock);
     const { result } = renderHook(
