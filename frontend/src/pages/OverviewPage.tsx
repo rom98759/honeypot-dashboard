@@ -88,7 +88,7 @@ export function OverviewPage() {
           <div className="chart-actions">
             <button
               className="btn"
-              onClick={() => goToSessions({ ...bucketRangeToDates(zoomRange.start, zoomRange.end), period })}
+              onClick={() => goToSessions(bucketRangeToDates(zoomRange.start, zoomRange.end))}
             >
               Voir les sessions de cette période
             </button>
