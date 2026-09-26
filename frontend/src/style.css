@@ -162,6 +162,15 @@ td { padding: var(--space-3); border-top: 1px solid var(--border); }
   display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
 
+.filter-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-4); }
+.filter-chip {
+  display: flex; align-items: center; gap: var(--space-1);
+  background: var(--accent-subtle); color: var(--accent);
+  border-radius: 999px; padding: 2px var(--space-2); font-size: 13px;
+}
+.filter-chip .btn-icon { padding: 0; width: 16px; height: 16px; }
+.filter-chip .btn-icon svg { width: 14px; height: 14px; }
+
 .filter-bar {
   display: flex; align-items: center; gap: var(--space-2);
   background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
