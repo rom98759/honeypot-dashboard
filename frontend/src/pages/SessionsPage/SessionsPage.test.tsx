@@ -84,6 +84,28 @@ describe("SessionsPage", () => {
     expect(document.activeElement).toBe(input);
   });
 
+  it("resets to page 1 when the IP filter changes while on a later page", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const fetchMock = vi.fn((_url: string) => jsonResponse(SESSIONS_PAGE_1));
+    vi.stubGlobal("fetch", fetchMock);
+    renderWithProviders(<SessionsPage />, { route: "/sessions?page=3" });
+    await waitFor(() => expect(screen.getByText("1.2.3.4")).toBeInTheDocument());
+    expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("offset=50"));
+
+    const input = screen.getByPlaceholderText("Filtrer par IP...") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "9.9.9.9" } });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("ip=9.9.9.9"))
+    );
+    const lastUrl = fetchMock.mock.calls[fetchMock.mock.calls.length - 1][0] as string;
+    expect(lastUrl).toContain("offset=0");
+    expect(lastUrl).not.toContain("offset=50");
+  });
+
   it("cancels a pending debounced filter update when a sort click happens before it fires", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const fetchMock = vi.fn((_url: string) => jsonResponse(SESSIONS_PAGE_1));

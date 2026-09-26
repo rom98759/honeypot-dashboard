@@ -95,7 +95,7 @@ export function SessionsPage() {
     setIpInput(value);
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      updateParams({ ...current, ip: value });
+      updateParams({ ...current, ip: value, page: undefined });
     }, 300);
   }
 
