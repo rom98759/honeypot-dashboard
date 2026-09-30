@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request
 
-from app.attack_map import get_map_points
+from app.attack_map import get_map_events
 from app.periods import VALID_PERIODS
 
 router = APIRouter()
@@ -12,7 +12,7 @@ async def get_map(request: Request, period: str = "24h"):
         raise HTTPException(status_code=400, detail=f"invalid period: {period}")
 
     db = request.app.state.db
-    points = get_map_points(db, period)
+    events = get_map_events(db, period)
 
     vps_latitude = request.app.state.vps_latitude
     vps_longitude = request.app.state.vps_longitude
@@ -22,4 +22,4 @@ async def get_map(request: Request, period: str = "24h"):
         else None
     )
 
-    return {"points": points, "destination": destination}
+    return {"events": events, "destination": destination}

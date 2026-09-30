@@ -23,7 +23,7 @@ def test_map_returns_points_and_null_destination_by_default(tmp_path, monkeypatc
     response = client.get("/api/map?period=all")
     assert response.status_code == 200
     body = response.json()
-    assert body["points"][0]["city"] == "Paris"
+    assert body["events"][0]["city"] == "Paris"
     assert body["destination"] is None
 
 
@@ -77,4 +77,4 @@ def test_map_defaults_to_24h_period(tmp_path):
     client = TestClient(app)
 
     response = client.get("/api/map")  # no period param -> defaults to 24h; session is from 2020
-    assert response.json()["points"] == []
+    assert response.json()["events"] == []
