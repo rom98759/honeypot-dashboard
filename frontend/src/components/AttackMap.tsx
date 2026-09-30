@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ComposableMap, Geographies, Geography, ZoomableGroup, Line } from "react-simple-maps";
 import { geoEqualEarth, type GeoProjection } from "d3-geo";
 import simpleheat from "simpleheat";
@@ -11,28 +11,19 @@ const WIDTH = 800;
 const HEIGHT = 500;
 const projection: GeoProjection = geoEqualEarth().scale(140).translate([WIDTH / 2, HEIGHT / 2]);
 
-interface ZoomState {
-  coordinates: [number, number];
-  zoom: number;
+// Mirrors react-simple-maps' own ZoomableGroup transform: it applies
+// `translate(x, y) scale(k)` to its SVG <g> (see its `transformString`, built from the
+// raw d3-zoom transform `{x, y, k}`). `onMove` reports that exact same raw transform
+// mid-gesture, so the canvas heatmap re-projects points with the identical forward math
+// — no lon/lat inversion, and no feeding anything back into ZoomableGroup's controlled
+// props (see task-5 fix report for why that combination froze live drags).
+interface ViewState {
+  x: number;
+  y: number;
+  k: number;
 }
 
-const DEFAULT_ZOOM_STATE: ZoomState = { coordinates: [0, 0], zoom: 1 };
-
-// react-simple-maps' ZoomableGroup only hands `onMoveStart`/`onMoveEnd` a pre-computed
-// `{ coordinates, zoom }`. Mid-gesture, `onMove` instead reports the raw d3-zoom transform
-// (`{ x, y, zoom, dragging }` — screen-pixel translate + scale), because recomputing the
-// inverse projection on every pointermove would be wasteful for its own internal state.
-// We need the same lon/lat center for our canvas re-projection, so this mirrors
-// react-simple-maps' own internal `getCoords` + `projection.invert` (see its source,
-// ZoomableGroup's `handleZoomEnd`) to recover it from the transform onMove gives us.
-function zoomStateFromTransform(position: { x: number; y: number; zoom: number }): ZoomState {
-  const k = position.zoom;
-  const xOffset = (WIDTH * k - WIDTH) / 2;
-  const yOffset = (HEIGHT * k - HEIGHT) / 2;
-  const pixel: [number, number] = [WIDTH / 2 - (xOffset + position.x) / k, HEIGHT / 2 - (yOffset + position.y) / k];
-  const coordinates = (projection.invert?.(pixel) ?? [0, 0]) as [number, number];
-  return { coordinates, zoom: k };
-}
+const DEFAULT_VIEW_STATE: ViewState = { x: 0, y: 0, k: 1 };
 
 export function AttackMap({
   heatPoints,
@@ -44,13 +35,17 @@ export function AttackMap({
   arrivingPoints: HeatPoint[];
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [zoomState, setZoomState] = useState<ZoomState>(DEFAULT_ZOOM_STATE);
+  const [viewState, setViewState] = useState<ViewState>(DEFAULT_VIEW_STATE);
+
+  // Stable identity: ZoomableGroup's internal effect that binds the d3-zoom listeners
+  // depends on this prop, so a new function every render would rebind on every render.
+  const onMove = useCallback((position: { x: number; y: number; zoom: number }) => {
+    setViewState({ x: position.x, y: position.y, k: position.zoom });
+  }, []);
 
   function project(longitude: number, latitude: number): [number, number] {
     const base = projection([longitude, latitude]) ?? [0, 0];
-    const center = projection(zoomState.coordinates) ?? [WIDTH / 2, HEIGHT / 2];
-    const k = zoomState.zoom;
-    return [(base[0] - center[0]) * k + WIDTH / 2, (base[1] - center[1]) * k + HEIGHT / 2];
+    return [viewState.k * base[0] + viewState.x, viewState.k * base[1] + viewState.y];
   }
 
   useEffect(() => {
@@ -63,7 +58,7 @@ export function AttackMap({
     heat.gradient({ 0.25: "#2ecfff", 0.55: "#ffb020", 1: "#ff3b3b" });
     heat.draw();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [heatPoints, zoomState]);
+  }, [heatPoints, viewState]);
 
   const arrivingKeys = new Set(arrivingPoints.map(pointKey));
 
@@ -73,15 +68,19 @@ export function AttackMap({
         ref={canvasRef}
         width={WIDTH}
         height={HEIGHT}
-        style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}
       />
-      <ComposableMap projection={() => projection} width={WIDTH} height={HEIGHT}>
-        <ZoomableGroup
-          center={zoomState.coordinates}
-          zoom={zoomState.zoom}
-          onMove={(position) => setZoomState(zoomStateFromTransform(position))}
-          onMoveEnd={(position) => setZoomState({ coordinates: position.coordinates, zoom: position.zoom })}
-        >
+      {/*
+        react-simple-maps' `ProjectionFunction` type claims `projection` is a factory
+        `(width, height, config) => GeoProjection`, but its runtime `makeProjection`
+        (dist/index.es.js, `isFunc` branch, ~line 188) treats ANY function prop as the
+        projection object itself — verified against the actual installed source, not just
+        the types. The previous `projection={() => projection}` handed the library a
+        function with no `.stream`/`.invert`, crashing `Geographies`' `geoPath().projection(...)`.
+      */}
+      {/* @ts-expect-error react-simple-maps' ProjectionFunction type is wrong — it accepts a GeoProjection instance directly, not a factory */}
+      <ComposableMap projection={projection} width={WIDTH} height={HEIGHT}>
+        <ZoomableGroup onMove={onMove}>{/* uncontrolled: no center/zoom props, see above */}
           <Geographies geography={worldAtlas}>
             {({ geographies }) =>
               geographies.map((geo: object & { rsmKey: string }) => (
