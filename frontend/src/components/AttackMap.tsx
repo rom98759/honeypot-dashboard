@@ -63,7 +63,7 @@ export function AttackMap({
   const arrivingKeys = new Set(arrivingPoints.map(pointKey));
 
   return (
-    <div style={{ position: "relative" }}>
+    <div style={{ position: "relative", maxWidth: 896, margin: "0 auto" }}>
       <canvas
         ref={canvasRef}
         width={WIDTH}
