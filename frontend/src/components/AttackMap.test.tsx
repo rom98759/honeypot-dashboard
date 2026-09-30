@@ -65,7 +65,7 @@ describe("AttackMap", () => {
     );
   });
 
-  it("re-projects heatmap points when the zoom/pan state changes via onMove (not only onMoveEnd)", () => {
+  it("re-projects heatmap points when the zoom/pan state changes via continuous onMove sync", () => {
     render(<AttackMap heatPoints={POINTS} destination={null} arrivingPoints={[]} />);
     dataSpy.mockClear();
 

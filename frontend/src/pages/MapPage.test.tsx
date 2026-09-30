@@ -105,7 +105,11 @@ describe("MapPage", () => {
   });
 
   it("turning Live on resets the scrubber to the full range", async () => {
-    vi.stubGlobal("fetch", vi.fn(() => jsonResponse(EVENTS_LOW)));
+    // Uses EVENTS_HIGH (two distinct timestamps) rather than EVENTS_LOW: a single-event
+    // period has startTime === endTime, a zero-width range where the scrubber always
+    // clamps to the max position (see Scrubber's cutoffToSliderPosition guard), so
+    // dragging to a "midpoint" wouldn't be meaningful.
+    vi.stubGlobal("fetch", vi.fn(() => jsonResponse(EVENTS_HIGH)));
     renderWithProviders(<MapPage />, { route: "/map" });
     await waitFor(() => expect(screen.getByRole("slider")).toBeInTheDocument());
 

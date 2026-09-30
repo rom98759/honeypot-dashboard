@@ -49,4 +49,34 @@ describe("Scrubber", () => {
     fireEvent.click(screen.getByRole("button", { name: /lecture/i }));
     expect(onTogglePlay).toHaveBeenCalledTimes(1);
   });
+
+  it("renders at the max slider position without NaN when startTime === endTime (single-event period)", () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const SAME = "2026-08-13T12:00:00Z";
+    render(<Scrubber startTime={SAME} endTime={SAME} value={null} onChange={vi.fn()} playing={false} onTogglePlay={vi.fn()} />);
+    const slider = screen.getByRole("slider") as HTMLInputElement;
+    expect(Number(slider.value)).toBe(Number(slider.max));
+    expect(Number.isNaN(Number(slider.value))).toBe(false);
+    const nanWarning = consoleError.mock.calls.some((call) => String(call[0]).includes("NaN"));
+    expect(nanWarning).toBe(false);
+    consoleError.mockRestore();
+  });
+
+  it("has an accessible name on the range input", () => {
+    render(<Scrubber startTime={START} endTime={END} value={null} onChange={vi.fn()} playing={false} onTogglePlay={vi.fn()} />);
+    expect(screen.getByRole("slider", { name: /curseur temporel/i })).toBeInTheDocument();
+  });
+
+  it("shows 'maintenant' when value is null, and updates the timestamp label when value changes", () => {
+    const { rerender } = render(
+      <Scrubber startTime={START} endTime={END} value={null} onChange={vi.fn()} playing={false} onTogglePlay={vi.fn()} />
+    );
+    expect(screen.getByText(/maintenant/i)).toBeInTheDocument();
+
+    rerender(
+      <Scrubber startTime={START} endTime={END} value="2026-08-13T12:00:00Z" onChange={vi.fn()} playing={false} onTogglePlay={vi.fn()} />
+    );
+    expect(screen.queryByText(/maintenant/i)).not.toBeInTheDocument();
+    expect(screen.getByText(new Date("2026-08-13T12:00:00Z").toLocaleString())).toBeInTheDocument();
+  });
 });

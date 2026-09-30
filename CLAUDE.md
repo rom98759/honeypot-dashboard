@@ -71,8 +71,9 @@ blobs off disk (mounted read-only at `app.state.cowrie_var_path`) and converts t
 `app/ttyplayer.py` into an asciinema v2 `.cast` stream for the frontend's asciinema-player. Cowrie logs
 ttylog paths relative to its own root (`var/lib/cowrie/tty/...`); the mount points directly at that
 `var/` dir, so the router strips the leading `var/` segment before resolving. `app/routers/map.py`
-(backed by `app/attack_map.py`) serves `/api/map`, aggregating sessions by geo_cache coordinates into
-points for the attack map, plus the optional VPS destination point. `app/routers/ip.py` serves the IP
+(backed by `app/attack_map.py`) serves `/api/map`, returning one event per session (ip, city, country,
+geo_cache coordinates, connect_time) rather than pre-aggregated points — the frontend aggregates these
+client-side into heatmap points, plus the optional VPS destination point. `app/routers/ip.py` serves the IP
 detail page's data: `/api/ip/{ip}/summary` (session/command counts, geo, ban status), `/fail2ban`, and
 `/sshd-auth` (paginated per-IP event history for each source), plus `POST /ban` and `/unban` to act
 on fail2ban's `sshd` jail. Ban status and the ban/unban actions go through `app/fban_control.py`,

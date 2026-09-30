@@ -16,7 +16,8 @@ const projection: GeoProjection = geoEqualEarth().scale(140).translate([WIDTH / 
 // raw d3-zoom transform `{x, y, k}`). `onMove` reports that exact same raw transform
 // mid-gesture, so the canvas heatmap re-projects points with the identical forward math
 // — no lon/lat inversion, and no feeding anything back into ZoomableGroup's controlled
-// props (see task-5 fix report for why that combination froze live drags).
+// props (feeding the transform back into ZoomableGroup's controlled center/zoom props
+// froze live drags, which is why this component keeps ZoomableGroup uncontrolled).
 interface ViewState {
   x: number;
   y: number;
@@ -60,8 +61,6 @@ export function AttackMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [heatPoints, viewState]);
 
-  const arrivingKeys = new Set(arrivingPoints.map(pointKey));
-
   return (
     <div style={{ position: "relative", maxWidth: 896, margin: "0 auto" }}>
       <canvas
@@ -95,18 +94,16 @@ export function AttackMap({
             }
           </Geographies>
           {destination
-            ? arrivingPoints
-                .filter((p) => arrivingKeys.has(pointKey(p)))
-                .map((p) => (
-                  <Line
-                    key={`line-${pointKey(p)}`}
-                    from={[p.longitude, p.latitude]}
-                    to={[destination.longitude, destination.latitude]}
-                    className="attack-line"
-                    stroke="var(--danger)"
-                    strokeWidth={1.5}
-                  />
-                ))
+            ? arrivingPoints.map((p) => (
+                <Line
+                  key={`line-${pointKey(p)}`}
+                  from={[p.longitude, p.latitude]}
+                  to={[destination.longitude, destination.latitude]}
+                  className="attack-line"
+                  stroke="var(--danger)"
+                  strokeWidth={1.5}
+                />
+              ))
             : null}
         </ZoomableGroup>
       </ComposableMap>

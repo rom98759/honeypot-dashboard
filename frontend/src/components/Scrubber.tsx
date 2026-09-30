@@ -7,17 +7,17 @@ function toMillis(iso: string): number {
 }
 
 function sliderPositionToCutoff(position: number, startTime: string, endTime: string): string | null {
-  if (position >= SLIDER_STEPS) return null;
   const startMs = toMillis(startTime);
   const endMs = toMillis(endTime);
+  if (position >= SLIDER_STEPS || endMs <= startMs) return null;
   const cutoffMs = startMs + (position / SLIDER_STEPS) * (endMs - startMs);
   return new Date(cutoffMs).toISOString();
 }
 
 function cutoffToSliderPosition(value: string | null, startTime: string, endTime: string): number {
-  if (value === null) return SLIDER_STEPS;
   const startMs = toMillis(startTime);
   const endMs = toMillis(endTime);
+  if (value === null || endMs <= startMs) return SLIDER_STEPS;
   const ratio = (toMillis(value) - startMs) / (endMs - startMs);
   return Math.round(ratio * SLIDER_STEPS);
 }
@@ -38,6 +38,7 @@ export function Scrubber({
   onTogglePlay: () => void;
 }) {
   const position = cutoffToSliderPosition(value, startTime, endTime);
+  const label = value === null ? "maintenant" : new Date(value).toLocaleString();
 
   return (
     <div className="scrubber">
@@ -47,11 +48,13 @@ export function Scrubber({
       <input
         type="range"
         className="scrubber-track"
+        aria-label="Curseur temporel"
         min={0}
         max={SLIDER_STEPS}
         value={position}
         onChange={(e) => onChange(sliderPositionToCutoff(Number(e.target.value), startTime, endTime))}
       />
+      <span className="scrubber-label">{label}</span>
     </div>
   );
 }
