@@ -14,7 +14,7 @@ describe("useMap", () => {
 
   it("fetches /api/map with the given period", async () => {
     const fetchMock = vi.fn(
-      async () => ({ ok: true, json: async () => ({ points: [], destination: null }) }) as Response
+      async () => ({ ok: true, json: async () => ({ events: [], destination: null }) }) as Response
     );
     vi.stubGlobal("fetch", fetchMock);
 
@@ -25,7 +25,7 @@ describe("useMap", () => {
 
   it("sets refetchInterval only when live is true", async () => {
     const fetchMock = vi.fn(
-      async () => ({ ok: true, json: async () => ({ points: [], destination: null }) }) as Response
+      async () => ({ ok: true, json: async () => ({ events: [], destination: null }) }) as Response
     );
     vi.stubGlobal("fetch", fetchMock);
 

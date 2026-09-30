@@ -59,13 +59,13 @@ export interface CorrelationRow {
   real_ssh_attempts: number;
 }
 
-export interface MapPoint {
+export interface MapEvent {
+  ip: string;
   city: string | null;
   country: string | null;
   latitude: number;
   longitude: number;
-  session_count: number;
-  ips: string[];
+  connect_time: string;
 }
 
 export interface MapDestination {
@@ -74,7 +74,7 @@ export interface MapDestination {
 }
 
 export interface MapData {
-  points: MapPoint[];
+  events: MapEvent[];
   destination: MapDestination | null;
 }
 
