@@ -69,6 +69,7 @@ export function MapPage() {
     setSearchParams({ period: value, live: String(live) });
     setScrubCutoff(null);
     setPlaying(false);
+    clearInterval(playbackIntervalRef.current);
   }
 
   function handleLiveToggle() {

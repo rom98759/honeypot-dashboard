@@ -145,6 +145,37 @@ describe("MapPage", () => {
     expect(screen.getByRole("button", { name: /lecture/i })).toBeInTheDocument();
   });
 
+  it("switching period while the scrubber is playing actually stops the playback interval, not just hides it", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.stubGlobal("fetch", vi.fn(() => jsonResponse(EVENTS_HIGH)));
+    renderWithProviders(<MapPage />, { route: "/map" });
+    await waitFor(() => expect(screen.getByRole("slider")).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole("button", { name: /lecture/i }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000); // several playback ticks in
+    });
+    const slider = screen.getByRole("slider") as HTMLInputElement;
+    const midPlaybackValue = Number(slider.value);
+    expect(midPlaybackValue).toBeGreaterThan(0);
+    expect(midPlaybackValue).toBeLessThan(Number(slider.max));
+
+    await userEvent.click(screen.getByRole("button", { name: "7j" }));
+    await waitFor(() => {
+      const refreshedSlider = screen.getByRole("slider") as HTMLInputElement;
+      expect(Number(refreshedSlider.value)).toBe(Number(refreshedSlider.max));
+    });
+
+    // If the old playback interval weren't actually cleared (only hidden/ignored), its next
+    // tick would fire within 250ms and overwrite scrubCutoff away from null/max again.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    const refreshedSlider = screen.getByRole("slider") as HTMLInputElement;
+    expect(Number(refreshedSlider.value)).toBe(Number(refreshedSlider.max));
+    expect(screen.getByRole("button", { name: /lecture/i })).toBeInTheDocument();
+  });
+
   it("shares the period with OverviewPage through PeriodContext", async () => {
     const fetchMock = vi.fn((url: string) => {
       if (url.includes("/overview/heatmap")) return jsonResponse({ cells: [] });
