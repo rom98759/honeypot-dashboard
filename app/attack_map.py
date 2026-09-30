@@ -3,7 +3,7 @@ import sqlite3
 from app.periods import period_cutoff
 
 
-def get_map_points(db: sqlite3.Connection, period: str) -> list[dict]:
+def get_map_events(db: sqlite3.Connection, period: str) -> list[dict]:
     where_clause = ""
     params: list = []
     cutoff = period_cutoff(period)
@@ -12,22 +12,21 @@ def get_map_points(db: sqlite3.Connection, period: str) -> list[dict]:
         params.append(cutoff)
 
     rows = db.execute(
-        "SELECT MIN(g.city) AS city, MIN(g.country) AS country, g.latitude, g.longitude, "
-        "COUNT(*) AS session_count, GROUP_CONCAT(DISTINCT s.src_ip) AS ips_csv "
+        "SELECT s.src_ip AS ip, g.city, g.country, g.latitude, g.longitude, s.connect_time "
         "FROM sessions s JOIN geo_cache g ON g.ip = s.src_ip "
         "WHERE g.latitude IS NOT NULL AND g.longitude IS NOT NULL" + where_clause + " "
-        "GROUP BY g.latitude, g.longitude ORDER BY session_count DESC",
+        "ORDER BY s.connect_time",
         params,
     ).fetchall()
 
     return [
         {
+            "ip": r["ip"],
             "city": r["city"],
             "country": r["country"],
             "latitude": r["latitude"],
             "longitude": r["longitude"],
-            "session_count": r["session_count"],
-            "ips": r["ips_csv"].split(","),
+            "connect_time": r["connect_time"],
         }
         for r in rows
     ]
