@@ -271,19 +271,6 @@ td { padding: var(--space-3); border-top: 1px solid var(--border); }
   background: var(--accent); color: #fff; font-weight: 500;
 }
 .period-selector .btn.active:hover { background: var(--accent); }
-.map-tooltip {
-  position: absolute; top: var(--space-4); right: var(--space-4);
-  background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
-  box-shadow: var(--shadow-sm); padding: var(--space-4); width: 240px; z-index: 10;
-  max-height: calc(100% - var(--space-8));
-  overflow-y: auto;
-}
-.map-tooltip h3 { margin: 0 0 var(--space-1); font-size: 14px; }
-.map-tooltip p { margin: 0 0 var(--space-2); font-size: 13px; color: var(--text-secondary); }
-.map-tooltip-close { position: absolute; top: var(--space-2); right: var(--space-2); }
-.map-tooltip-ips { list-style: none; padding: 0; margin: var(--space-2) 0 0; font-size: 13px; }
-.map-tooltip-ips li { padding: var(--space-1) 0; }
-
 [data-theme="dark"] {
   --bg-page: #14161a;
   --bg-surface: #1c1f26;

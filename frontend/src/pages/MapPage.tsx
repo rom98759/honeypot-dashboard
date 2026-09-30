@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { useSearchParams, Link } from "react-router-dom";
-import { X } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { useMap } from "../api/map";
 import { usePeriod } from "../theme/PeriodContext";
-import { AttackMap, pointKey } from "../components/AttackMap";
+import { AttackMap } from "../components/AttackMap";
+import { Scrubber } from "../components/Scrubber";
 import { SkeletonBlock } from "../components/SkeletonBlock";
 import { ErrorState } from "../components/ErrorState";
 import { EmptyState } from "../components/EmptyState";
-import type { MapPeriod, MapPoint } from "../api/types";
+import { aggregateMapEvents, pointKey } from "../utils/mapAggregation";
+import type { MapPeriod } from "../api/types";
+import type { HeatPoint } from "../utils/mapAggregation";
 
 const PERIODS: { value: MapPeriod; label: string }[] = [
   { value: "24h", label: "24h" },
@@ -16,17 +18,20 @@ const PERIODS: { value: MapPeriod; label: string }[] = [
   { value: "all", label: "Tout" },
 ];
 
-const ARRIVAL_ANIMATION_MS = 2000;
+const PLAYBACK_DURATION_MS = 25_000;
+const PLAYBACK_TICK_MS = 250;
 
 export function MapPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [period, setPeriod] = usePeriod();
   const live = searchParams.get("live") === "true";
 
-  const [arrivingKeys, setArrivingKeys] = useState<Set<string>>(new Set());
-  const [selectedPoint, setSelectedPoint] = useState<MapPoint | null>(null);
+  const [scrubCutoff, setScrubCutoff] = useState<string | null>(null);
+  const [playing, setPlaying] = useState(false);
   const previousCountsRef = useRef<Map<string, number> | null>(null);
+  const [arrivingPoints, setArrivingPoints] = useState<HeatPoint[]>([]);
   const arrivalTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const playbackIntervalRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
   const { data, isPending, isError, refetch } = useMap({ period, live });
 
@@ -34,39 +39,78 @@ export function MapPage() {
     previousCountsRef.current = null;
   }, [period]);
 
+  const heatPoints = data ? aggregateMapEvents(data.events, scrubCutoff) : [];
+
   useEffect(() => {
     if (!data || !live) return;
     const previous = previousCountsRef.current;
-    const nextCounts = new Map(data.points.map((p) => [pointKey(p), p.session_count]));
+    const nextCounts = new Map(heatPoints.map((p) => [pointKey(p), p.count]));
 
     if (previous !== null) {
-      const newlyArrived = new Set<string>();
-      for (const point of data.points) {
-        const key = pointKey(point);
-        const previousCount = previous.get(key) ?? 0;
-        if (point.session_count > previousCount) {
-          newlyArrived.add(key);
-        }
-      }
-      if (newlyArrived.size > 0) {
-        setArrivingKeys(newlyArrived);
+      const newlyArrived = heatPoints.filter((p) => p.count > (previous.get(pointKey(p)) ?? 0));
+      if (newlyArrived.length > 0) {
+        setArrivingPoints(newlyArrived);
         clearTimeout(arrivalTimeoutRef.current);
-        arrivalTimeoutRef.current = setTimeout(() => setArrivingKeys(new Set()), ARRIVAL_ANIMATION_MS);
+        arrivalTimeoutRef.current = setTimeout(() => setArrivingPoints([]), 2000);
       }
     }
 
     previousCountsRef.current = nextCounts;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, live]);
 
-  useEffect(() => () => clearTimeout(arrivalTimeoutRef.current), []);
+  useEffect(() => () => {
+    clearTimeout(arrivalTimeoutRef.current);
+    clearInterval(playbackIntervalRef.current);
+  }, []);
 
   function handlePeriodChange(value: MapPeriod) {
     setPeriod(value);
     setSearchParams({ period: value, live: String(live) });
+    setScrubCutoff(null);
+    setPlaying(false);
   }
 
   function handleLiveToggle() {
-    setSearchParams({ period, live: String(!live) });
+    const nextLive = !live;
+    setSearchParams({ period, live: String(nextLive) });
+    if (nextLive) {
+      setScrubCutoff(null);
+      setPlaying(false);
+      clearInterval(playbackIntervalRef.current);
+    }
+  }
+
+  function handleScrubChange(cutoff: string | null) {
+    setScrubCutoff(cutoff);
+    if (live) setSearchParams({ period, live: "false" });
+  }
+
+  function handleTogglePlay() {
+    if (playing) {
+      clearInterval(playbackIntervalRef.current);
+      setPlaying(false);
+      return;
+    }
+    if (!data || data.events.length === 0) return;
+    if (live) setSearchParams({ period, live: "false" });
+
+    const startMs = new Date(data.events[0].connect_time).getTime();
+    const endMs = new Date(data.events[data.events.length - 1].connect_time).getTime();
+    const startPoint = scrubCutoff === null ? startMs : new Date(scrubCutoff).getTime();
+    let elapsed = startPoint - startMs;
+    setPlaying(true);
+    playbackIntervalRef.current = setInterval(() => {
+      elapsed += ((endMs - startMs) * PLAYBACK_TICK_MS) / PLAYBACK_DURATION_MS;
+      const currentMs = startMs + elapsed;
+      if (currentMs >= endMs) {
+        setScrubCutoff(null);
+        setPlaying(false);
+        clearInterval(playbackIntervalRef.current);
+        return;
+      }
+      setScrubCutoff(new Date(currentMs).toISOString());
+    }, PLAYBACK_TICK_MS);
   }
 
   if (isPending) return <SkeletonBlock rows={8} />;
@@ -95,37 +139,23 @@ export function MapPage() {
           </button>
         </div>
       </div>
-      {data.points.length ? (
+      {data.events.length ? (
         <div className="map-container">
-          <AttackMap
-            points={data.points}
-            destination={data.destination}
-            arrivingKeys={arrivingKeys}
-            onPointClick={setSelectedPoint}
-          />
-          {selectedPoint ? (
-            <div className="map-tooltip">
-              <button className="btn-icon map-tooltip-close" onClick={() => setSelectedPoint(null)}>
-                <X />
-              </button>
-              <h3>{selectedPoint.city ?? "Ville inconnue"}</h3>
-              <p>{selectedPoint.country}</p>
-              <p>
-                {selectedPoint.session_count} session{selectedPoint.session_count > 1 ? "s" : ""}
-              </p>
-              <ul className="map-tooltip-ips">
-                {selectedPoint.ips.map((ip) => (
-                  <li key={ip}>
-                    <Link to={`/sessions?ip=${encodeURIComponent(ip)}`}>Voir les sessions ({ip})</Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
+          <AttackMap heatPoints={heatPoints} destination={data.destination} arrivingPoints={arrivingPoints} />
         </div>
       ) : (
         <EmptyState message="Aucune attaque géolocalisée pour cette période" />
       )}
+      {data.events.length ? (
+        <Scrubber
+          startTime={data.events[0].connect_time}
+          endTime={data.events[data.events.length - 1].connect_time}
+          value={scrubCutoff}
+          onChange={handleScrubChange}
+          playing={playing}
+          onTogglePlay={handleTogglePlay}
+        />
+      ) : null}
     </>
   );
 }

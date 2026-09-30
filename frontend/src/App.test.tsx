@@ -56,7 +56,7 @@ beforeEach(() => {
         return jsonResponse([]);
       }
       if (url.startsWith("/api/map")) {
-        return jsonResponse({ points: [], destination: null });
+        return jsonResponse({ events: [], destination: null });
       }
       return jsonResponse({});
     })
