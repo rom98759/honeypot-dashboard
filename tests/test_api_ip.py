@@ -288,3 +288,53 @@ def test_ban_ip_returns_503_on_timeout(tmp_path):
         "/api/ip/1.2.3.4/ban", headers={"Origin": "http://testserver"}
     )
     assert response.status_code == 503
+
+
+def test_ip_summary_defaults_to_pending_when_no_enrichment_row(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    db.execute("INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('s1', '1.2.3.4', 't')")
+    db.commit()
+    app = create_app(db=db, start_background_tasks=False)
+    client = TestClient(app)
+
+    response = client.get("/api/ip/1.2.3.4/summary")
+    body = response.json()
+    assert body["enrichment_status"] == "pending"
+    assert body["asn"] is None
+    assert body["abuseipdb_configured"] is False
+
+
+def test_ip_summary_includes_resolved_enrichment_fields(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    db.executescript(
+        """
+        INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('s1', '1.2.3.4', 't');
+        INSERT INTO ip_enrichment (ip, asn, asn_org, reverse_dns, abuseipdb_score, abuseipdb_total_reports, abuseipdb_last_reported_at, status, looked_up_at)
+        VALUES ('1.2.3.4', 15169, 'GOOGLE', 'dns.google', 10, 2, '2026-10-01T00:00:00Z', 'done', 't');
+        """
+    )
+    db.commit()
+    app = create_app(db=db, start_background_tasks=False)
+    client = TestClient(app)
+
+    response = client.get("/api/ip/1.2.3.4/summary")
+    body = response.json()
+    assert body["enrichment_status"] == "done"
+    assert body["asn"] == 15169
+    assert body["asn_org"] == "GOOGLE"
+    assert body["reverse_dns"] == "dns.google"
+    assert body["abuseipdb_score"] == 10
+    assert body["abuseipdb_total_reports"] == 2
+    assert body["abuseipdb_last_reported_at"] == "2026-10-01T00:00:00Z"
+
+
+def test_ip_summary_abuseipdb_configured_true_when_key_set(tmp_path, monkeypatch):
+    monkeypatch.setenv("ABUSEIPDB_API_KEY", "fake-key")
+    db = connect(tmp_path / "db.sqlite3")
+    db.execute("INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('s1', '1.2.3.4', 't')")
+    db.commit()
+    app = create_app(db=db, start_background_tasks=False)
+    client = TestClient(app)
+
+    response = client.get("/api/ip/1.2.3.4/summary")
+    assert response.json()["abuseipdb_configured"] is True

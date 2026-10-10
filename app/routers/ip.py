@@ -24,6 +24,12 @@ def get_ip_summary(request: Request, ip: str):
         "SELECT country, city, latitude, longitude FROM geo_cache WHERE ip = ?", (ip,)
     ).fetchone()
 
+    enrichment = db.execute(
+        "SELECT asn, asn_org, reverse_dns, abuseipdb_score, abuseipdb_total_reports, "
+        "abuseipdb_last_reported_at, status FROM ip_enrichment WHERE ip = ?",
+        (ip,),
+    ).fetchone()
+
     session_stats = db.execute(
         "SELECT COUNT(*) AS total, MIN(connect_time) AS first_seen, MAX(connect_time) AS last_seen "
         "FROM sessions WHERE src_ip = ?",
@@ -62,6 +68,14 @@ def get_ip_summary(request: Request, ip: str):
         "total_sessions": session_stats["total"],
         "total_commands": total_commands,
         "currently_banned": currently_banned,
+        "asn": enrichment["asn"] if enrichment else None,
+        "asn_org": enrichment["asn_org"] if enrichment else None,
+        "reverse_dns": enrichment["reverse_dns"] if enrichment else None,
+        "abuseipdb_score": enrichment["abuseipdb_score"] if enrichment else None,
+        "abuseipdb_total_reports": enrichment["abuseipdb_total_reports"] if enrichment else None,
+        "abuseipdb_last_reported_at": enrichment["abuseipdb_last_reported_at"] if enrichment else None,
+        "abuseipdb_configured": request.app.state.abuseipdb_configured,
+        "enrichment_status": enrichment["status"] if enrichment else "pending",
     }
 
 
