@@ -1,6 +1,13 @@
 from app.db import connect
 from app.geoip import GeoLookup
-from app.main import _backfill_geo_cache, _backfill_ip_enrichment, _open_asn_reader, create_app
+from app.ip_enrichment import AsnLookup
+from app.main import (
+    _backfill_geo_cache,
+    _backfill_ip_enrichment,
+    _backfill_missing_asn,
+    _open_asn_reader,
+    create_app,
+)
 
 
 class _StubReader:
@@ -145,6 +152,62 @@ def test_backfill_ip_enrichment_skips_ips_that_already_have_a_row(tmp_path):
     assert row["asn"] == 15169
 
 
+class _StubAsnReader:
+    def asn(self, ip):
+        if ip == "8.8.8.8":
+            return type(
+                "R",
+                (),
+                {"autonomous_system_number": 15169, "autonomous_system_organization": "Google LLC"},
+            )()
+        raise ValueError("address not found in database")
+
+
+def test_backfill_missing_asn_fills_in_done_rows_with_null_asn(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    db.execute(
+        "INSERT INTO ip_enrichment (ip, status, asn, asn_org) VALUES ('8.8.8.8', 'done', NULL, NULL)"
+    )
+    db.commit()
+    asn_lookup = AsnLookup(_StubAsnReader())
+
+    _backfill_missing_asn(db, asn_lookup)
+
+    row = db.execute("SELECT asn, asn_org, status FROM ip_enrichment WHERE ip = '8.8.8.8'").fetchone()
+    assert row["asn"] == 15169
+    assert row["asn_org"] == "Google LLC"
+    assert row["status"] == "done"
+
+
+def test_backfill_missing_asn_noop_when_no_reader(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    db.execute(
+        "INSERT INTO ip_enrichment (ip, status, asn, asn_org) VALUES ('8.8.8.8', 'done', NULL, NULL)"
+    )
+    db.commit()
+    asn_lookup = AsnLookup(reader=None)
+
+    _backfill_missing_asn(db, asn_lookup)  # must not raise
+
+    row = db.execute("SELECT asn FROM ip_enrichment WHERE ip = '8.8.8.8'").fetchone()
+    assert row["asn"] is None
+
+
+def test_backfill_missing_asn_leaves_genuinely_unresolvable_ip_null(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    db.execute(
+        "INSERT INTO ip_enrichment (ip, status, asn, asn_org) VALUES ('172.21.0.1', 'done', NULL, NULL)"
+    )
+    db.commit()
+    asn_lookup = AsnLookup(_StubAsnReader())
+
+    _backfill_missing_asn(db, asn_lookup)  # must not raise
+
+    row = db.execute("SELECT asn, status FROM ip_enrichment WHERE ip = '172.21.0.1'").fetchone()
+    assert row["asn"] is None
+    assert row["status"] == "done"
+
+
 def test_open_asn_reader_missing_path_returns_none():
     assert _open_asn_reader(None) is None
     assert _open_asn_reader("/nonexistent/GeoLite2-ASN.mmdb") is None
@@ -159,6 +222,12 @@ def test_create_app_abuseipdb_enabled_when_key_set(tmp_path, monkeypatch):
     monkeypatch.setenv("ABUSEIPDB_API_KEY", "fake-key")
     app = create_app(db=connect(tmp_path / "db.sqlite3"), start_background_tasks=False)
     assert app.state.abuseipdb_configured is True
+
+
+def test_create_app_abuseipdb_disabled_when_key_is_empty_string(tmp_path, monkeypatch):
+    monkeypatch.setenv("ABUSEIPDB_API_KEY", "")
+    app = create_app(db=connect(tmp_path / "db.sqlite3"), start_background_tasks=False)
+    assert app.state.abuseipdb_configured is False
 
 
 def test_create_app_sets_up_enrichment_worker(tmp_path):

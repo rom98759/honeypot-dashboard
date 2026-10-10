@@ -104,7 +104,9 @@ writing the result back with `status='done'`. Both the ASN lookup and the AbuseI
 `None`/no-op rather than raising when unconfigured: `GEOIP_ASN_DB_PATH` (optional, same
 missing-file-is-fine contract as `GEOIP_DB_PATH` via `_open_asn_reader`) and `ABUSEIPDB_API_KEY`
 (optional; unset disables AbuseIPDB calls entirely, surfaced to the rest of the app as
-`app.state.abuseipdb_configured`).
+`app.state.abuseipdb_configured`). `/api/ip/{ip}/summary` also returns `enrichment_status`
+(`"pending"`/`"done"`) and `abuseipdb_configured`; the frontend polls that endpoint every 5 seconds
+while `enrichment_status` is `"pending"`.
 
 **Concurrency note**: route handlers are `async def` but do synchronous sqlite3 calls directly against
 a single shared connection (`check_same_thread=False`, WAL mode, `busy_timeout=5000`) — this is

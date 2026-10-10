@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # /home/user/geoip-update.sh
-# Refreshes the GeoLite2-City database used by honeypot-dashboard.
+# Refreshes the GeoLite2-City and GeoLite2-ASN databases used by honeypot-dashboard.
 # Credentials read from /home/user/.geoip-credentials (chmod 600), never
 # hardcoded here or passed on the command line (would leak into ps/crontab logs).
 set -euo pipefail

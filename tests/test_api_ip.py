@@ -290,7 +290,8 @@ def test_ban_ip_returns_503_on_timeout(tmp_path):
     assert response.status_code == 503
 
 
-def test_ip_summary_defaults_to_pending_when_no_enrichment_row(tmp_path):
+def test_ip_summary_defaults_to_pending_when_no_enrichment_row(tmp_path, monkeypatch):
+    monkeypatch.delenv("ABUSEIPDB_API_KEY", raising=False)
     db = connect(tmp_path / "db.sqlite3")
     db.execute("INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('s1', '1.2.3.4', 't')")
     db.commit()

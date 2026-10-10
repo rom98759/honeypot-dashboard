@@ -118,6 +118,33 @@ def _backfill_geo_cache(db, geo_lookup: GeoLookup) -> None:
     db.commit()
 
 
+def _backfill_missing_asn(db, asn_lookup: AsnLookup) -> None:
+    """Second pass for ASN, mirroring `_backfill_geo_cache`'s own second pass
+    for coordinates: rows that were fully processed (`status = 'done'`) but
+    got no ASN — either because no GeoLite2-ASN.mmdb reader existed yet at
+    the time, or because the IP genuinely isn't found — stay stuck at
+    asn = NULL forever otherwise, since done rows are never reprocessed by
+    the worker. Re-querying a genuinely-not-found IP on every startup is
+    harmless, same tradeoff `_backfill_geo_cache` accepts for its own
+    "missing coordinates" pass. Only asn/asn_org are touched; reverse_dns,
+    the abuseipdb_* fields, and status are left alone."""
+    if asn_lookup.reader is None:
+        return
+
+    missing_asn = db.execute(
+        "SELECT ip FROM ip_enrichment WHERE status = 'done' AND asn IS NULL"
+    ).fetchall()
+    for row in missing_asn:
+        asn, asn_org = asn_lookup.lookup(row["ip"])
+        if asn is None and asn_org is None:
+            continue
+        db.execute(
+            "UPDATE ip_enrichment SET asn = ?, asn_org = ? WHERE ip = ?",
+            (asn, asn_org, row["ip"]),
+        )
+    db.commit()
+
+
 def _backfill_ip_enrichment(db) -> None:
     """Catches any src_ip already in `sessions` that has no ip_enrichment
     row yet — otherwise IPs ingested before this feature shipped would
@@ -164,7 +191,7 @@ def create_app(
     fban_timeout_seconds = float(os.environ.get("FBAN_TIMEOUT_SECONDS", "2.0"))
     geoip_db_path = os.environ.get("GEOIP_DB_PATH")
     geoip_asn_db_path = os.environ.get("GEOIP_ASN_DB_PATH")
-    abuseipdb_api_key = os.environ.get("ABUSEIPDB_API_KEY")
+    abuseipdb_api_key = os.environ.get("ABUSEIPDB_API_KEY", "").strip() or None
     vps_latitude = _parse_optional_float(os.environ.get("VPS_LATITUDE"))
     vps_longitude = _parse_optional_float(os.environ.get("VPS_LONGITUDE"))
 
@@ -196,6 +223,7 @@ def create_app(
         AsnLookup(_open_asn_reader(geoip_asn_db_path)),
         AbuseIpDbClient(abuseipdb_api_key),
     )
+    _backfill_missing_asn(app.state.db, app.state.ip_enrichment.asn_lookup)
     app.state.enrichment_worker = EnrichmentWorker(app.state.db, app.state.ip_enrichment)
     app.state.cowrie_ingester = CowrieIngester(app.state.db, cowrie_json_path, app.state.geo_lookup)
     app.state.fail2ban_ingester = FailbanIngester(app.state.db, fail2ban_log_path)
