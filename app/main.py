@@ -10,9 +10,11 @@ from fastapi.staticfiles import StaticFiles
 
 from app.correlation import FailbanIngester, SshdAuthIngester
 from app.db import connect
+from app.enrichment_worker import EnrichmentWorker
 from app.fban_control import FbanControl
 from app.geoip import GeoLookup
 from app.ingester import CowrieIngester
+from app.ip_enrichment import AbuseIpDbClient, AsnLookup, IpEnrichment
 from app.routers import commands, correlation, ip, map as map_router, overview, sessions
 
 POLL_INTERVAL_SECONDS = 5
@@ -43,6 +45,18 @@ def _open_geoip_reader(geoip_db_path: str | None):
         return None
     try:
         return geoip2.database.Reader(geoip_db_path)
+    except Exception:
+        return None
+
+
+def _open_asn_reader(asn_db_path: str | None):
+    """Same degrade-to-None contract as `_open_geoip_reader` — a missing
+    GeoLite2-ASN.mmdb (dev checkout, or VPS before geoip-update.sh has run)
+    must not crash app startup."""
+    if not asn_db_path or not Path(asn_db_path).exists():
+        return None
+    try:
+        return geoip2.database.Reader(asn_db_path)
     except Exception:
         return None
 
@@ -149,16 +163,21 @@ def create_app(
     fban_queue_path = Path(os.environ.get("FBAN_QUEUE_PATH", "/queue"))
     fban_timeout_seconds = float(os.environ.get("FBAN_TIMEOUT_SECONDS", "2.0"))
     geoip_db_path = os.environ.get("GEOIP_DB_PATH")
+    geoip_asn_db_path = os.environ.get("GEOIP_ASN_DB_PATH")
+    abuseipdb_api_key = os.environ.get("ABUSEIPDB_API_KEY")
     vps_latitude = _parse_optional_float(os.environ.get("VPS_LATITUDE"))
     vps_longitude = _parse_optional_float(os.environ.get("VPS_LONGITUDE"))
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        task = None
+        tasks = []
         if start_background_tasks:
-            task = asyncio.create_task(_poll_loop(app))
+            tasks = [
+                asyncio.create_task(_poll_loop(app)),
+                asyncio.create_task(app.state.enrichment_worker.run_forever()),
+            ]
         yield
-        if task is not None:
+        for task in tasks:
             task.cancel()
 
     app = FastAPI(lifespan=lifespan)
@@ -172,6 +191,12 @@ def create_app(
     app.state.geo_lookup = GeoLookup(app.state.db, _open_geoip_reader(geoip_db_path))
     _backfill_geo_cache(app.state.db, app.state.geo_lookup)
     _backfill_ip_enrichment(app.state.db)
+    app.state.abuseipdb_configured = abuseipdb_api_key is not None
+    app.state.ip_enrichment = IpEnrichment(
+        AsnLookup(_open_asn_reader(geoip_asn_db_path)),
+        AbuseIpDbClient(abuseipdb_api_key),
+    )
+    app.state.enrichment_worker = EnrichmentWorker(app.state.db, app.state.ip_enrichment)
     app.state.cowrie_ingester = CowrieIngester(app.state.db, cowrie_json_path, app.state.geo_lookup)
     app.state.fail2ban_ingester = FailbanIngester(app.state.db, fail2ban_log_path)
     app.state.sshd_auth_ingester = SshdAuthIngester(app.state.db, sshd_auth_log_path)

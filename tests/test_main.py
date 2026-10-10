@@ -1,6 +1,6 @@
 from app.db import connect
 from app.geoip import GeoLookup
-from app.main import _backfill_geo_cache, _backfill_ip_enrichment
+from app.main import _backfill_geo_cache, _backfill_ip_enrichment, _open_asn_reader, create_app
 
 
 class _StubReader:
@@ -143,3 +143,25 @@ def test_backfill_ip_enrichment_skips_ips_that_already_have_a_row(tmp_path):
     row = db.execute("SELECT status, asn FROM ip_enrichment WHERE ip = '8.8.8.8'").fetchone()
     assert row["status"] == "done"
     assert row["asn"] == 15169
+
+
+def test_open_asn_reader_missing_path_returns_none():
+    assert _open_asn_reader(None) is None
+    assert _open_asn_reader("/nonexistent/GeoLite2-ASN.mmdb") is None
+
+
+def test_create_app_abuseipdb_disabled_by_default(tmp_path):
+    app = create_app(db=connect(tmp_path / "db.sqlite3"), start_background_tasks=False)
+    assert app.state.abuseipdb_configured is False
+
+
+def test_create_app_abuseipdb_enabled_when_key_set(tmp_path, monkeypatch):
+    monkeypatch.setenv("ABUSEIPDB_API_KEY", "fake-key")
+    app = create_app(db=connect(tmp_path / "db.sqlite3"), start_background_tasks=False)
+    assert app.state.abuseipdb_configured is True
+
+
+def test_create_app_sets_up_enrichment_worker(tmp_path):
+    app = create_app(db=connect(tmp_path / "db.sqlite3"), start_background_tasks=False)
+    assert app.state.ip_enrichment is not None
+    assert app.state.enrichment_worker is not None

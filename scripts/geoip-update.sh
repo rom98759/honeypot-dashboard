@@ -20,3 +20,15 @@ find "$WORKDIR" -name 'GeoLite2-City.mmdb' -exec mv {} "$TARGET_DIR/GeoLite2-Cit
 rm -rf "$WORKDIR" "$TMP_FILE"
 
 echo "$(date -Iseconds) GeoLite2-City.mmdb refreshed"
+
+TMP_FILE="$(mktemp)"
+curl -sSL -u "${MAXMIND_ID}:${MAXMIND_KEY}" \
+  "https://download.maxmind.com/geoip/databases/GeoLite2-ASN/download?suffix=tar.gz" \
+  -o "$TMP_FILE"
+
+WORKDIR="$(mktemp -d)"
+tar -xzf "$TMP_FILE" -C "$WORKDIR"
+find "$WORKDIR" -name 'GeoLite2-ASN.mmdb' -exec mv {} "$TARGET_DIR/GeoLite2-ASN.mmdb" \;
+rm -rf "$WORKDIR" "$TMP_FILE"
+
+echo "$(date -Iseconds) GeoLite2-ASN.mmdb refreshed"

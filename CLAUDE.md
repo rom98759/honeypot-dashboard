@@ -94,6 +94,18 @@ per-file-relative time.
 lookups that fail (private IP, reader unavailable, IP not found) are cached as `NULL` rather than
 retried every tick.
 
+**IP enrichment** (`app/ip_enrichment.py`, `app/enrichment_worker.py`) adds ASN, reverse DNS, and
+AbuseIPDB data per source IP, stored in the `ip_enrichment` table, which doubles as a pending-work
+queue: `apply_cowrie_record` inserts a `status='pending'` row for every new IP on `session.connect`,
+`main.py::_backfill_ip_enrichment` catches any IP already in `sessions` with no row yet (same
+idempotent backfill pattern as `_backfill_geo_cache`), and `EnrichmentWorker.run_forever` (started
+alongside `_poll_loop` in `lifespan`) drains pending rows one at a time via `IpEnrichment.resolve`,
+writing the result back with `status='done'`. Both the ASN lookup and the AbuseIPDB client degrade to
+`None`/no-op rather than raising when unconfigured: `GEOIP_ASN_DB_PATH` (optional, same
+missing-file-is-fine contract as `GEOIP_DB_PATH` via `_open_asn_reader`) and `ABUSEIPDB_API_KEY`
+(optional; unset disables AbuseIPDB calls entirely, surfaced to the rest of the app as
+`app.state.abuseipdb_configured`).
+
 **Concurrency note**: route handlers are `async def` but do synchronous sqlite3 calls directly against
 a single shared connection (`check_same_thread=False`, WAL mode, `busy_timeout=5000`) — this is
 intentional (see commit `d1b5a29`) to avoid threadpool-based concurrent access to that connection, not

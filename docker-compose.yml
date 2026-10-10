@@ -31,6 +31,8 @@ services:
       - FAIL2BAN_LOG_PATH=/var/log/fail2ban.log
       - SSHD_AUTH_LOG_PATH=/var/log/sshd-auth.log
       - GEOIP_DB_PATH=/geoip/GeoLite2-City.mmdb
+      - GEOIP_ASN_DB_PATH=/geoip/GeoLite2-ASN.mmdb
+      - ABUSEIPDB_API_KEY=${ABUSEIPDB_API_KEY:-}
       - FBAN_QUEUE_PATH=/queue
       - VPS_LATITUDE=51.0162051
       - VPS_LONGITUDE=2.1556627
