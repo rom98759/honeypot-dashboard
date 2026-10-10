@@ -104,6 +104,19 @@ def _backfill_geo_cache(db, geo_lookup: GeoLookup) -> None:
     db.commit()
 
 
+def _backfill_ip_enrichment(db) -> None:
+    """Catches any src_ip already in `sessions` that has no ip_enrichment
+    row yet — otherwise IPs ingested before this feature shipped would
+    never get enqueued (apply_cowrie_record only enqueues on new
+    session.connect events). Idempotent (INSERT OR IGNORE), safe to run on
+    every startup, same pattern as _backfill_geo_cache."""
+    db.execute(
+        "INSERT OR IGNORE INTO ip_enrichment (ip) "
+        "SELECT DISTINCT src_ip FROM sessions"
+    )
+    db.commit()
+
+
 async def _poll_loop(app: FastAPI) -> None:
     while True:
         app.state.cowrie_ingester.tick()
@@ -158,6 +171,7 @@ def create_app(
     app.state.vps_longitude = vps_longitude
     app.state.geo_lookup = GeoLookup(app.state.db, _open_geoip_reader(geoip_db_path))
     _backfill_geo_cache(app.state.db, app.state.geo_lookup)
+    _backfill_ip_enrichment(app.state.db)
     app.state.cowrie_ingester = CowrieIngester(app.state.db, cowrie_json_path, app.state.geo_lookup)
     app.state.fail2ban_ingester = FailbanIngester(app.state.db, fail2ban_log_path)
     app.state.sshd_auth_ingester = SshdAuthIngester(app.state.db, sshd_auth_log_path)

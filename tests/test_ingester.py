@@ -91,3 +91,48 @@ def test_picks_up_appended_lines(tmp_path):
     with cowrie_json.open("a") as f:
         f.write(lines[5])  # command.input — handled
     assert ingester.tick() == 1
+
+
+def test_session_connect_inserts_pending_row_for_new_ip(tmp_path):
+    cowrie_json = tmp_path / "cowrie.json"
+    shutil.copy(FIXTURE, cowrie_json)
+    db = connect(tmp_path / "db.sqlite3")
+    ingester = CowrieIngester(db, cowrie_json)
+
+    ingester.tick()
+
+    row = db.execute("SELECT status FROM ip_enrichment WHERE ip = '172.21.0.1'").fetchone()
+    assert row is not None
+    assert row["status"] == "pending"
+
+
+def test_session_connect_does_not_reset_an_already_done_row(tmp_path):
+    cowrie_json = tmp_path / "cowrie.json"
+    shutil.copy(FIXTURE, cowrie_json)
+    db = connect(tmp_path / "db.sqlite3")
+    db.execute(
+        "INSERT INTO ip_enrichment (ip, status, asn) VALUES ('172.21.0.1', 'done', 12345)"
+    )
+    db.commit()
+    ingester = CowrieIngester(db, cowrie_json)
+
+    ingester.tick()
+
+    row = db.execute("SELECT status, asn FROM ip_enrichment WHERE ip = '172.21.0.1'").fetchone()
+    assert row["status"] == "done"
+    assert row["asn"] == 12345
+
+
+def test_two_sessions_same_new_ip_do_not_duplicate_enrichment_row(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    from app.cowrie_parser import SessionConnect
+    from app.ingester import apply_cowrie_record
+
+    first = SessionConnect(session_id="s1", src_ip="9.9.9.9", src_port=1234, protocol="ssh", timestamp="t1")
+    second = SessionConnect(session_id="s2", src_ip="9.9.9.9", src_port=5678, protocol="ssh", timestamp="t2")
+    apply_cowrie_record(db, first)
+    apply_cowrie_record(db, second)  # must not raise on the PK conflict
+    db.commit()
+
+    count = db.execute("SELECT COUNT(*) AS n FROM ip_enrichment WHERE ip = '9.9.9.9'").fetchone()["n"]
+    assert count == 1

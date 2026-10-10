@@ -1,6 +1,6 @@
 from app.db import connect
 from app.geoip import GeoLookup
-from app.main import _backfill_geo_cache
+from app.main import _backfill_geo_cache, _backfill_ip_enrichment
 
 
 class _StubReader:
@@ -119,3 +119,27 @@ def test_backfill_preserves_existing_country_city_when_reader_fails_to_reresolve
     assert row["country"] == "United States"
     assert row["city"] == "Mountain View"
     assert row["latitude"] is None
+
+
+def test_backfill_ip_enrichment_enqueues_ips_with_no_row(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    db.execute("INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('s1', '8.8.8.8', 't')")
+    db.commit()
+
+    _backfill_ip_enrichment(db)
+
+    row = db.execute("SELECT status FROM ip_enrichment WHERE ip = '8.8.8.8'").fetchone()
+    assert row["status"] == "pending"
+
+
+def test_backfill_ip_enrichment_skips_ips_that_already_have_a_row(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    db.execute("INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('s1', '8.8.8.8', 't')")
+    db.execute("INSERT INTO ip_enrichment (ip, status, asn) VALUES ('8.8.8.8', 'done', 15169)")
+    db.commit()
+
+    _backfill_ip_enrichment(db)  # must not reset the existing done row
+
+    row = db.execute("SELECT status, asn FROM ip_enrichment WHERE ip = '8.8.8.8'").fetchone()
+    assert row["status"] == "done"
+    assert row["asn"] == 15169

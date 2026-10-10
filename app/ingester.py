@@ -22,6 +22,10 @@ def apply_cowrie_record(db: sqlite3.Connection, record, geo_lookup=None) -> None
         )
         if geo_lookup is not None:
             geo_lookup.lookup(record.src_ip)
+        db.execute(
+            "INSERT OR IGNORE INTO ip_enrichment (ip) VALUES (?)",
+            (record.src_ip,),
+        )
     elif isinstance(record, LoginAttempt):
         db.execute(
             "UPDATE sessions SET login_username = ?, login_password = ?, login_success = ? "
