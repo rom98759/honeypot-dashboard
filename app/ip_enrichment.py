@@ -1,3 +1,4 @@
+import concurrent.futures
 import datetime
 import socket
 from dataclasses import dataclass
@@ -27,18 +28,21 @@ class AsnLookup:
 
 
 def reverse_dns_lookup(ip: str, timeout: float = REVERSE_DNS_TIMEOUT_SECONDS) -> str | None:
-    """A bare socket.gethostbyaddr call with a hard socket timeout. Returns
-    None on timeout, socket.herror (no PTR record), or any other failure —
-    never raises."""
-    previous_timeout = socket.getdefaulttimeout()
-    socket.setdefaulttimeout(timeout)
+    """Runs socket.gethostbyaddr in a one-shot worker thread with a hard
+    wall-clock timeout on the future, rather than mutating the process-wide
+    socket.setdefaulttimeout — that global would affect every socket opened
+    anywhere in the process during the call, and race with concurrent
+    reverse_dns_lookup calls on other threads. Returns None on timeout,
+    socket.herror (no PTR record), or any other failure — never raises."""
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
     try:
-        hostname, _aliases, _addresses = socket.gethostbyaddr(ip)
+        future = executor.submit(socket.gethostbyaddr, ip)
+        hostname, _aliases, _addresses = future.result(timeout=timeout)
         return hostname
     except Exception:
         return None
     finally:
-        socket.setdefaulttimeout(previous_timeout)
+        executor.shutdown(wait=False)
 
 
 class AbuseIpDbClient:
