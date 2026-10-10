@@ -34,6 +34,12 @@ function formatDuration(ms: number | null): string {
   return ms ? `${Math.round(ms / 1000)}s` : "-";
 }
 
+function abuseipdbTone(score: number): "danger" | "warning" | "success" {
+  if (score >= 75) return "danger";
+  if (score >= 25) return "warning";
+  return "success";
+}
+
 export function IpDetailPage() {
   const { ip = "" } = useParams<{ ip: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -121,6 +127,44 @@ export function IpDetailPage() {
         <StatCard label="Commandes" value={data.total_commands} />
         <StatCard label="Première vue" value={data.first_seen ? formatTimestamp(data.first_seen) : "-"} small />
         <StatCard label="Dernière vue" value={data.last_seen ? formatTimestamp(data.last_seen) : "-"} small />
+      </div>
+
+      <div className="panel">
+        <h3>Enrichissement</h3>
+        {data.enrichment_status === "pending" ? (
+          <SkeletonBlock rows={3} />
+        ) : (
+          <>
+            <div className="cards">
+              <StatCard
+                label="ASN"
+                value={data.asn ? `AS${data.asn} · ${data.asn_org ?? ""}` : "Non résolu"}
+                small
+              />
+              <StatCard label="Reverse DNS" value={data.reverse_dns ?? "Aucun"} small />
+            </div>
+            {data.abuseipdb_configured ? (
+              <div className="reputation-row">
+                {data.abuseipdb_score !== null ? (
+                  <>
+                    <Badge
+                      label={`Score ${data.abuseipdb_score}/100`}
+                      tone={abuseipdbTone(data.abuseipdb_score)}
+                    />
+                    <span className="mono">
+                      {data.abuseipdb_total_reports} signalement(s)
+                      {data.abuseipdb_last_reported_at
+                        ? ` — dernier le ${formatTimestamp(data.abuseipdb_last_reported_at)}`
+                        : ""}
+                    </span>
+                  </>
+                ) : (
+                  <EmptyState message="Aucune donnée AbuseIPDB" />
+                )}
+              </div>
+            ) : null}
+          </>
+        )}
       </div>
 
       <div className="panel">

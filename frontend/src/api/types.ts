@@ -91,6 +91,14 @@ export interface IpSummary {
   total_sessions: number;
   total_commands: number;
   currently_banned: boolean;
+  asn: number | null;
+  asn_org: string | null;
+  reverse_dns: string | null;
+  abuseipdb_score: number | null;
+  abuseipdb_total_reports: number | null;
+  abuseipdb_last_reported_at: string | null;
+  abuseipdb_configured: boolean;
+  enrichment_status: "pending" | "done";
 }
 
 export interface Fail2banEvent {

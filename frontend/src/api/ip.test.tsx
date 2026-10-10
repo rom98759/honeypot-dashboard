@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from "@testing-library/react";
+import { renderHook, waitFor, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi, afterEach } from "vitest";
 import type { ReactNode } from "react";
@@ -33,6 +33,41 @@ describe("useIpSummary", () => {
     const { result } = renderHook(() => useIpSummary("1.2.3.4"), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(fetchMock).toHaveBeenCalledWith("/api/ip/1.2.3.4/summary");
+  });
+
+  it("polls every 5s while enrichment_status is pending, stops once done", async () => {
+    vi.useFakeTimers();
+    let callCount = 0;
+    const fetchMock = vi.fn(() => {
+      callCount += 1;
+      const status = callCount >= 2 ? "done" : "pending";
+      return jsonResponse({ ip: "1.2.3.4", enrichment_status: status });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result } = renderHook(() => useIpSummary("1.2.3.4"), { wrapper });
+
+    // vi.waitFor's internal polling uses real timers in some Vitest versions and can hang
+    // under vi.useFakeTimers(); flush microtasks manually instead.
+    for (let i = 0; i < 50 && !result.current.isSuccess; i++) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+    }
+    expect(result.current.isSuccess).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2); // still pending after call 1 -> refetches
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2); // call 2 returned "done" -> no further polling
+
+    vi.useRealTimers();
   });
 });
 

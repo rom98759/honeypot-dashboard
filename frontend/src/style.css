@@ -104,6 +104,7 @@ main#content { flex: 1; padding: var(--space-8); overflow-x: auto; max-width: 12
 .btn-icon svg { width: 16px; height: 16px; }
 
 .cards { display: flex; flex-wrap: wrap; gap: var(--space-4); margin-bottom: var(--space-6); }
+.reputation-row { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-3); }
 .card {
   flex: 1; background: var(--bg-surface); border: 1px solid var(--border);
   border-radius: var(--radius); box-shadow: var(--shadow-sm);

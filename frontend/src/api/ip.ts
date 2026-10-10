@@ -8,6 +8,7 @@ export function useIpSummary(ip: string) {
   return useQuery({
     queryKey: ["ip-summary", ip],
     queryFn: () => fetchJSON<IpSummary>(`/api/ip/${encodeURIComponent(ip)}/summary`),
+    refetchInterval: (query) => (query.state.data?.enrichment_status === "pending" ? 5000 : false),
   });
 }
 

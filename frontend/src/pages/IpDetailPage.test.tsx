@@ -20,6 +20,14 @@ const SUMMARY = {
   total_sessions: 3,
   total_commands: 7,
   currently_banned: true,
+  asn: 15169,
+  asn_org: "GOOGLE",
+  reverse_dns: "dns.google",
+  abuseipdb_score: 87,
+  abuseipdb_total_reports: 12,
+  abuseipdb_last_reported_at: "2026-10-01T00:00:00Z",
+  abuseipdb_configured: true,
+  enrichment_status: "done",
 };
 
 const SESSIONS = {
@@ -244,5 +252,58 @@ describe("IpDetailPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Bannir" }));
 
     await waitFor(() => expect(screen.getByText("Échec de l'action, réessaie.")).toBeInTheDocument());
+  });
+});
+
+describe("IP enrichment panel", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("shows a skeleton while enrichment_status is pending", async () => {
+    stubFetch({ summary: { ...SUMMARY, enrichment_status: "pending", asn: null, asn_org: null, reverse_dns: null } });
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText("Enrichissement")).toBeInTheDocument());
+    expect(screen.queryByText("AS15169 · GOOGLE")).not.toBeInTheDocument();
+  });
+
+  it("shows ASN and reverse DNS once done", async () => {
+    stubFetch();
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText("AS15169 · GOOGLE")).toBeInTheDocument());
+    expect(screen.getByText("dns.google")).toBeInTheDocument();
+  });
+
+  it("shows fallback text when ASN/reverse DNS resolved to nothing", async () => {
+    stubFetch({ summary: { ...SUMMARY, asn: null, asn_org: null, reverse_dns: null } });
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText("Non résolu")).toBeInTheDocument());
+    expect(screen.getByText("Aucun")).toBeInTheDocument();
+  });
+
+  it("shows the AbuseIPDB badge with a danger tone for a high score", async () => {
+    stubFetch();
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText("Score 87/100")).toBeInTheDocument());
+    expect(screen.getByText("Score 87/100")).toHaveClass("badge-danger");
+    expect(screen.getByText(/12 signalement/)).toBeInTheDocument();
+  });
+
+  it("hides the AbuseIPDB section entirely when the feature is not configured", async () => {
+    stubFetch({ summary: { ...SUMMARY, abuseipdb_configured: false, abuseipdb_score: null, abuseipdb_total_reports: null } });
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText("AS15169 · GOOGLE")).toBeInTheDocument());
+    expect(screen.queryByText(/Score/)).not.toBeInTheDocument();
+  });
+
+  it("renders a hostile-looking reverse DNS value as inert text, not markup", async () => {
+    stubFetch({ summary: { ...SUMMARY, reverse_dns: "<img src=x onerror=alert(1)>" } });
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText("<img src=x onerror=alert(1)>")).toBeInTheDocument());
+    expect(document.querySelector("img[onerror]")).toBeNull();
   });
 });
