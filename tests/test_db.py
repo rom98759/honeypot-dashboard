@@ -55,3 +55,21 @@ def test_connect_adds_connect_time_and_timestamp_indexes(tmp_path):
     indexes = {row["name"] for row in db.execute("SELECT name FROM sqlite_master WHERE type = 'index'").fetchall()}
     assert "idx_sessions_connect_time" in indexes
     assert "idx_fail2ban_events_timestamp" in indexes
+
+
+def test_ip_enrichment_table_exists(tmp_path):
+    db = connect(tmp_path / "test.sqlite3")
+    columns = {row["name"] for row in db.execute("PRAGMA table_info(ip_enrichment)").fetchall()}
+    assert columns == {
+        "ip", "asn", "asn_org", "reverse_dns",
+        "abuseipdb_score", "abuseipdb_total_reports", "abuseipdb_last_reported_at",
+        "status", "looked_up_at",
+    }
+
+
+def test_ip_enrichment_status_defaults_to_pending(tmp_path):
+    db = connect(tmp_path / "test.sqlite3")
+    db.execute("INSERT INTO ip_enrichment (ip) VALUES ('1.2.3.4')")
+    db.commit()
+    row = db.execute("SELECT status FROM ip_enrichment WHERE ip = '1.2.3.4'").fetchone()
+    assert row["status"] == "pending"

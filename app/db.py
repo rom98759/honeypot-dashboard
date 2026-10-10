@@ -38,6 +38,18 @@ CREATE TABLE IF NOT EXISTS geo_cache (
     looked_up_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS ip_enrichment (
+    ip TEXT PRIMARY KEY,
+    asn INTEGER,
+    asn_org TEXT,
+    reverse_dns TEXT,
+    abuseipdb_score INTEGER,
+    abuseipdb_total_reports INTEGER,
+    abuseipdb_last_reported_at TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    looked_up_at TEXT
+);
+
 CREATE TABLE IF NOT EXISTS fail2ban_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     ip TEXT NOT NULL,
