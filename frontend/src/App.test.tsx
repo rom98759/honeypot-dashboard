@@ -3,6 +3,9 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { renderWithProviders } from "./test-utils";
 import App from "./App";
 
+vi.mock("./components/ActivityChart", () => ({ ActivityChart: () => <div>activity chart</div> }));
+vi.mock("./components/WorldMap", () => ({ WorldMap: () => <div>world map</div> }));
+
 function jsonResponse(body: unknown): Promise<Response> {
   return Promise.resolve({ ok: true, json: () => Promise.resolve(body) } as Response);
 }
@@ -19,12 +22,19 @@ beforeEach(() => {
           total_connections: 0,
           unique_ips: 0,
           login_attempts: 0,
+          avg_duration_ms: null,
+          previous: null,
+          active_sessions: 0,
           currently_banned: 0,
           top_offenders: [],
           top_countries: [],
+          countries: [],
           timeline: [],
           protocol_split: [],
           top_credentials: [],
+          top_usernames: [],
+          top_passwords: [],
+          top_commands: [],
           bans_timeline: [],
           duration_distribution: [],
         });
@@ -55,9 +65,6 @@ beforeEach(() => {
       if (url.startsWith("/api/correlation")) {
         return jsonResponse([]);
       }
-      if (url.startsWith("/api/map")) {
-        return jsonResponse({ events: [], destination: null });
-      }
       return jsonResponse({});
     })
   );
@@ -71,7 +78,7 @@ describe("App", () => {
   it("redirects the default route to Overview", async () => {
     renderWithProviders(<App />, { route: "/" });
     const nav = screen.getByRole("navigation");
-    await waitFor(() => expect(within(nav).getByText("Overview").closest("a")).toHaveClass("active"));
+    await waitFor(() => expect(within(nav).getByText("Vue d'ensemble").closest("a")).toHaveClass("active"));
   });
 
   it("renders the Sessions page when navigating there", async () => {

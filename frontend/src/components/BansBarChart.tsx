@@ -1,6 +1,7 @@
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip, type ChartEvent, type ActiveElement } from "chart.js";
 import { Bar } from "react-chartjs-2";
-import { ChartErrorBoundary } from "./TimelineChart";
+import { ChartErrorBoundary } from "./ChartErrorBoundary";
+import { chartTheme } from "../theme/chartTheme";
 import { useTheme } from "../theme/ThemeContext";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip);
@@ -18,19 +19,17 @@ export function BansBarChart({
   onBarClick?: (bucket: string) => void;
 }) {
   const [theme] = useTheme();
-  // Re-read the theme's CSS custom properties on every theme toggle so the chart
-  // stays in sync with dark/light mode instead of hardcoding light-mode colors.
-  const styles = getComputedStyle(document.documentElement);
-  const borderColor = styles.getPropertyValue("--border").trim();
-  const textSecondary = styles.getPropertyValue("--text-secondary").trim();
-  void theme;
+  const { line: borderColor, text: textSecondary } = chartTheme(theme);
   const data = {
     labels: bansTimeline.map((b) => b.bucket),
     datasets: [
       {
         label: "Bans",
         data: bansTimeline.map((b) => b.n),
-        backgroundColor: "#dc2626",
+        backgroundColor: "rgba(229, 72, 77, 0.5)",
+        hoverBackgroundColor: "rgba(229, 72, 77, 0.8)",
+        borderColor: "rgba(229, 72, 77, 0.8)",
+        borderWidth: 1,
       },
     ],
   };
@@ -39,10 +38,11 @@ export function BansBarChart({
     maintainAspectRatio: false,
     plugins: { legend: { display: false } },
     scales: {
-      x: { grid: { display: false }, ticks: { color: textSecondary } },
+      x: { grid: { display: false }, border: { color: borderColor }, ticks: { color: textSecondary, maxRotation: 0 } },
       y: {
         beginAtZero: true,
         grid: { color: borderColor },
+        border: { color: borderColor },
         ticks: { precision: 0, color: textSecondary },
       },
     },

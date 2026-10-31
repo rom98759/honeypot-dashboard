@@ -198,7 +198,7 @@ def test_top_offenders_includes_country_and_last_seen(tmp_path):
 
     top_offenders = get_overview_stats(db, "all")["top_offenders"]
     assert top_offenders == [
-        {"src_ip": "1.2.3.4", "n": 2, "last_seen": _iso(now), "country": "France"}
+        {"src_ip": "1.2.3.4", "n": 2, "last_seen": _iso(now), "country": "France", "country_code": None}
     ]
 
 
@@ -213,7 +213,7 @@ def test_top_offenders_has_null_country_when_ungeolocated(tmp_path):
 
     top_offenders = get_overview_stats(db, "all")["top_offenders"]
     assert top_offenders == [
-        {"src_ip": "9.9.9.9", "n": 1, "last_seen": _iso(now), "country": None}
+        {"src_ip": "9.9.9.9", "n": 1, "last_seen": _iso(now), "country": None, "country_code": None}
     ]
 
 

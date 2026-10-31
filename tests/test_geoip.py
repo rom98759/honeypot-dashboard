@@ -10,7 +10,7 @@ class _FakeLocation:
 
 class _FakeCityResponse:
     def __init__(self, country, city, latitude=None, longitude=None):
-        self.country = type("C", (), {"name": country})()
+        self.country = type("C", (), {"name": country, "iso_code": "US" if country else None})()
         self.city = type("C", (), {"name": city})()
         self.location = _FakeLocation(latitude, longitude)
 
@@ -84,3 +84,11 @@ def test_missing_reader_returns_none_fields(tmp_path):
     assert result.city is None
     assert result.latitude is None
     assert result.longitude is None
+
+
+def test_stores_iso_country_code(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    GeoLookup(db, _StubReader()).lookup("8.8.8.8")
+
+    row = db.execute("SELECT country_code FROM geo_cache WHERE ip = '8.8.8.8'").fetchone()
+    assert row["country_code"] == "US"

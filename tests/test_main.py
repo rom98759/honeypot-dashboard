@@ -17,7 +17,7 @@ class _StubReader:
                 "R",
                 (),
                 {
-                    "country": type("C", (), {"name": "United States"})(),
+                    "country": type("C", (), {"name": "United States", "iso_code": "US"})(),
                     "city": type("C", (), {"name": "Mountain View"})(),
                     "location": type("L", (), {"latitude": 37.4056, "longitude": -122.0775})(),
                 },
@@ -43,6 +43,9 @@ def test_backfill_skips_ips_already_in_geo_cache(tmp_path):
     db.execute(
         "INSERT INTO geo_cache (ip, country, city, latitude, longitude, looked_up_at) "
         "VALUES ('8.8.8.8', 'Cached', NULL, 37.4056, -122.0775, 't')"
+    )
+    db.execute(
+        "UPDATE geo_cache SET country_code = 'US' WHERE ip = '8.8.8.8'"
     )
     db.commit()
 
@@ -234,3 +237,17 @@ def test_create_app_sets_up_enrichment_worker(tmp_path):
     app = create_app(db=connect(tmp_path / "db.sqlite3"), start_background_tasks=False)
     assert app.state.ip_enrichment is not None
     assert app.state.enrichment_worker is not None
+
+
+def test_backfill_adds_missing_country_code(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    db.execute(
+        "INSERT INTO geo_cache (ip, country, city, latitude, longitude, looked_up_at) "
+        "VALUES ('8.8.8.8', 'United States', NULL, 37.4056, -122.0775, 't')"
+    )
+    db.commit()
+
+    _backfill_geo_cache(db, GeoLookup(db, _StubReader()))
+
+    row = db.execute("SELECT country_code FROM geo_cache WHERE ip = '8.8.8.8'").fetchone()
+    assert row["country_code"] == "US"

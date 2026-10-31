@@ -10,9 +10,9 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "^5.2.5",
     "@tanstack/react-query": "^5.101.4",
     "chart.js": "4.4.4",
-    "chartjs-plugin-zoom": "^2.2.0",
     "d3-geo": "^2.0.2",
     "lucide-react": "^1.31.0",
     "prop-types": "^15.8.1",
@@ -20,9 +20,7 @@
     "react-chartjs-2": "^5.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.18.0",
-    "react-simple-maps": "^3.0.0",
-    "simpleheat": "^0.4.0",
-    "world-atlas": "^2.0.2"
+    "react-simple-maps": "^3.0.0"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^7.0.1",

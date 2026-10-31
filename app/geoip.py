@@ -30,12 +30,13 @@ class GeoLookup:
                 longitude=row["longitude"],
             )
 
-        country = city = None
+        country = city = country_code = None
         latitude = longitude = None
         if self.reader is not None:
             try:
                 response = self.reader.city(ip)
                 country = response.country.name
+                country_code = getattr(response.country, "iso_code", None)
                 city = response.city.name
                 latitude = response.location.latitude
                 longitude = response.location.longitude
@@ -43,11 +44,12 @@ class GeoLookup:
                 pass  # private/reserved IP, not in the database, reader unavailable, etc.
 
         self.db.execute(
-            "INSERT INTO geo_cache (ip, country, city, latitude, longitude, looked_up_at) "
-            "VALUES (?, ?, ?, ?, ?, ?) "
-            "ON CONFLICT(ip) DO UPDATE SET country = excluded.country, city = excluded.city, "
+            "INSERT INTO geo_cache (ip, country, country_code, city, latitude, longitude, looked_up_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(ip) DO UPDATE SET country = excluded.country, "
+            "country_code = excluded.country_code, city = excluded.city, "
             "latitude = excluded.latitude, longitude = excluded.longitude",
-            (ip, country, city, latitude, longitude, datetime.now(timezone.utc).isoformat()),
+            (ip, country, country_code, city, latitude, longitude, datetime.now(timezone.utc).isoformat()),
         )
         self.db.commit()
         return GeoResult(country=country, city=city, latitude=latitude, longitude=longitude)

@@ -1,69 +1,53 @@
-import { render, screen, waitFor, act } from "@testing-library/react";
+import { screen, waitFor, within, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, afterEach } from "vitest";
+import { render } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Routes, Route, useLocation } from "react-router-dom";
-import { renderWithProviders } from "../test-utils";
 import { PeriodProvider } from "../theme/PeriodContext";
+import { ThemeProvider } from "../theme/ThemeContext";
 import { OverviewPage } from "./OverviewPage";
+import type { SeriesPoint } from "../utils/timeSeries";
 
-vi.mock("../components/TimelineChart", () => ({
-  TimelineChart: ({
-    timeline,
-    onRangeChange,
+vi.mock("../components/ActivityChart", () => ({
+  ActivityChart: ({
+    series,
+    onBucketClick,
   }: {
-    timeline: { bucket: string; n: number }[];
-    onRangeChange?: (range: { start: string; end: string } | null) => void;
+    series: SeriesPoint[];
+    onBucketClick?: (p: SeriesPoint) => void;
   }) => (
-    <div data-testid="timeline-chart-stub">
-      {timeline.length}
-      <button onClick={() => onRangeChange?.({ start: "2026-08-13T10", end: "2026-08-13T11" })}>
-        Simulate zoom
+    <div data-testid="activity-chart-stub">
+      {series.length}
+      <button
+        onClick={() =>
+          onBucketClick?.({ ...series[0], from: "2026-08-13T10", to: "2026-08-13T11" })
+        }
+      >
+        Simulate bucket click
       </button>
-      <button onClick={() => onRangeChange?.(null)}>Simulate reset</button>
-    </div>
-  ),
-}));
-
-vi.mock("../components/ProtocolDonut", () => ({
-  ProtocolDonut: ({
-    protocolSplit,
-    onSliceClick,
-  }: {
-    protocolSplit: { protocol: string; n: number }[];
-    onSliceClick?: (protocol: string) => void;
-  }) => (
-    <div data-testid="protocol-donut-stub">
-      {protocolSplit.length}
-      <button onClick={() => onSliceClick?.("ssh")}>Simulate protocol click</button>
     </div>
   ),
 }));
 
 vi.mock("../components/BansBarChart", () => ({
-  BansBarChart: ({
-    bansTimeline,
-    onBarClick,
+  BansBarChart: ({ onBarClick }: { onBarClick?: (bucket: string) => void }) => (
+    <button onClick={() => onBarClick?.("2026-08-13")}>Simulate bar click</button>
+  ),
+}));
+
+vi.mock("../components/WorldMap", () => ({
+  WorldMap: ({
+    countries,
+    onCountryClick,
   }: {
-    bansTimeline: { bucket: string; n: number }[];
-    onBarClick?: (bucket: string) => void;
+    countries: { country: string }[];
+    onCountryClick?: (c: { country: string }) => void;
   }) => (
-    <div data-testid="bans-bar-chart-stub">
-      {bansTimeline.length}
-      <button onClick={() => onBarClick?.("2026-08-13")}>Simulate bar click</button>
+    <div data-testid="world-map-stub">
+      {countries.length}
+      <button onClick={() => onCountryClick?.(countries[0])}>Simulate country click</button>
     </div>
-  ),
-}));
-
-vi.mock("../components/AttackHeatmap", () => ({
-  AttackHeatmap: ({ cells }: { cells: { n: number }[] }) => (
-    <div data-testid="attack-heatmap-stub">{cells.length}</div>
-  ),
-}));
-
-vi.mock("../components/DurationDistributionChart", () => ({
-  DurationDistributionChart: ({ distribution }: { distribution: { n: number }[] }) => (
-    <div data-testid="duration-chart-stub">{distribution.length}</div>
   ),
 }));
 
@@ -73,39 +57,75 @@ function jsonResponse(body: unknown): Promise<Response> {
 
 const EMPTY_HEATMAP = { cells: [] };
 
-function SessionsStub() {
-  const location = useLocation();
-  return <div>Sessions stub: {location.search}</div>;
-}
-
-function stubOverviewFetch(overviewBody: unknown, heatmapBody: unknown = EMPTY_HEATMAP) {
-  return vi.fn((url: string) =>
-    url.includes("/heatmap") ? jsonResponse(heatmapBody) : jsonResponse(overviewBody)
-  );
-}
-
 const FULL_OVERVIEW = {
   total_connections: 12,
   unique_ips: 4,
   login_attempts: 3,
+  avg_duration_ms: 67_000,
+  previous: { total_connections: 6, unique_ips: 4, login_attempts: 6, avg_duration_ms: 67_000 },
+  active_sessions: 2,
   currently_banned: 1,
-  top_offenders: [{ src_ip: "1.2.3.4", n: 6, country: "France", last_seen: "2026-08-13T10:00:00Z" }],
-  duration_distribution: [
-    { bucket: "<10s", n: 1 },
-    { bucket: "10-60s", n: 2 },
-    { bucket: "1-5min", n: 3 },
-    { bucket: "5-30min", n: 4 },
-    { bucket: ">30min", n: 5 },
+  top_offenders: [
+    { src_ip: "1.2.3.4", n: 6, country: "France", country_code: "FR", last_seen: "2026-08-13T10:00:00Z" },
   ],
-  top_countries: [{ country: "France", n: 6 }],
-  timeline: [{ bucket: "2026-08-13T10", n: 6 }],
+  top_countries: [{ country: "France", country_code: "FR", n: 6 }],
+  countries: [{ country: "France", country_code: "FR", n: 6 }],
+  timeline: [{ bucket: "2026-08-13T10", n: 6, logins: 3 }],
   protocol_split: [
     { protocol: "ssh", n: 10 },
     { protocol: "telnet", n: 2 },
   ],
-  top_credentials: [{ login_username: "root", login_password: "123456", n: 5 }],
+  top_credentials: [
+    { login_username: "root", login_password: "123456", n: 5 },
+    { login_username: "admin", login_password: null, n: 1 },
+  ],
+  top_usernames: [{ value: "root", n: 5 }],
+  top_passwords: [{ value: "123456", n: 5 }],
+  top_commands: [{ input_text: "uname -a", n: 4 }],
   bans_timeline: [{ bucket: "2026-08-13T10", n: 2 }],
+  duration_distribution: [
+    { bucket: "<10s", n: 1 },
+    { bucket: "10-60s", n: 0 },
+    { bucket: "1-5min", n: 3 },
+    { bucket: "5-30min", n: 0 },
+    { bucket: ">30min", n: 0 },
+  ],
 };
+
+function stubFetch(overview: unknown = FULL_OVERVIEW) {
+  const mock = vi.fn((url: string) =>
+    url.includes("/heatmap") ? jsonResponse(EMPTY_HEATMAP) : jsonResponse(overview)
+  );
+  vi.stubGlobal("fetch", mock);
+  return mock;
+}
+
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="location">{location.pathname + location.search}</div>;
+}
+
+function renderPage(route = "/overview") {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[route]}>
+        <ThemeProvider>
+          <PeriodProvider>
+            <Routes>
+              <Route path="/overview" element={<OverviewPage />} />
+              <Route path="*" element={<div>other page</div>} />
+            </Routes>
+            <LocationProbe />
+          </PeriodProvider>
+        </ThemeProvider>
+      </MemoryRouter>
+    </QueryClientProvider>
+  );
+}
+
+const overviewCalls = (mock: ReturnType<typeof vi.fn>) =>
+  mock.mock.calls.map(([url]) => url as string).filter((u) => !u.includes("/heatmap"));
 
 describe("OverviewPage", () => {
   afterEach(() => {
@@ -113,223 +133,198 @@ describe("OverviewPage", () => {
     vi.useRealTimers();
   });
 
-  it("shows a skeleton before data resolves, then the stat cards", async () => {
+  it("shows a skeleton before data resolves, then the metric cards", async () => {
     let resolveFetch: (value: Response) => void = () => {};
     vi.stubGlobal(
       "fetch",
       vi.fn((url: string) =>
         url.includes("/heatmap")
-          ? Promise.resolve({ ok: true, json: async () => EMPTY_HEATMAP } as Response)
+          ? jsonResponse(EMPTY_HEATMAP)
           : new Promise<Response>((resolve) => (resolveFetch = resolve))
       )
     );
-    const { container } = renderWithProviders(<OverviewPage />);
+    const { container } = renderPage();
     expect(container.querySelector(".skeleton-block")).not.toBeNull();
 
     resolveFetch({ ok: true, json: async () => FULL_OVERVIEW } as Response);
-    await waitFor(() => expect(screen.getByText("12")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Connexions")).toBeInTheDocument());
     expect(container.querySelector(".skeleton-block")).toBeNull();
+    expect(screen.getByText("1m 7s")).toBeInTheDocument();
+    expect(screen.getByText("2 en cours")).toBeInTheDocument();
   });
 
-  it("fetches with the default 24h period and switches period on click", async () => {
-    const fetchMock = stubOverviewFetch(FULL_OVERVIEW);
-    vi.stubGlobal("fetch", fetchMock);
-    renderWithProviders(<OverviewPage />);
-    await waitFor(() => expect(screen.getByText("12")).toBeInTheDocument());
-    expect(fetchMock).toHaveBeenCalledWith("/api/overview?period=24h");
+  it("shows the change against the previous period, with attacks rising in red", async () => {
+    stubFetch();
+    renderPage();
+    const card = (await screen.findByText("Connexions")).closest(".metric-card")!;
+    const change = within(card as HTMLElement).getByTestId("change-label");
+    expect(change).toHaveTextContent("100%");
+    expect(change).toHaveClass("negative");
 
-    await userEvent.click(screen.getByRole("button", { name: "30j" }));
-    await waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith("/api/overview?period=30d"));
+    const logins = screen.getByText("Logins tentés").closest(".metric-card")!;
+    expect(within(logins as HTMLElement).getByTestId("change-label")).toHaveClass("positive");
   });
 
-  it("renders the protocol donut, bans chart, and top credentials table", async () => {
-    vi.stubGlobal("fetch", stubOverviewFetch(FULL_OVERVIEW));
-    renderWithProviders(<OverviewPage />);
-    await waitFor(() => expect(screen.getByTestId("protocol-donut-stub")).toBeInTheDocument());
-    expect(screen.getByTestId("bans-bar-chart-stub")).toBeInTheDocument();
-    expect(screen.getByText("root")).toBeInTheDocument();
-    expect(screen.getByText("123456")).toBeInTheDocument();
+  it("fetches the default 24h period and refetches when the period changes", async () => {
+    const fetchMock = stubFetch();
+    renderPage();
+    await screen.findByText("Connexions");
+    expect(overviewCalls(fetchMock)[0]).toBe("/api/overview?period=24h");
+
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Période" }), "7d");
+    await waitFor(() => expect(overviewCalls(fetchMock)).toContain("/api/overview?period=7d"));
+    expect(screen.getByTestId("location")).toHaveTextContent("period=7d");
+  });
+
+  it("adds a filter when a list row is clicked, and removes it from its chip", async () => {
+    const fetchMock = stubFetch();
+    renderPage();
+    await screen.findByText("Connexions");
+
+    await userEvent.click(screen.getByRole("tab", { name: "Pays" }));
+    await userEvent.click(screen.getByRole("button", { name: /France/ }));
+
+    await waitFor(() =>
+      expect(overviewCalls(fetchMock)).toContain("/api/overview?period=24h&country=France")
+    );
+    expect(screen.getByText("Pays", { selector: ".filter-chip b" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Retirer le filtre Pays" }));
+    await waitFor(() => expect(screen.getByTestId("location")).not.toHaveTextContent("country="));
+  });
+
+  it("adds a filter from the filter popover", async () => {
+    const fetchMock = stubFetch();
+    renderPage();
+    await screen.findByText("Connexions");
+
+    await userEvent.click(screen.getByRole("button", { name: "Filtre" }));
+    const form = screen.getByRole("form", { name: "Ajouter un filtre" });
+    await userEvent.selectOptions(within(form).getByLabelText("Champ"), "protocol");
+    await userEvent.type(within(form).getByPlaceholderText("est égal à…"), "telnet");
+    await userEvent.click(within(form).getByRole("button", { name: "Ajouter" }));
+
+    await waitFor(() =>
+      expect(overviewCalls(fetchMock)).toContain("/api/overview?period=24h&protocol=telnet")
+    );
+  });
+
+  it("applies filters already present in the URL and forwards them to the sessions link", async () => {
+    const fetchMock = stubFetch();
+    renderPage("/overview?ip=1.2.3.4&protocol=ssh");
+    await screen.findByText("Connexions");
+
+    expect(overviewCalls(fetchMock)[0]).toBe("/api/overview?period=24h&protocol=ssh&ip=1.2.3.4");
+    expect(screen.getByRole("link", { name: /Voir les sessions/ })).toHaveAttribute(
+      "href",
+      "/sessions?period=24h&ip=1.2.3.4&protocol=ssh"
+    );
   });
 
   it("shows (vide) for a null attempted password", async () => {
-    vi.stubGlobal(
-      "fetch",
-      stubOverviewFetch({
-        ...FULL_OVERVIEW,
-        top_credentials: [{ login_username: "admin", login_password: null, n: 2 }],
-      })
-    );
-    renderWithProviders(<OverviewPage />);
-    await waitFor(() => expect(screen.getByText("(vide)")).toBeInTheDocument());
+    stubFetch();
+    renderPage();
+    expect(await screen.findByText("admin / (vide)")).toBeInTheDocument();
   });
 
-  it("links the offender row to its IP detail page", async () => {
-    vi.stubGlobal("fetch", stubOverviewFetch(FULL_OVERVIEW));
-    renderWithProviders(<OverviewPage />);
-    await waitFor(() => expect(screen.getByRole("link", { name: "1.2.3.4" })).toBeInTheDocument());
-    expect(screen.getByRole("link", { name: "1.2.3.4" })).toHaveAttribute("href", "/ip/1.2.3.4");
+  it("links an offender to its IP page and filters on it when the row is clicked", async () => {
+    const fetchMock = stubFetch();
+    renderPage();
+    expect(await screen.findByRole("link", { name: "Détail de 1.2.3.4" })).toHaveAttribute("href", "/ip/1.2.3.4");
+
+    await userEvent.click(screen.getByText("1.2.3.4"));
+    await waitFor(() =>
+      expect(overviewCalls(fetchMock)).toContain("/api/overview?period=24h&ip=1.2.3.4")
+    );
   });
 
-  it("renders empty states and skips charts when there is no data", async () => {
-    vi.stubGlobal(
-      "fetch",
-      stubOverviewFetch({
-        ...FULL_OVERVIEW,
-        top_countries: [],
-        top_offenders: [],
-        protocol_split: [],
-        bans_timeline: [],
-        top_credentials: [],
-        duration_distribution: [
-          { bucket: "<10s", n: 0 },
-          { bucket: "10-60s", n: 0 },
-          { bucket: "1-5min", n: 0 },
-          { bucket: "5-30min", n: 0 },
-          { bucket: ">30min", n: 0 },
-        ],
-      })
+  it("navigates to the sessions running a command when a command row is clicked", async () => {
+    stubFetch();
+    renderPage();
+    await userEvent.click(await screen.findByText("uname -a"));
+    expect(screen.getByTestId("location")).toHaveTextContent("/sessions?period=24h&command=uname+-a");
+  });
+
+  it("navigates to a date-range-filtered sessions view from a chart bar", async () => {
+    stubFetch();
+    renderPage();
+    await userEvent.click(await screen.findByRole("button", { name: "Simulate bucket click" }));
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      "/sessions?date_from=2026-08-13T10&date_to=2026-08-13T11"
     );
-    renderWithProviders(<OverviewPage />);
-    await waitFor(() => expect(screen.getAllByText("Aucune donnée")).toHaveLength(7));
-    expect(screen.getByTestId("timeline-chart-stub")).toBeInTheDocument();
+  });
+
+  it("navigates to a date-range-filtered sessions view from a bans bar", async () => {
+    stubFetch();
+    renderPage();
+    await screen.findByText("Connexions");
+    await userEvent.click(screen.getByRole("tab", { name: "Bans fail2ban" }));
+    await userEvent.click(screen.getByRole("button", { name: "Simulate bar click" }));
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      "/sessions?date_from=2026-08-13&date_to=2026-08-14"
+    );
+  });
+
+  it("filters on a country clicked on the map", async () => {
+    const fetchMock = stubFetch();
+    renderPage();
+    await userEvent.click(await screen.findByRole("button", { name: "Simulate country click" }));
+    await waitFor(() =>
+      expect(overviewCalls(fetchMock)).toContain("/api/overview?period=24h&country=France")
+    );
+  });
+
+  it("renders empty states when there is no data", async () => {
+    stubFetch({
+      ...FULL_OVERVIEW,
+      previous: null,
+      top_offenders: [],
+      top_countries: [],
+      countries: [],
+      timeline: [],
+      protocol_split: [],
+      top_credentials: [],
+      top_usernames: [],
+      top_passwords: [],
+      top_commands: [],
+      bans_timeline: [],
+    });
+    localStorage.setItem("period", "all");
+    renderPage();
+    await screen.findByText("Connexions");
+    expect(screen.queryByTestId("change-label")).toBeNull();
+    expect(screen.getByText("Aucune session sur la période")).toBeInTheDocument();
+    expect(screen.getAllByText("Aucune donnée").length).toBeGreaterThan(0);
   });
 
   it("shows an error state and recovers via the retry button", async () => {
-    const fetchMock = vi.fn((url: string) =>
-      url.includes("/heatmap")
-        ? jsonResponse(EMPTY_HEATMAP)
-        : Promise.resolve({ ok: false, status: 500 } as Response)
+    let fail = true;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        if (url.includes("/heatmap")) return jsonResponse(EMPTY_HEATMAP);
+        if (fail) return Promise.resolve({ ok: false, status: 500 } as Response);
+        return jsonResponse(FULL_OVERVIEW);
+      })
     );
-    vi.stubGlobal("fetch", fetchMock);
-    renderWithProviders(<OverviewPage />);
-    await waitFor(() => expect(screen.getByText("Erreur de chargement, réessaie.")).toBeInTheDocument());
-
-    fetchMock.mockImplementationOnce(() => jsonResponse(FULL_OVERVIEW));
+    renderPage();
+    await screen.findByText("Erreur de chargement, réessaie.");
+    fail = false;
     await userEvent.click(screen.getByRole("button", { name: "Réessayer" }));
-    await waitFor(() => expect(screen.getByText("12")).toBeInTheDocument());
+    expect(await screen.findByText("Connexions")).toBeInTheDocument();
   });
 
   it("auto-refreshes every 10s without flashing the skeleton again", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    const fetchMock = stubOverviewFetch(FULL_OVERVIEW);
-    vi.stubGlobal("fetch", fetchMock);
-    renderWithProviders(<OverviewPage />);
-    await waitFor(() => expect(screen.getByText("12")).toBeInTheDocument());
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const fetchMock = stubFetch();
+    const { container } = renderPage();
+    await screen.findByText("Connexions");
+    const before = overviewCalls(fetchMock).length;
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(10_000);
     });
-    expect(fetchMock).toHaveBeenCalledTimes(3);
-    expect(document.querySelector(".skeleton-block")).toBeNull();
-  });
-
-  it("reads the initial period from a pre-set PeriodContext value, not just the default", async () => {
-    localStorage.setItem("period", "7d");
-    const fetchMock = stubOverviewFetch(FULL_OVERVIEW);
-    vi.stubGlobal("fetch", fetchMock);
-    render(
-      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-        <MemoryRouter>
-          <PeriodProvider>
-            <OverviewPage />
-          </PeriodProvider>
-        </MemoryRouter>
-      </QueryClientProvider>
-    );
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/overview?period=7d"));
-    localStorage.clear();
-  });
-
-  it("navigates to a protocol-filtered Sessions view when a donut slice is clicked", async () => {
-    vi.stubGlobal("fetch", stubOverviewFetch(FULL_OVERVIEW));
-    function Harness() {
-      return (
-        <Routes>
-          <Route path="/overview" element={<OverviewPage />} />
-          <Route path="/sessions" element={<SessionsStub />} />
-        </Routes>
-      );
-    }
-    renderWithProviders(<Harness />, { route: "/overview" });
-    await waitFor(() => expect(screen.getByTestId("protocol-donut-stub")).toBeInTheDocument());
-
-    await userEvent.click(screen.getByRole("button", { name: "Simulate protocol click" }));
-    await waitFor(() => expect(screen.getByText(/protocol=ssh/)).toBeInTheDocument());
-    expect(screen.getByText(/period=24h/)).toBeInTheDocument();
-  });
-
-  it("navigates to a country-filtered Sessions view when a top-country row is clicked", async () => {
-    vi.stubGlobal("fetch", stubOverviewFetch(FULL_OVERVIEW));
-    function Harness() {
-      return (
-        <Routes>
-          <Route path="/overview" element={<OverviewPage />} />
-          <Route path="/sessions" element={<SessionsStub />} />
-        </Routes>
-      );
-    }
-    renderWithProviders(<Harness />, { route: "/overview" });
-    await waitFor(() => expect(screen.getByRole("link", { name: "France" })).toBeInTheDocument());
-
-    await userEvent.click(screen.getByRole("link", { name: "France" }));
-    await waitFor(() => expect(screen.getByText(/country=France/)).toBeInTheDocument());
-    expect(screen.getByText(/period=24h/)).toBeInTheDocument();
-  });
-
-  it("navigates to a date-range-filtered Sessions view when a bans bar is clicked", async () => {
-    vi.stubGlobal("fetch", stubOverviewFetch(FULL_OVERVIEW));
-    function Harness() {
-      return (
-        <Routes>
-          <Route path="/overview" element={<OverviewPage />} />
-          <Route path="/sessions" element={<SessionsStub />} />
-        </Routes>
-      );
-    }
-    renderWithProviders(<Harness />, { route: "/overview" });
-    await waitFor(() => expect(screen.getByTestId("bans-bar-chart-stub")).toBeInTheDocument());
-
-    await userEvent.click(screen.getByRole("button", { name: "Simulate bar click" }));
-    await waitFor(() =>
-      expect(screen.getByText(/date_from=2026-08-13.*date_to=2026-08-14/)).toBeInTheDocument()
-    );
-    expect(screen.queryByText(/period=/)).not.toBeInTheDocument();
-  });
-
-  it("shows a 'view these sessions' action only while the timeline is zoomed, and clears it on reset", async () => {
-    vi.stubGlobal("fetch", stubOverviewFetch(FULL_OVERVIEW));
-    renderWithProviders(<OverviewPage />);
-    await waitFor(() => expect(screen.getByTestId("timeline-chart-stub")).toBeInTheDocument());
-    expect(screen.queryByRole("button", { name: "Voir les sessions de cette période" })).not.toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole("button", { name: "Simulate zoom" }));
-    expect(screen.getByRole("button", { name: "Voir les sessions de cette période" })).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole("button", { name: "Simulate reset" }));
-    expect(screen.queryByRole("button", { name: "Voir les sessions de cette période" })).not.toBeInTheDocument();
-  });
-
-  it("navigates to a date-range-filtered Sessions view from the zoomed timeline action", async () => {
-    vi.stubGlobal("fetch", stubOverviewFetch(FULL_OVERVIEW));
-    function Harness() {
-      return (
-        <Routes>
-          <Route path="/overview" element={<OverviewPage />} />
-          <Route path="/sessions" element={<SessionsStub />} />
-        </Routes>
-      );
-    }
-    renderWithProviders(<Harness />, { route: "/overview" });
-    await waitFor(() => expect(screen.getByTestId("timeline-chart-stub")).toBeInTheDocument());
-
-    await userEvent.click(screen.getByRole("button", { name: "Simulate zoom" }));
-    await userEvent.click(screen.getByRole("button", { name: "Voir les sessions de cette période" }));
-    await waitFor(() =>
-      expect(
-        screen.getByText(/date_from=2026-08-13T10.*date_to=2026-08-13T12/)
-      ).toBeInTheDocument()
-    );
-    expect(screen.queryByText(/period=/)).not.toBeInTheDocument();
+    await waitFor(() => expect(overviewCalls(fetchMock).length).toBeGreaterThan(before));
+    expect(container.querySelector(".skeleton-block")).toBeNull();
   });
 });

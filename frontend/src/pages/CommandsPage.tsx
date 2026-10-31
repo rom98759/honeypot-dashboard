@@ -1,20 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Search } from "lucide-react";
+import { Search, Terminal } from "lucide-react";
 import { useCommands, COMMANDS_PAGE_SIZE } from "../api/commands";
 import { usePeriod, type Period } from "../theme/PeriodContext";
 import { SkeletonBlock } from "../components/SkeletonBlock";
 import { ErrorState } from "../components/ErrorState";
 import { EmptyState } from "../components/EmptyState";
 import { Pagination } from "../components/Pagination";
+import { PageHeader } from "../components/PageHeader";
+import { PeriodSelect } from "../components/PeriodSelect";
 import { formatTimestamp } from "../utils/formatDate";
-
-const PERIODS: { value: Period; label: string }[] = [
-  { value: "24h", label: "24h" },
-  { value: "7d", label: "7j" },
-  { value: "30d", label: "30j" },
-  { value: "all", label: "Tout" },
-];
 
 export function CommandsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -61,20 +56,16 @@ export function CommandsPage() {
 
   return (
     <>
-      <div className="topbar">
-        <h1>Commandes</h1>
-        <div className="period-selector">
-          {PERIODS.map((p) => (
-            <button
-              key={p.value}
-              className={`btn${period === p.value ? " active" : ""}`}
-              onClick={() => handlePeriodChange(p.value)}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <PageHeader
+        title={
+          <>
+            <Terminal />
+            Commandes
+          </>
+        }
+      >
+        <PeriodSelect value={period} onChange={handlePeriodChange} />
+      </PageHeader>
       <div className="filter-bar">
         <Search />
         <input

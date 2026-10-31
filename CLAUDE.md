@@ -1,143 +1,65 @@
-# CLAUDE.md
+# CLAUDE.md — honeypot-dashboard
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## But
+Dashboard self-hosted pour un honeypot Cowrie (SSH/Telnet) sur le VPS OVH. Ingère le JSON Cowrie, le log
+fail2ban et un log d'auth sshd dans SQLite ; sert vue d'ensemble, sessions (replay terminal), carte,
+corrélation honeypot / sshd réel / bans, page IP (enrichissement, ban/unban). Statut : actif, perso, déployé.
+Backlog : `TODO.md`. Décisions de design : `docs/superpowers/specs/`.
 
-## What this is
+## Stack & architecture
+- Backend FastAPI + SQLite brut (pas d'ORM) : `app/` (`main.py` create_app, `ingester.py`, `tailer.py`,
+  `correlation.py`, `cowrie_parser.py`, `ttyplayer.py`, `geoip.py`, `ip_enrichment.py`,
+  `enrichment_worker.py`, `fban_control.py`, `routers/`). Tests : `tests/` (pytest).
+- Frontend React + TS + Vite : `frontend/` (HashRouter, TanStack Query, un seul `src/style.css`, Chart.js npm,
+  `public/vendor/` = asciinema-player vendoré).
+- Flux : `_poll_loop` appelle `.tick()` des 3 ingesters toutes les 5 s ; chaque `LogTailer` garde offset+inode
+  dans `ingest_offsets` (reprise après restart, détection de rotation ; copytruncate non géré). Offset et
+  lignes insérées sont commités dans la même transaction.
+- Cowrie : `parse_event` (dataclasses typées) puis `apply_cowrie_record` (tables `sessions`, `commands`,
+  `ttylogs`). Un nouveau type d'événement = étendre les deux.
+- `create_app(db=..., start_background_tasks=...)` injectable pour `TestClient` sans I/O ; `tests/conftest.py`
+  redirige les chemins vers `data/` avant tout import de `app.main`.
+- Routers fins, SQL inline sur `request.app.state.db`. Handlers `async` mais sqlite synchrone sur une seule
+  connexion partagée (WAL) : volontaire (commit `d1b5a29`), ne pas "corriger" avec `to_thread`.
+- Replay : `/api/sessions/{id}/replay` lit les ttylogs Cowrie (mount RO), `ttyplayer.py` les convertit en
+  asciinema v2 ; le routeur retire le préfixe `var/` des chemins Cowrie.
+- Design : clone fidèle d'Umami v3 (voir `DESIGN.md`) ; tokens dans `style.css`, couleurs Chart.js/carte dans
+  `theme/chartTheme.ts`. La carte est une choroplèthe (`public/world.json` + `utils/isoCountries.ts`, repris
+  d'Umami, MIT) alimentée par `countries` de `/api/overview` ; elle a besoin de `geo_cache.country_code`
+  (rempli au lookup et par le backfill de démarrage). `/api/map` n'est plus utilisé par le front.
+- Filtres façon Umami : `country`/`protocol`/`ip`/`username` dans l'URL (`theme/useFilters.ts`), passés à
+  `/api/overview` ; `previous` = mêmes totaux sur la période précédente (null pour `all`).
+- Ban/unban : `fban_control.py` parle à un worker systemd hôte (`scripts/fban-queue-worker.sh`) via un
+  répertoire de queue bind-mounté (`FBAN_QUEUE_PATH`) ; repli sur l'heuristique logs après
+  `FBAN_TIMEOUT_SECONDS` (2.0). `/ban` et `/unban` rejettent les requêtes cross-origin (Origin/Referer).
+- Enrichissement IP (ASN, rDNS, AbuseIPDB) : table `ip_enrichment` = file d'attente + résultats, drainée par
+  `EnrichmentWorker`. Sans config, tout dégrade en no-op.
+- Le dashboard est déployé en conteneur durci (`read_only`, `cap_drop: ALL`, `no-new-privileges`) sur le
+  réseau externe `nginx-proxy-network`, derrière Nginx Proxy Manager. `scripts/` = helpers côté VPS.
 
-A self-hosted dashboard for a Cowrie SSH/Telnet honeypot running on the user's VPS. It tails Cowrie's
-JSON event log, fail2ban's log, and an sshd auth log into a SQLite database, then serves an overview,
-a session browser (with terminal replay), and an IP correlation view (honeypot sessions vs. real sshd
-auth attempts vs. fail2ban bans) via a FastAPI backend + React frontend.
-
-## Commands
-
+## Commandes
 ```bash
-# Run the dev server (auto-reload)
-.venv/bin/uvicorn app.main:app --reload
-
-# Run all tests
-.venv/bin/pytest
-
-# Run a single test file / test
-.venv/bin/pytest tests/test_ingester.py
-.venv/bin/pytest tests/test_ingester.py::test_name -v
-
-# Frontend dev server (run alongside the backend above)
-cd frontend && npm run dev
-
-# Frontend tests
-cd frontend && npm test
-
-# Frontend production build (also runs automatically inside the Docker build)
-cd frontend && npm run build
-
-# Docker (production deployment on the VPS)
-docker compose up -d --build
+.venv/bin/uvicorn app.main:app --reload        # backend dev (:8000)
+cd frontend && npm run dev                      # frontend dev, proxy /api -> localhost:8000
+.venv/bin/pytest                                # tests backend (un test : tests/x.py::nom -v)
+cd frontend && npm test                         # tests frontend (vitest)
+cd frontend && npm run build                    # tsc -b && vite build (aussi fait par le Dockerfile)
+docker compose up -d --build                    # build/run local ou VPS
+# Déploiement (après push sur origin/main) :
+ssh vps 'cd honeypot-dashboard && git pull && docker compose up -d --build'
 ```
+Pas de lint/format configuré : imiter le style existant. Après déploiement : `docker compose ps` et
+`docker compose logs --tail=20 dashboard`.
 
-There's no separate lint/format command configured — match existing style.
+## Conventions du projet
+- Un bug = un commit = un cycle de déploiement ; cocher la ligne dans `TODO.md`.
+- Déboguer avec des données réelles du VPS (sqlite du conteneur, vrais ttylogs) plutôt que des fixtures seules.
+- Sur le VPS, `~/honeypot-dashboard/` cohabite avec `~/budget/` (autre app) : vérifier le dossier avant `git pull`.
 
-## Architecture
-
-**Ingestion is pull-based polling, not streaming.** `app/main.py`'s `_poll_loop` calls `.tick()` on
-three ingesters (`CowrieIngester`, `FailbanIngester`, `SshdAuthIngester`, all in `app/ingester.py` /
-`app/correlation.py`) every `POLL_INTERVAL_SECONDS` (5s). Each ingester wraps an `app/tailer.py`
-`LogTailer`, which tracks a byte offset + inode per log source in the `ingest_offsets` table so it can
-resume after restarts and detect rotation (inode change or size-shrink resets the offset to 0;
-copytruncate-style rotation is a known unhandled gap, see comment in `tailer.py`). A tick's offset
-update and the rows it inserts are committed together in one transaction — see the docstrings on
-`LogTailer.read_new_lines` and `CowrieIngester.tick` for the crash-consistency reasoning.
-
-**Cowrie events are parsed in two stages**: `app/cowrie_parser.py::parse_event` turns raw JSON dicts
-into typed dataclasses (`SessionConnect`, `LoginAttempt`, `CommandInput`, `TTYLogClosed`,
-`SessionClosed`); `app/ingester.py::apply_cowrie_record` writes each type to its SQLite table
-(`sessions`, `commands`, `ttylogs`). Adding support for a new Cowrie event type means extending both
-functions.
-
-**`app/main.py::create_app`** builds the app with dependency-injectable `db` and
-`start_background_tasks` params specifically so tests can use a `TestClient(app)` without triggering
-real file I/O or the polling loop — request-serving state (`app.state.db`, `app.state.*_ingester`) is
-set synchronously outside `lifespan`, since `TestClient` without a `with` block never runs lifespan
-startup. `lifespan` is reserved solely for starting/cancelling the polling task. Most configuration
-comes from env vars with Docker-oriented path defaults (e.g. `/data/dashboard.sqlite3`); `tests/conftest.py`
-overrides these to a repo-local `data/` dir before any test imports `app.main`, since bare imports of
-that module trigger `create_app()` at module scope. `VPS_LATITUDE`/`VPS_LONGITUDE` are the exception —
-not paths but the map's arrival-line destination coordinates, parsed by `_parse_optional_float` and
-left `None` (destination `null`) when unset or non-finite.
-
-**Routers** (`app/routers/`) are thin — they read `request.app.state.db` directly and run raw SQL
-inline (no ORM). `sessions.py` also holds `/api/sessions/{id}/replay`, which reads raw Cowrie ttylog
-blobs off disk (mounted read-only at `app.state.cowrie_var_path`) and converts them via
-`app/ttyplayer.py` into an asciinema v2 `.cast` stream for the frontend's asciinema-player. Cowrie logs
-ttylog paths relative to its own root (`var/lib/cowrie/tty/...`); the mount points directly at that
-`var/` dir, so the router strips the leading `var/` segment before resolving. `app/routers/map.py`
-(backed by `app/attack_map.py`) serves `/api/map`, returning one event per session (ip, city, country,
-geo_cache coordinates, connect_time) rather than pre-aggregated points — the frontend aggregates these
-client-side into heatmap points, plus the optional VPS destination point. `app/routers/ip.py` serves the IP
-detail page's data: `/api/ip/{ip}/summary` (session/command counts, geo, ban status), `/fail2ban`, and
-`/sshd-auth` (paginated per-IP event history for each source), plus `POST /ban` and `/unban` to act
-on fail2ban's `sshd` jail. Ban status and the ban/unban actions go through `app/fban_control.py`,
-which talks to a host-side systemd worker (`scripts/fban-queue-worker.sh`) via a bind-mounted queue
-directory (`FBAN_QUEUE_PATH`, `/queue` in the container) rather than giving the container any
-fail2ban socket or capability — `currently_banned` prefers that live answer and falls back to the
-log-derived heuristic if the worker doesn't respond within `FBAN_TIMEOUT_SECONDS` (default `2.0`).
-`/ban` and `/unban` reject cross-origin requests (Origin/Referer check) since NPM Basic Auth alone
-is CSRF-able on write endpoints.
-
-**`app/ttyplayer.py`** parses Cowrie's binary ttylog frame format (struct `<iLiiLL`) and mirrors
-upstream `playlog`'s stream-direction selection logic (`_select_events`) to pick one I/O direction plus
-always-shown interactive frames. Multiple ttylog files for one session (Cowrie rotates them) are
-concatenated onto a single global timeline using their real Unix-epoch frame timestamps, not
-per-file-relative time.
-
-**GeoIP** (`app/geoip.py`) wraps a MaxMind reader with a SQLite-backed cache (`geo_cache` table);
-lookups that fail (private IP, reader unavailable, IP not found) are cached as `NULL` rather than
-retried every tick.
-
-**IP enrichment** (`app/ip_enrichment.py`, `app/enrichment_worker.py`) adds ASN, reverse DNS, and
-AbuseIPDB data per source IP, stored in the `ip_enrichment` table, which doubles as a pending-work
-queue: `apply_cowrie_record` inserts a `status='pending'` row for every new IP on `session.connect`,
-`main.py::_backfill_ip_enrichment` catches any IP already in `sessions` with no row yet (same
-idempotent backfill pattern as `_backfill_geo_cache`), and `EnrichmentWorker.run_forever` (started
-alongside `_poll_loop` in `lifespan`) drains pending rows one at a time via `IpEnrichment.resolve`,
-writing the result back with `status='done'`. Both the ASN lookup and the AbuseIPDB client degrade to
-`None`/no-op rather than raising when unconfigured: `GEOIP_ASN_DB_PATH` (optional, same
-missing-file-is-fine contract as `GEOIP_DB_PATH` via `_open_asn_reader`) and `ABUSEIPDB_API_KEY`
-(optional; unset disables AbuseIPDB calls entirely, surfaced to the rest of the app as
-`app.state.abuseipdb_configured`). `/api/ip/{ip}/summary` also returns `enrichment_status`
-(`"pending"`/`"done"`) and `abuseipdb_configured`; the frontend polls that endpoint every 5 seconds
-while `enrichment_status` is `"pending"`.
-
-**Concurrency note**: route handlers are `async def` but do synchronous sqlite3 calls directly against
-a single shared connection (`check_same_thread=False`, WAL mode, `busy_timeout=5000`) — this is
-intentional (see commit `d1b5a29`) to avoid threadpool-based concurrent access to that connection, not
-an oversight to "fix" by adding `await asyncio.to_thread(...)`.
-
-## Frontend
-
-React + TypeScript, built with Vite (`frontend/`). `frontend/src/main.tsx` mounts `App.tsx`, which
-pairs a `HashRouter` (URLs stay `#/overview`, `#/sessions`, `#/correlation`, `#/map`, `#/ip/:ip`,
-matching the pre-migration vanilla-JS routing so no backend routing changes were needed) with TanStack Query for
-all `/api/*` data fetching. `frontend/src/style.css` (ported from the pre-React vanilla version) is
-imported once in `main.tsx` and is the single global stylesheet — no CSS modules, no Tailwind (a
-future styling-layer migration is anticipated in component prop design but not implemented). The
-session detail panel (`frontend/src/pages/SessionsPage/SessionDetailPanel.tsx`) renders via a React
-Portal into `document.body` rather than as a DOM node inside the router's normal tree, which
-eliminates by construction the manual listener/timer cleanup code the earlier vanilla slide-over panel
-needed. `frontend/public/vendor/` holds the vendored `asciinema-player` bundle (loaded via a plain
-`<script>` tag in `index.html`, since it's a UMD global, not an ES module); Chart.js is an npm
-dependency (`chart.js` + `react-chartjs-2`) rather than vendored. The Docker build compiles
-`frontend/` in a `node:20-slim` stage and copies `frontend/dist/` into the Python runtime image's
-`static/` mount point — see the root `Dockerfile`. For local development, run the Vite dev server
-(`npm run dev` inside `frontend/`) alongside the FastAPI backend
-(`.venv/bin/uvicorn app.main:app --reload`); `vite.config.ts` proxies `/api/*` to `localhost:8000` so
-both run side by side without a Docker rebuild per change.
-
-## Deployment context
-
-Runs via `docker-compose.yml` on the user's OVH VPS behind Nginx Proxy Manager, on the external
-`nginx-proxy-network`. The container is hardened: `read_only: true`, `cap_drop: ALL`,
-`no-new-privileges`, mounts the honeypot's log volume and GeoIP DB read-only. `scripts/` holds VPS-side
-helpers (log export, firewall, backups) that run outside the container — see `scripts/*.sh` headers for
-per-script details, and `docs/superpowers/specs/2026-08-12-honeypot-dashboard.md` for the original
-design spec if deeper deployment rationale is needed. The `dashboard` container also gets one RW bind mount (`/opt/honeypot/fban-queue:/queue`) for the fail2ban ban/unban/status queue described above — every other hardening setting is unchanged.
+## Pièges connus
+- Env vars : `COWRIE_JSON_PATH`, `COWRIE_VAR_PATH`, `DASHBOARD_DB_PATH`, `FAIL2BAN_LOG_PATH`,
+  `SSHD_AUTH_LOG_PATH`, `GEOIP_DB_PATH`, `GEOIP_ASN_DB_PATH`, `ABUSEIPDB_API_KEY` (vide = désactivé),
+  `FBAN_QUEUE_PATH`, `FBAN_TIMEOUT_SECONDS`, `VPS_LATITUDE`/`VPS_LONGITUDE` (None si absent).
+- Les défauts de chemins sont ceux du conteneur (`/data/...`) ; importer `app.main` crée l'app au niveau module.
+- Le libellé « port 50022 » de la page Corrélation est codé en dur (voir `TODO.md`).
+- `docs/superpowers/` est dans `.gitignore` mais 26 fichiers déjà suivis restent versionnés.

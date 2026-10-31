@@ -1,14 +1,24 @@
 import { type FormEvent, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { Shield, BarChart2, List, Terminal, Link2, Globe, Sun, Moon, Search } from "lucide-react";
+import { Shield, LayoutDashboard, List, Terminal, Link2, Globe, Sun, Moon, Search } from "lucide-react";
 import { useTheme } from "../theme/ThemeContext";
 
-const NAV_ITEMS = [
-  { to: "/overview", label: "Overview", Icon: BarChart2 },
-  { to: "/sessions", label: "Sessions", Icon: List },
-  { to: "/commands", label: "Commandes", Icon: Terminal },
-  { to: "/correlation", label: "Corrélation", Icon: Link2 },
-  { to: "/map", label: "Carte", Icon: Globe },
+const NAV_SECTIONS = [
+  {
+    label: "Trafic",
+    items: [
+      { to: "/overview", label: "Vue d'ensemble", Icon: LayoutDashboard },
+      { to: "/sessions", label: "Sessions", Icon: List },
+      { to: "/commands", label: "Commandes", Icon: Terminal },
+    ],
+  },
+  {
+    label: "Analyse",
+    items: [
+      { to: "/map", label: "Carte", Icon: Globe },
+      { to: "/correlation", label: "Corrélation", Icon: Link2 },
+    ],
+  },
 ];
 
 // A plain shape check, not a validity check: any dotted-quad or colon-bearing input is treated as
@@ -32,9 +42,10 @@ function GlobalSearch() {
 
   return (
     <form className="sidebar-search" onSubmit={handleSubmit}>
-      <Search size={16} />
+      <Search />
       <input
         placeholder="IP ou session..."
+        aria-label="Rechercher une IP ou une session"
         value={value}
         onChange={(e) => setValue(e.target.value)}
       />
@@ -44,27 +55,33 @@ function GlobalSearch() {
 
 export function Sidebar() {
   const [theme, toggleTheme] = useTheme();
+  const themeLabel = theme === "dark" ? "Passer en thème clair" : "Passer en thème sombre";
 
   return (
     <nav className="sidebar">
       <div className="brand">
         <Shield />
         <span>Honeypot</span>
-        <button
-          className="btn-icon theme-toggle"
-          onClick={toggleTheme}
-          title={theme === "dark" ? "Passer en thème clair" : "Passer en thème sombre"}
-        >
+      </div>
+      <GlobalSearch />
+      <div className="sidebar-nav">
+        {NAV_SECTIONS.map((section) => (
+          <div key={section.label}>
+            <div className="nav-section">{section.label}</div>
+            {section.items.map(({ to, label, Icon }) => (
+              <NavLink key={to} to={to} className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}>
+                <Icon />
+                {label}
+              </NavLink>
+            ))}
+          </div>
+        ))}
+      </div>
+      <div className="sidebar-footer">
+        <button className="btn-icon theme-toggle" onClick={toggleTheme} title={themeLabel} aria-label={themeLabel}>
           {theme === "dark" ? <Sun /> : <Moon />}
         </button>
       </div>
-      <GlobalSearch />
-      {NAV_ITEMS.map(({ to, label, Icon }) => (
-        <NavLink key={to} to={to} className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}>
-          <Icon />
-          {label}
-        </NavLink>
-      ))}
     </nav>
   );
 }

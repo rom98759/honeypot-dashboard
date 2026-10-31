@@ -8,10 +8,18 @@ router = APIRouter()
 
 
 @router.get("/api/overview")
-async def get_overview(request: Request, period: str = "24h"):
+async def get_overview(
+    request: Request,
+    period: str = "24h",
+    country: str | None = None,
+    protocol: str | None = None,
+    ip: str | None = None,
+    username: str | None = None,
+):
     if period not in VALID_PERIODS:
         raise HTTPException(status_code=400, detail=f"invalid period: {period}")
-    return get_overview_stats(request.app.state.db, period)
+    filters = {"country": country, "protocol": protocol, "ip": ip, "username": username}
+    return get_overview_stats(request.app.state.db, period, filters)
 
 
 @router.get("/api/overview/heatmap")

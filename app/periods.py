@@ -9,6 +9,10 @@ _PERIOD_DELTAS = {
 }
 
 
+def period_delta(period: str) -> timedelta:
+    return _PERIOD_DELTAS[period]
+
+
 def period_cutoff(period: str) -> str | None:
     if period == "all":
         return None

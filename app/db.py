@@ -103,3 +103,5 @@ def _migrate_geo_cache_coordinates(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE geo_cache ADD COLUMN latitude REAL")
     if "longitude" not in existing_columns:
         conn.execute("ALTER TABLE geo_cache ADD COLUMN longitude REAL")
+    if "country_code" not in existing_columns:
+        conn.execute("ALTER TABLE geo_cache ADD COLUMN country_code TEXT")

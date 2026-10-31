@@ -78,8 +78,8 @@ def _backfill_geo_cache(db, geo_lookup: GeoLookup) -> None:
     Two passes. First: populate geo_cache for sessions ingested before GeoLookup
     was wired up (or before geoip-update.sh had produced an .mmdb file) — a
     rerun is a no-op since it only touches IPs geo_cache doesn't already have.
-    Second: re-resolve rows already in geo_cache but missing coordinates (added
-    after GeoLookup started extracting them). This queries the reader directly
+    Second: re-resolve rows already in geo_cache but missing coordinates or the
+    ISO country code (both added after GeoLookup started extracting them). This queries the reader directly
     and only writes on a successful response — unlike deleting the row first
     and calling geo_lookup.lookup() again, this never destroys a previously
     correct country/city if the IP no longer resolves under the current mmdb
@@ -98,7 +98,8 @@ def _backfill_geo_cache(db, geo_lookup: GeoLookup) -> None:
         geo_lookup.lookup(row["src_ip"])
 
     missing_coordinates = db.execute(
-        "SELECT ip FROM geo_cache WHERE latitude IS NULL AND country IS NOT NULL"
+        "SELECT ip FROM geo_cache "
+        "WHERE (latitude IS NULL OR country_code IS NULL) AND country IS NOT NULL"
     ).fetchall()
     for row in missing_coordinates:
         try:
@@ -106,11 +107,13 @@ def _backfill_geo_cache(db, geo_lookup: GeoLookup) -> None:
         except Exception:
             continue  # keep the existing country/city rather than nulling it
         db.execute(
-            "UPDATE geo_cache SET latitude = ?, longitude = ?, country = ?, city = ? WHERE ip = ?",
+            "UPDATE geo_cache SET latitude = ?, longitude = ?, country = ?, country_code = ?, "
+            "city = ? WHERE ip = ?",
             (
                 response.location.latitude,
                 response.location.longitude,
                 response.country.name,
+                getattr(response.country, "iso_code", None),
                 response.city.name,
                 row["ip"],
             ),

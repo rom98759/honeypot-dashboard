@@ -26,19 +26,44 @@ export interface PaginatedSessions {
   total: number;
 }
 
-export interface OverviewData {
+export interface OverviewTotals {
   total_connections: number;
   unique_ips: number;
   login_attempts: number;
+  avg_duration_ms: number | null;
+}
+
+export interface CountryCount {
+  country: string;
+  country_code: string | null;
+  n: number;
+}
+
+export interface OverviewData extends OverviewTotals {
+  previous: OverviewTotals | null;
+  active_sessions: number;
   currently_banned: number;
-  top_offenders: { src_ip: string; n: number; country: string | null; last_seen: string }[];
-  top_countries: { country: string; n: number }[];
-  timeline: { bucket: string; n: number }[];
+  top_offenders: {
+    src_ip: string;
+    n: number;
+    country: string | null;
+    country_code?: string | null;
+    last_seen: string;
+  }[];
+  top_countries: CountryCount[];
+  countries: CountryCount[];
+  timeline: { bucket: string; n: number; logins: number }[];
   protocol_split: { protocol: string; n: number }[];
   top_credentials: { login_username: string; login_password: string | null; n: number }[];
+  top_usernames: { value: string; n: number }[];
+  top_passwords: { value: string; n: number }[];
+  top_commands: { input_text: string; n: number }[];
   bans_timeline: { bucket: string; n: number }[];
   duration_distribution: { bucket: string; n: number }[];
 }
+
+export type FilterKey = "country" | "protocol" | "ip" | "username";
+export type Filters = Partial<Record<FilterKey, string>>;
 
 export type OverviewPeriod = "24h" | "7d" | "30d" | "all";
 
