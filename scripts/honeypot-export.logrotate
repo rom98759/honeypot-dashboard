@@ -1,4 +1,4 @@
-/var/log/sshd-auth.log {
+/var/log/honeypot-export/*.log {
     weekly
     rotate 8
     compress

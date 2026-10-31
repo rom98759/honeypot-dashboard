@@ -14,7 +14,7 @@ from app.fban_control import FbanControl
 from app.geoip import GeoLookup
 from app.ingester import CowrieIngester
 from app.ip_enrichment import AbuseIpDbClient, AsnLookup, IpEnrichment
-from app.routers import commands, correlation, ip, overview, sessions
+from app.routers import commands, correlation, health, ip, overview, sessions
 from app.ttl_cache import TtlCache
 
 POLL_INTERVAL_SECONDS = 5
@@ -176,8 +176,8 @@ def create_app(
         os.environ.get("COWRIE_JSON_PATH", "/cowrie-var/log/cowrie/cowrie.json")
     )
     cowrie_var_path = Path(os.environ.get("COWRIE_VAR_PATH", "/cowrie-var"))
-    fail2ban_log_path = Path(os.environ.get("FAIL2BAN_LOG_PATH", "/var/log/fail2ban.log"))
-    sshd_auth_log_path = Path(os.environ.get("SSHD_AUTH_LOG_PATH", "/var/log/sshd-auth.log"))
+    fail2ban_log_path = Path(os.environ.get("FAIL2BAN_LOG_PATH", "/var/log/honeypot-export/fail2ban.log"))
+    sshd_auth_log_path = Path(os.environ.get("SSHD_AUTH_LOG_PATH", "/var/log/honeypot-export/sshd-auth.log"))
     fban_queue_path = Path(os.environ.get("FBAN_QUEUE_PATH", "/queue"))
     fban_timeout_seconds = float(os.environ.get("FBAN_TIMEOUT_SECONDS", "2.0"))
     geoip_db_path = os.environ.get("GEOIP_DB_PATH")
@@ -222,6 +222,7 @@ def create_app(
     app.include_router(correlation.router)
     app.include_router(ip.router)
     app.include_router(commands.router)
+    app.include_router(health.router)
     if STATIC_DIR.exists():
         app.mount("/", NoCacheStaticFiles(directory=STATIC_DIR, html=True), name="static")
     return app

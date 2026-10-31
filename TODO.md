@@ -2,6 +2,13 @@
 
 ## Bugs
 
+- [x] Ingestion fail2ban/sshd figée en silence (fail2ban bloqué au 2026-09-14) :
+      les logs étaient bind-mountés comme fichiers, Docker fige l'inode, donc
+      après chaque logrotate le conteneur relisait l'ancien fichier jusqu'au
+      redémarrage suivant, et les fichiers tournés entre deux redémarrages
+      n'étaient jamais lus. Corrigé : export hôte vers
+      `/var/log/honeypot-export/` monté comme répertoire, `/api/health`.
+      Trou 14/09 → ~26/09 perdu (déjà effacé par logrotate).
 - [x] Timestamps affichés bruts en UTC — corrigé via `frontend/src/utils/formatDate.ts`
       (`formatTimestamp`), appliqué dans `SessionDetailPanel.tsx`, `SessionsPage.tsx`
       et `IpDetailPage.tsx`.

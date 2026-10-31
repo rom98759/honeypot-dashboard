@@ -9,12 +9,11 @@ services:
     volumes:
       - cowrie-var:/cowrie-var:ro
       - dashboard-data:/data
-      - /var/log/fail2ban.log:/var/log/fail2ban.log:ro
-      - /var/log/sshd-auth.log:/var/log/sshd-auth.log:ro
+      - /var/log/honeypot-export:/var/log/honeypot-export:ro
       - ./geoip:/geoip:ro
       - /opt/honeypot/fban-queue:/queue
     group_add:
-      - "4" # adm on the VPS host: read access to the two mounted log files
+      - "4" # adm on the VPS host: read access to /var/log/honeypot-export
     cap_drop:
       - ALL
     security_opt:
@@ -28,8 +27,8 @@ services:
       - COWRIE_JSON_PATH=/cowrie-var/log/cowrie/cowrie.json
       - COWRIE_VAR_PATH=/cowrie-var
       - DASHBOARD_DB_PATH=/data/dashboard.sqlite3
-      - FAIL2BAN_LOG_PATH=/var/log/fail2ban.log
-      - SSHD_AUTH_LOG_PATH=/var/log/sshd-auth.log
+      - FAIL2BAN_LOG_PATH=/var/log/honeypot-export/fail2ban.log
+      - SSHD_AUTH_LOG_PATH=/var/log/honeypot-export/sshd-auth.log
       - GEOIP_DB_PATH=/geoip/GeoLite2-City.mmdb
       - GEOIP_ASN_DB_PATH=/geoip/GeoLite2-ASN.mmdb
       - ABUSEIPDB_API_KEY=${ABUSEIPDB_API_KEY:-}

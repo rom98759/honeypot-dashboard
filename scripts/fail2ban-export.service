@@ -1,0 +1,6 @@
+[Unit]
+Description=Export new fail2ban log lines to /var/log/honeypot-export/fail2ban.log
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/fail2ban-export.sh

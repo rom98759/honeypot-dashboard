@@ -15,6 +15,10 @@ Backlog : `TODO.md`. Décisions de design : `docs/superpowers/specs/`.
 - Flux : `_poll_loop` appelle `.tick()` des 3 ingesters toutes les 5 s ; chaque `LogTailer` garde offset+inode
   dans `ingest_offsets` (reprise après restart, détection de rotation ; copytruncate non géré). Offset et
   lignes insérées sont commités dans la même transaction.
+- fail2ban et sshd : l'hôte exporte vers `/var/log/honeypot-export/` (`scripts/fail2ban-export.sh` +
+  `sshd-auth-export.sh`, timers systemd), et le conteneur monte ce *répertoire*. Ne jamais remonter un log
+  comme fichier : le bind-mount fige l'inode et l'ingestion s'arrête en silence à la rotation suivante.
+  `/api/health` expose par source le retard de lecture (`lag_bytes`) et le dernier événement.
 - Cowrie : `parse_event` (dataclasses typées) puis `apply_cowrie_record` (tables `sessions`, `commands`,
   `ttylogs`). Un nouveau type d'événement = étendre les deux.
 - `create_app(db=..., start_background_tasks=...)` injectable pour `TestClient` sans I/O ; `tests/conftest.py`
