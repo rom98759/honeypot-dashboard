@@ -3,6 +3,19 @@ import sqlite3
 from app.periods import period_cutoff
 
 
+def commands_from(sessions_first: bool) -> str:
+    """FROM clause joining commands to sessions (aliases c and s).
+
+    SQLite's planner prefers scanning commands through idx_commands_input_text for the GROUP BY,
+    which reads every command even when only the last 24h of sessions matter. When the sessions
+    side is selective (a period cutoff or a filter), CROSS JOIN pins the order so the scan starts
+    from idx_sessions_connect_time instead. Over the whole history the planner's choice is faster.
+    """
+    if sessions_first:
+        return "sessions s CROSS JOIN commands c ON c.session_id = s.session_id"
+    return "commands c JOIN sessions s ON s.session_id = c.session_id"
+
+
 def get_commands_stats(db: sqlite3.Connection, period: str, q: str, limit: int, offset: int) -> dict:
     where_clauses = []
     params: list = []
@@ -14,16 +27,16 @@ def get_commands_stats(db: sqlite3.Connection, period: str, q: str, limit: int, 
         where_clauses.append("c.input_text LIKE ?")
         params.append(f"%{q}%")
     where = (" AND " + " AND ".join(where_clauses)) if where_clauses else ""
+    source = commands_from(sessions_first=cutoff is not None)
 
     total = db.execute(
-        "SELECT COUNT(DISTINCT c.input_text) AS n FROM commands c "
-        "JOIN sessions s ON s.session_id = c.session_id WHERE 1=1" + where,
+        f"SELECT COUNT(DISTINCT c.input_text) AS n FROM {source} WHERE 1=1" + where,
         params,
     ).fetchone()["n"]
 
     rows = db.execute(
         "SELECT c.input_text, COUNT(*) AS n, MAX(c.timestamp) AS last_seen "
-        "FROM commands c JOIN sessions s ON s.session_id = c.session_id "
+        f"FROM {source} "
         "WHERE 1=1" + where + " "
         "GROUP BY c.input_text ORDER BY n DESC, c.input_text ASC LIMIT ? OFFSET ?",
         [*params, limit, offset],

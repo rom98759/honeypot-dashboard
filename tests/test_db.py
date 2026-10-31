@@ -73,3 +73,9 @@ def test_ip_enrichment_status_defaults_to_pending(tmp_path):
     db.commit()
     row = db.execute("SELECT status FROM ip_enrichment WHERE ip = '1.2.3.4'").fetchone()
     assert row["status"] == "pending"
+
+
+def test_connect_adds_ttylogs_session_id_index(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    indexes = {row["name"] for row in db.execute("SELECT name FROM sqlite_master WHERE type = 'index'").fetchall()}
+    assert "idx_ttylogs_session_id" in indexes

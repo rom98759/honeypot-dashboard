@@ -3,10 +3,12 @@ import { useEffect, useRef } from "react";
 declare global {
   interface Window {
     AsciinemaPlayer: {
-      create(url: string, element: HTMLElement): { dispose(): void };
+      create(source: string | { data: string }, element: HTMLElement): { dispose(): void };
     };
   }
 }
+
+const UNAVAILABLE = "Replay indisponible pour cette session.";
 
 export function ReplayPlayer({ sessionId }: { sessionId: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -14,21 +16,19 @@ export function ReplayPlayer({ sessionId }: { sessionId: string }) {
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-    const replayUrl = `/api/sessions/${encodeURIComponent(sessionId)}/replay`;
     let player: { dispose(): void } | undefined;
     let cancelled = false;
 
-    fetch(replayUrl)
-      .then((response) => {
-        if (cancelled) return;
-        if (response.ok) {
-          player = window.AsciinemaPlayer.create(replayUrl, container);
-        } else {
-          container.textContent = "Replay indisponible pour cette session.";
-        }
+    // One request: the status tells us whether a replay exists, and the body is handed to the
+    // player as data instead of letting it download the same recording a second time.
+    fetch(`/api/sessions/${encodeURIComponent(sessionId)}/replay`)
+      .then(async (response) => {
+        if (!response.ok) throw new Error(String(response.status));
+        const data = await response.text();
+        if (!cancelled) player = window.AsciinemaPlayer.create({ data }, container);
       })
       .catch(() => {
-        if (!cancelled) container.textContent = "Replay indisponible pour cette session.";
+        if (!cancelled) container.textContent = UNAVAILABLE;
       });
 
     return () => {

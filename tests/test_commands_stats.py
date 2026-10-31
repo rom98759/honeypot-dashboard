@@ -101,3 +101,22 @@ def test_returns_empty_when_no_commands(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
     result = get_commands_stats(db, "all", "", limit=25, offset=0)
     assert result == {"items": [], "total": 0}
+
+
+def test_period_query_drives_from_sessions_index(tmp_path):
+    # With a period cutoff the selective side is sessions; scanning every command first was
+    # ~30x slower on the production database.
+    from app.commands_stats import commands_from
+
+    db = connect(tmp_path / "db.sqlite3")
+    plan = " | ".join(
+        row[3]
+        for row in db.execute(
+            "EXPLAIN QUERY PLAN SELECT c.input_text, COUNT(*) FROM "
+            + commands_from(sessions_first=True)
+            + " WHERE s.connect_time >= ? GROUP BY c.input_text",
+            ["2026-01-01"],
+        )
+    )
+    assert plan.startswith("SEARCH s USING INDEX idx_sessions_connect_time")
+    assert "idx_commands_session_id" in plan

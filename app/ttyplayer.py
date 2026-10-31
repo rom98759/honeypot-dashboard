@@ -1,4 +1,5 @@
 import json
+import re
 import struct
 
 TTYSTRUCT = "<iLiiLL"
@@ -21,6 +22,11 @@ CHUNK_STEP_SECONDS = 0.01
 # sure it ends with a newline before the response follows.
 _COLOR_COMMAND = "\x1b[32m"
 _COLOR_RESET = "\x1b[0m"
+
+
+# Cowrie records output without the "\r" a real tty inserts before "\n" (onlcr). Without it,
+# asciinema starts each line where the previous one ended and output drifts into a staircase.
+_BARE_LF = re.compile(r"(?<!\r)\n")
 
 
 class TTYLogError(Exception):
@@ -99,6 +105,7 @@ def ttylogs_to_asciicast(ttylog_blobs: list[bytes], width: int = 80, height: int
         elapsed = round(timestamp - start_time, 6)
         if direction == TYPE_INTERACT and not text.endswith("\n"):
             text += "\n"
+        text = _BARE_LF.sub("\r\n", text)
         chunks = _chunk_text(text)
         for chunk_index, chunk in enumerate(chunks):
             if direction == TYPE_INTERACT:

@@ -18,10 +18,10 @@ def test_converts_real_ttylog_to_asciicast():
 
     events = [json.loads(line) for line in lines[1:]]
     assert events == [
-        [0.000364, "o", "\x1b[32mw\n\x1b[0m"],  # single TYPE_INTERACT frame: colored + newline-terminated
-        [0.056544, "o", " 10:20:50 up 20 min,  1 user,  load average: 0.00, 0.00, 0.00\n"],
-        [0.056849, "o", "USER     TTY      FROM              LOGIN@   IDLE   JCPU   PCPU WHAT\n"],
-        [0.056963, "o", "ftpuser  pts/0    172.21.0.1        10:20    0.00s  0.00s  0.00s w\n"],
+        [0.000364, "o", "\x1b[32mw\r\n\x1b[0m"],  # single TYPE_INTERACT frame: colored + newline-terminated
+        [0.056544, "o", " 10:20:50 up 20 min,  1 user,  load average: 0.00, 0.00, 0.00\r\n"],
+        [0.056849, "o", "USER     TTY      FROM              LOGIN@   IDLE   JCPU   PCPU WHAT\r\n"],
+        [0.056963, "o", "ftpuser  pts/0    172.21.0.1        10:20    0.00s  0.00s  0.00s w\r\n"],
     ]
 
 
@@ -77,8 +77,25 @@ def test_colorizes_and_newline_terminates_interact_command_before_output():
     events = [json.loads(line) for line in lines[1:]]
 
     command_text = "".join(e[2] for e in events[:-1])
-    assert command_text == "\x1b[32m" + command.decode() + "\n\x1b[0m"
-    assert events[-1][2] == output.decode()
+    assert command_text == "\x1b[32m" + command.decode() + "\r\n\x1b[0m"
+    assert events[-1][2] == output.decode().replace("\n", "\r\n")
+
+
+def test_bare_newlines_become_crlf_like_a_real_terminal():
+    # Cowrie records "\n" without the "\r" a real tty adds (onlcr); played as-is, every line
+    # starts where the previous one ended and the output drifts into a staircase.
+    import struct
+
+    from app.ttyplayer import OP_CLOSE, OP_OPEN, OP_WRITE, TTYSTRUCT, TYPE_OUTPUT
+
+    output = b"one\ntwo\r\nthree\n"
+    frames = struct.pack(TTYSTRUCT, OP_OPEN, 0, 0, 0, 1000, 0)
+    frames += struct.pack(TTYSTRUCT, OP_WRITE, 0, len(output), TYPE_OUTPUT, 1001, 0) + output
+    frames += struct.pack(TTYSTRUCT, OP_CLOSE, 0, 0, 0, 1002, 0)
+
+    events = [json.loads(line) for line in ttylogs_to_asciicast([frames]).strip().split("\n")[1:]]
+
+    assert "".join(e[2] for e in events) == "one\r\ntwo\r\nthree\r\n"
 
 
 def test_empty_list_raises():

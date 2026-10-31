@@ -1,6 +1,7 @@
 import sqlite3
 from datetime import datetime, timedelta, timezone
 
+from app.commands_stats import commands_from
 from app.periods import bucket_expr, period_cutoff, period_delta
 
 DURATION_BUCKETS = ["<10s", "10-60s", "1-5min", "5-30min", ">30min"]
@@ -131,8 +132,7 @@ def get_overview_stats(db: sqlite3.Connection, period: str, filters: dict | None
         ]
 
     top_commands = db.execute(
-        "SELECT c.input_text, COUNT(*) AS n FROM commands c "
-        "JOIN sessions s ON s.session_id = c.session_id "
+        f"SELECT c.input_text, COUNT(*) AS n FROM {commands_from(sessions_first=bool(where))} "
         "WHERE 1=1" + where + " "
         "GROUP BY c.input_text ORDER BY n DESC, c.input_text LIMIT 10",
         params,
