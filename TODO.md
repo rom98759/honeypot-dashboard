@@ -2,6 +2,13 @@
 
 ## Bugs
 
+- [x] Parseur sshd usurpable : il prenait la 1re IPv4 de la ligne, donc un
+      username « 1.2.3.4 » attribuait la tentative à cette IP. Corrigé : IP de
+      la dernière paire `<ip> port <n>` (suffixe local VERBOSE retiré, IPv6
+      acceptée). Les lignes déjà en base ne sont pas reparsées.
+- [x] « Banni » contradictoire : Corrélation = banni au moins une fois, page
+      IP = banni actuellement. Une seule requête (`CURRENTLY_BANNED_IPS_SQL`,
+      `app/correlation.py`) pour Corrélation, KPI Overview et page IP.
 - [x] Ingestion fail2ban/sshd figée en silence (fail2ban bloqué au 2026-09-14) :
       les logs étaient bind-mountés comme fichiers, Docker fige l'inode, donc
       après chaque logrotate le conteneur relisait l'ancien fichier jusqu'au

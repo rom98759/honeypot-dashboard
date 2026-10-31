@@ -3,6 +3,7 @@ from urllib.parse import urlparse
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
+from app.correlation import is_currently_banned
 from app.fban_control import FbanControlError
 
 router = APIRouter()
@@ -48,18 +49,7 @@ async def get_ip_summary(request: Request, ip: str):
         (ip,),
     ).fetchone()["n"]
 
-    log_derived_banned = bool(
-        db.execute(
-            "SELECT EXISTS ("
-            "  SELECT 1 FROM fail2ban_events f1 WHERE f1.ip = ? AND f1.action IN ('Ban', 'Restore Ban') "
-            "  AND NOT EXISTS ("
-            "    SELECT 1 FROM fail2ban_events f2 "
-            "    WHERE f2.ip = f1.ip AND f2.action = 'Unban' AND f2.timestamp > f1.timestamp"
-            "  )"
-            ") AS banned",
-            (ip,),
-        ).fetchone()["banned"]
-    )
+    log_derived_banned = is_currently_banned(db, ip)
     live_banned = await asyncio.to_thread(request.app.state.fban_control.request_status, ip)
     currently_banned = live_banned if live_banned is not None else log_derived_banned
 

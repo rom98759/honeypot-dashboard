@@ -2,6 +2,7 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 
 from app.commands_stats import commands_from
+from app.correlation import CURRENTLY_BANNED_IPS_SQL
 from app.periods import bucket_expr, period_cutoff, period_delta
 
 DURATION_BUCKETS = ["<10s", "10-60s", "1-5min", "5-30min", ">30min"]
@@ -72,11 +73,7 @@ def get_overview_stats(db: sqlite3.Connection, period: str, filters: dict | None
     ).fetchone()["n"]
 
     currently_banned = db.execute(
-        "SELECT COUNT(DISTINCT ip) AS n FROM fail2ban_events f1 "
-        "WHERE action IN ('Ban', 'Restore Ban') AND NOT EXISTS ("
-        "  SELECT 1 FROM fail2ban_events f2 "
-        "  WHERE f2.ip = f1.ip AND f2.action = 'Unban' AND f2.timestamp > f1.timestamp"
-        ")"
+        f"SELECT COUNT(*) AS n FROM ({CURRENTLY_BANNED_IPS_SQL})"
     ).fetchone()["n"]
 
     top_offenders = db.execute(
