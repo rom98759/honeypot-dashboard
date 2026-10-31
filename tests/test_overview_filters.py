@@ -129,3 +129,18 @@ def test_api_passes_filters_through(tmp_path):
 
     assert body["total_connections"] == 1
     assert body["countries"][0]["country_code"] == "US"
+
+
+def test_overview_endpoint_is_cached_per_period_and_filters():
+    db = connect(":memory:")
+    _seed(db)
+    client = TestClient(create_app(db=db, start_background_tasks=False))
+    first = client.get("/api/overview?period=all").json()
+    db.execute(
+        "INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('new', '9.9.9.9', ?)",
+        (_iso(datetime.now(timezone.utc)),),
+    )
+    assert client.get("/api/overview?period=all").json()["total_connections"] == first["total_connections"]
+    assert client.get("/api/overview?period=all&ip=9.9.9.9").json()["total_connections"] == 1
+    client.app.state.stats_cache.clear()
+    assert client.get("/api/overview?period=all").json()["total_connections"] == first["total_connections"] + 1

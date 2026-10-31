@@ -2,7 +2,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi, afterEach } from "vitest";
 import type { ReactNode } from "react";
-import { useOverview, useOverviewHeatmap } from "./overview";
+import { overviewRefetchInterval, useOverview, useOverviewHeatmap } from "./overview";
 
 function wrapper({ children }: { children: ReactNode }) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -63,5 +63,14 @@ describe("useOverviewHeatmap", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(fetchMock).toHaveBeenCalledWith("/api/overview/heatmap");
     expect(result.current.data?.cells).toEqual([{ day_of_week: 0, hour: 3, n: 2 }]);
+  });
+});
+
+describe("overviewRefetchInterval", () => {
+  it("polls long periods less often than the last 24h", () => {
+    expect(overviewRefetchInterval("24h")).toBe(10_000);
+    expect(overviewRefetchInterval("7d")).toBe(30_000);
+    expect(overviewRefetchInterval("30d")).toBe(60_000);
+    expect(overviewRefetchInterval("all")).toBe(60_000);
   });
 });

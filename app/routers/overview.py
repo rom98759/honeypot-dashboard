@@ -6,6 +6,10 @@ from app.periods import VALID_PERIODS
 
 router = APIRouter()
 
+# Longer periods cost more to aggregate and change less between two polls.
+OVERVIEW_TTL_SECONDS = {"24h": 10, "7d": 30, "30d": 60, "all": 60}
+HEATMAP_TTL_SECONDS = 300
+
 
 @router.get("/api/overview")
 async def get_overview(
@@ -19,9 +23,18 @@ async def get_overview(
     if period not in VALID_PERIODS:
         raise HTTPException(status_code=400, detail=f"invalid period: {period}")
     filters = {"country": country, "protocol": protocol, "ip": ip, "username": username}
-    return get_overview_stats(request.app.state.db, period, filters)
+    key = ("overview", period, tuple(sorted(filters.items())))
+    return request.app.state.stats_cache.get_or_compute(
+        key,
+        OVERVIEW_TTL_SECONDS[period],
+        lambda: get_overview_stats(request.app.state.db, period, filters),
+    )
 
 
 @router.get("/api/overview/heatmap")
 async def get_overview_heatmap(request: Request):
-    return {"cells": get_heatmap_stats(request.app.state.db)}
+    return request.app.state.stats_cache.get_or_compute(
+        ("heatmap",),
+        HEATMAP_TTL_SECONDS,
+        lambda: {"cells": get_heatmap_stats(request.app.state.db)},
+    )

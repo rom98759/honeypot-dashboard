@@ -23,7 +23,7 @@ services:
     tmpfs:
       - /tmp
     mem_limit: 256m
-    cpus: "0.5"
+    cpus: "2"
     environment:
       - COWRIE_JSON_PATH=/cowrie-var/log/cowrie/cowrie.json
       - COWRIE_VAR_PATH=/cowrie-var

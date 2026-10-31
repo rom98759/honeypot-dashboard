@@ -15,6 +15,7 @@ from app.geoip import GeoLookup
 from app.ingester import CowrieIngester
 from app.ip_enrichment import AbuseIpDbClient, AsnLookup, IpEnrichment
 from app.routers import commands, correlation, ip, overview, sessions
+from app.ttl_cache import TtlCache
 
 POLL_INTERVAL_SECONDS = 5
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
@@ -197,6 +198,7 @@ def create_app(
 
     app = FastAPI(lifespan=lifespan)
     app.state.db = db if db is not None else connect(db_path)
+    app.state.stats_cache = TtlCache()
     app.state.fban_control = (
         fban_control if fban_control is not None else FbanControl(fban_queue_path, timeout=fban_timeout_seconds)
     )

@@ -29,6 +29,9 @@ Backlog : `TODO.md`. Décisions de design : `docs/superpowers/specs/`.
   (rempli au lookup et par le backfill de démarrage).
 - Filtres façon Umami : `country`/`protocol`/`ip`/`username` dans l'URL (`theme/useFilters.ts`), passés à
   `/api/overview` ; `previous` = mêmes totaux sur la période précédente (null pour `all`).
+- `/api/overview` et la heatmap passent par `app.state.stats_cache` (`ttl_cache.py`, TTL par période dans
+  `routers/overview.py`, 10 s pour 24h à 60 s pour all) ; le front poll au même rythme. Un test qui insère
+  puis relit l'overview doit vider ce cache.
 - Ban/unban : `fban_control.py` parle à un worker systemd hôte (`scripts/fban-queue-worker.sh`) via un
   répertoire de queue bind-mounté (`FBAN_QUEUE_PATH`) ; repli sur l'heuristique logs après
   `FBAN_TIMEOUT_SECONDS` (2.0). `/ban` et `/unban` rejettent les requêtes cross-origin (Origin/Referer).
