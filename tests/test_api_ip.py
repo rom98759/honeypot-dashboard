@@ -340,3 +340,70 @@ def test_ip_summary_abuseipdb_configured_true_when_key_set(tmp_path, monkeypatch
 
     response = client.get("/api/ip/1.2.3.4/summary")
     assert response.json()["abuseipdb_configured"] is True
+
+
+def _on_event_loop() -> bool:
+    import asyncio
+
+    try:
+        asyncio.get_running_loop()
+        return True
+    except RuntimeError:
+        return False
+
+
+class _LoopCheckingDb:
+    """Records whether each query ran on the event loop: the shared connection is not thread-safe."""
+
+    def __init__(self, conn):
+        self._conn = conn
+        self.off_loop_queries = []
+
+    def execute(self, sql, *args):
+        if not _on_event_loop():
+            self.off_loop_queries.append(sql)
+        return self._conn.execute(sql, *args)
+
+    def __getattr__(self, name):
+        return getattr(self._conn, name)
+
+
+class _OffLoopFbanControl:
+    """Fails the request if a blocking fail2ban round-trip runs on (and would stall) the event loop."""
+
+    def __init__(self):
+        self.on_loop_calls = []
+
+    def _check(self, verb):
+        if _on_event_loop():
+            self.on_loop_calls.append(verb)
+
+    def request_ban(self, ip, jail="sshd"):
+        self._check("ban")
+
+    def request_unban(self, ip, jail="sshd"):
+        self._check("unban")
+
+    def request_status(self, ip, jail="sshd"):
+        self._check("status")
+        return True
+
+
+def test_ip_endpoints_keep_db_on_event_loop_and_fban_off_it(tmp_path):
+    conn = connect(tmp_path / "db.sqlite3")
+    conn.execute(
+        "INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('s1', '1.2.3.4', '2026-08-14T08:00:00Z')"
+    )
+    conn.commit()
+    db = _LoopCheckingDb(conn)
+    fban = _OffLoopFbanControl()
+    client = TestClient(create_app(db=db, start_background_tasks=False, fban_control=fban))
+    db.off_loop_queries.clear()  # startup backfills run outside any request
+
+    headers = {"Origin": "http://testserver"}
+    assert client.get("/api/ip/1.2.3.4/summary").status_code == 200
+    assert client.post("/api/ip/1.2.3.4/ban", headers=headers).status_code == 200
+    assert client.post("/api/ip/1.2.3.4/unban", headers=headers).status_code == 200
+
+    assert db.off_loop_queries == []
+    assert fban.on_loop_calls == []

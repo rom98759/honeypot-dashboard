@@ -20,7 +20,9 @@ Backlog : `TODO.md`. Décisions de design : `docs/superpowers/specs/`.
 - `create_app(db=..., start_background_tasks=...)` injectable pour `TestClient` sans I/O ; `tests/conftest.py`
   redirige les chemins vers `data/` avant tout import de `app.main`.
 - Routers fins, SQL inline sur `request.app.state.db`. Handlers `async` mais sqlite synchrone sur une seule
-  connexion partagée (WAL) : volontaire (commit `d1b5a29`), ne pas "corriger" avec `to_thread`.
+  connexion partagée (WAL) : volontaire (commit `d1b5a29`), ne pas "corriger" avec `to_thread`. Jamais
+  de handler `def` qui touche la base (threadpool → accès concurrent → 500) ; seul un appel bloquant sans
+  base (ex. `fban_control`) passe par `asyncio.to_thread`.
 - Replay : `/api/sessions/{id}/replay` lit les ttylogs Cowrie (mount RO), `ttyplayer.py` les convertit en
   asciinema v2 ; le routeur retire le préfixe `var/` des chemins Cowrie.
 - Design : clone fidèle d'Umami v3 (voir `DESIGN.md`) ; tokens dans `style.css`, couleurs Chart.js/carte dans

@@ -1,3 +1,4 @@
+import asyncio
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -7,8 +8,13 @@ from app.fban_control import FbanControlError
 router = APIRouter()
 
 
+# Handlers stay `async` so every query runs on the event loop, the only thread that touches the
+# shared SQLite connection. Only the blocking fail2ban round-trips (no DB access, up to
+# FBAN_TIMEOUT_SECONDS each) are pushed to a worker thread.
+
+
 @router.get("/api/ip/{ip}/summary")
-def get_ip_summary(request: Request, ip: str):
+async def get_ip_summary(request: Request, ip: str):
     db = request.app.state.db
 
     has_any_data = db.execute(
@@ -54,7 +60,7 @@ def get_ip_summary(request: Request, ip: str):
             (ip,),
         ).fetchone()["banned"]
     )
-    live_banned = request.app.state.fban_control.request_status(ip)
+    live_banned = await asyncio.to_thread(request.app.state.fban_control.request_status, ip)
     currently_banned = live_banned if live_banned is not None else log_derived_banned
 
     return {
@@ -121,26 +127,26 @@ def _verify_dashboard_origin(request: Request) -> None:
 
 
 @router.post("/api/ip/{ip}/ban")
-def ban_ip(request: Request, ip: str):
+async def ban_ip(request: Request, ip: str):
     _verify_dashboard_origin(request)
     fban_control = request.app.state.fban_control
     try:
-        fban_control.request_ban(ip)
+        await asyncio.to_thread(fban_control.request_ban, ip)
     except FbanControlError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return {"currently_banned": fban_control.request_status(ip)}
+    return {"currently_banned": await asyncio.to_thread(fban_control.request_status, ip)}
 
 
 @router.post("/api/ip/{ip}/unban")
-def unban_ip(request: Request, ip: str):
+async def unban_ip(request: Request, ip: str):
     _verify_dashboard_origin(request)
     fban_control = request.app.state.fban_control
     try:
-        fban_control.request_unban(ip)
+        await asyncio.to_thread(fban_control.request_unban, ip)
     except FbanControlError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return {"currently_banned": fban_control.request_status(ip)}
+    return {"currently_banned": await asyncio.to_thread(fban_control.request_status, ip)}
