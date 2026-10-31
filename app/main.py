@@ -1,5 +1,4 @@
 import asyncio
-import math
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -15,7 +14,7 @@ from app.fban_control import FbanControl
 from app.geoip import GeoLookup
 from app.ingester import CowrieIngester
 from app.ip_enrichment import AbuseIpDbClient, AsnLookup, IpEnrichment
-from app.routers import commands, correlation, ip, map as map_router, overview, sessions
+from app.routers import commands, correlation, ip, overview, sessions
 
 POLL_INTERVAL_SECONDS = 5
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
@@ -59,18 +58,6 @@ def _open_asn_reader(asn_db_path: str | None):
         return geoip2.database.Reader(asn_db_path)
     except Exception:
         return None
-
-
-def _parse_optional_float(value: str | None) -> float | None:
-    if value is None:
-        return None
-    try:
-        parsed = float(value)
-    except ValueError:
-        return None
-    if not math.isfinite(parsed):
-        return None
-    return parsed
 
 
 def _backfill_geo_cache(db, geo_lookup: GeoLookup) -> None:
@@ -195,8 +182,6 @@ def create_app(
     geoip_db_path = os.environ.get("GEOIP_DB_PATH")
     geoip_asn_db_path = os.environ.get("GEOIP_ASN_DB_PATH")
     abuseipdb_api_key = os.environ.get("ABUSEIPDB_API_KEY", "").strip() or None
-    vps_latitude = _parse_optional_float(os.environ.get("VPS_LATITUDE"))
-    vps_longitude = _parse_optional_float(os.environ.get("VPS_LONGITUDE"))
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -216,8 +201,6 @@ def create_app(
         fban_control if fban_control is not None else FbanControl(fban_queue_path, timeout=fban_timeout_seconds)
     )
     app.state.cowrie_var_path = cowrie_var_path
-    app.state.vps_latitude = vps_latitude
-    app.state.vps_longitude = vps_longitude
     app.state.geo_lookup = GeoLookup(app.state.db, _open_geoip_reader(geoip_db_path))
     _backfill_geo_cache(app.state.db, app.state.geo_lookup)
     _backfill_ip_enrichment(app.state.db)
@@ -235,7 +218,6 @@ def create_app(
     app.include_router(overview.router)
     app.include_router(sessions.router)
     app.include_router(correlation.router)
-    app.include_router(map_router.router)
     app.include_router(ip.router)
     app.include_router(commands.router)
     if STATIC_DIR.exists():

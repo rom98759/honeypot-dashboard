@@ -26,7 +26,7 @@ Backlog : `TODO.md`. Décisions de design : `docs/superpowers/specs/`.
 - Design : clone fidèle d'Umami v3 (voir `DESIGN.md`) ; tokens dans `style.css`, couleurs Chart.js/carte dans
   `theme/chartTheme.ts`. La carte est une choroplèthe (`public/world.json` + `utils/isoCountries.ts`, repris
   d'Umami, MIT) alimentée par `countries` de `/api/overview` ; elle a besoin de `geo_cache.country_code`
-  (rempli au lookup et par le backfill de démarrage). `/api/map` n'est plus utilisé par le front.
+  (rempli au lookup et par le backfill de démarrage).
 - Filtres façon Umami : `country`/`protocol`/`ip`/`username` dans l'URL (`theme/useFilters.ts`), passés à
   `/api/overview` ; `previous` = mêmes totaux sur la période précédente (null pour `all`).
 - Ban/unban : `fban_control.py` parle à un worker systemd hôte (`scripts/fban-queue-worker.sh`) via un
@@ -59,7 +59,7 @@ Pas de lint/format configuré : imiter le style existant. Après déploiement : 
 ## Pièges connus
 - Env vars : `COWRIE_JSON_PATH`, `COWRIE_VAR_PATH`, `DASHBOARD_DB_PATH`, `FAIL2BAN_LOG_PATH`,
   `SSHD_AUTH_LOG_PATH`, `GEOIP_DB_PATH`, `GEOIP_ASN_DB_PATH`, `ABUSEIPDB_API_KEY` (vide = désactivé),
-  `FBAN_QUEUE_PATH`, `FBAN_TIMEOUT_SECONDS`, `VPS_LATITUDE`/`VPS_LONGITUDE` (None si absent).
+  `FBAN_QUEUE_PATH`, `FBAN_TIMEOUT_SECONDS`.
 - Les défauts de chemins sont ceux du conteneur (`/data/...`) ; importer `app.main` crée l'app au niveau module.
 - Le libellé « port 50022 » de la page Corrélation est codé en dur (voir `TODO.md`).
 - `docs/superpowers/` est dans `.gitignore` mais 26 fichiers déjà suivis restent versionnés.

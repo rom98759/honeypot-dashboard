@@ -17,8 +17,8 @@ def test_ip_summary_aggregates_sessions_and_geo(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
     db.executescript(
         """
-        INSERT INTO geo_cache (ip, country, city, latitude, longitude, looked_up_at)
-        VALUES ('1.2.3.4', 'France', 'Paris', 48.85, 2.35, 't');
+        INSERT INTO geo_cache (ip, country, country_code, city, latitude, longitude, looked_up_at)
+        VALUES ('1.2.3.4', 'France', 'FR', 'Paris', 48.85, 2.35, 't');
         INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('s1', '1.2.3.4', '2026-08-01T10:00:00Z');
         INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('s2', '1.2.3.4', '2026-08-14T09:00:00Z');
         INSERT INTO commands (session_id, timestamp, input_text) VALUES ('s1', '2026-08-01T10:00:01Z', 'whoami');
@@ -34,6 +34,7 @@ def test_ip_summary_aggregates_sessions_and_geo(tmp_path):
     assert response.status_code == 200
     body = response.json()
     assert body["country"] == "France"
+    assert body["country_code"] == "FR"
     assert body["city"] == "Paris"
     assert body["total_sessions"] == 2
     assert body["total_commands"] == 2

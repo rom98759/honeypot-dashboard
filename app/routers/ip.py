@@ -21,7 +21,7 @@ def get_ip_summary(request: Request, ip: str):
         raise HTTPException(status_code=404, detail="no data for this IP")
 
     geo = db.execute(
-        "SELECT country, city, latitude, longitude FROM geo_cache WHERE ip = ?", (ip,)
+        "SELECT country, country_code, city, latitude, longitude FROM geo_cache WHERE ip = ?", (ip,)
     ).fetchone()
 
     enrichment = db.execute(
@@ -60,6 +60,7 @@ def get_ip_summary(request: Request, ip: str):
     return {
         "ip": ip,
         "country": geo["country"] if geo else None,
+        "country_code": geo["country_code"] if geo else None,
         "city": geo["city"] if geo else None,
         "latitude": geo["latitude"] if geo else None,
         "longitude": geo["longitude"] if geo else None,

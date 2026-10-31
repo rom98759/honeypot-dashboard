@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Search } from "lucide-react";
+import { List } from "lucide-react";
 import { useSessions, PAGE_SIZE } from "../../api/sessions";
 import { SkeletonBlock } from "../../components/SkeletonBlock";
 import { ErrorState } from "../../components/ErrorState";
@@ -9,7 +9,11 @@ import { FilterChips, type FilterChip } from "../../components/FilterChips";
 import { SortableTableHeader, type Column } from "../../components/SortableTableHeader";
 import { Pagination } from "../../components/Pagination";
 import { SessionDetailPanel } from "./SessionDetailPanel";
+import { PageHeader } from "../../components/PageHeader";
+import { SearchField } from "../../components/SearchField";
+import { Badge } from "../../components/Badge";
 import { formatTimestamp } from "../../utils/formatDate";
+import { formatDuration, formatNumber } from "../../utils/format";
 
 const COLUMNS: Column[] = [
   { key: "src_ip", label: "IP" },
@@ -17,10 +21,6 @@ const COLUMNS: Column[] = [
   { key: "duration_ms", label: "Durée" },
   { key: "login_username", label: "Login" },
 ];
-
-function formatDuration(ms: number | null): string {
-  return ms ? `${Math.round(ms / 1000)}s` : "-";
-}
 
 interface ParamUpdate {
   ip?: string;
@@ -138,61 +138,76 @@ export function SessionsPage() {
 
   return (
     <>
-      <div className="topbar">
-        <h1>Sessions</h1>
+      <PageHeader
+        title={
+          <>
+            <List />
+            Sessions
+          </>
+        }
+      >
         <span className="result-count">
-          {data.total} résultat{data.total > 1 ? "s" : ""}
+          {formatNumber(data.total)} résultat{data.total > 1 ? "s" : ""}
         </span>
+      </PageHeader>
+      <div className="controls">
+        <div className="controls-group">
+          <SearchField value={ipInput} placeholder="Filtrer par IP..." onChange={handleFilterChange} />
+          <FilterChips chips={chips} />
+        </div>
       </div>
-      <FilterChips chips={chips} />
-      <div className="filter-bar">
-        <Search />
-        <input
-          className="filter-input"
-          placeholder="Filtrer par IP..."
-          value={ipInput}
-          onChange={(e) => handleFilterChange(e.target.value)}
-        />
-      </div>
-      <table className="sessions-table">
-        <thead>
-          <tr>
-            <SortableTableHeader columns={COLUMNS} sort={sort} order={order} onSort={handleSort} />
-          </tr>
-        </thead>
-        <tbody>
-          {data.items.length ? (
-            data.items.map((s) => (
-              <tr key={s.session_id} className="session-row" onClick={() => handleRowClick(s.session_id)}>
-                <td className="mono">
-                  <Link
-                    to={`/ip/${encodeURIComponent(s.src_ip)}`}
-                    className="ip-link"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {s.src_ip}
-                  </Link>
-                </td>
-                <td className="mono">{formatTimestamp(s.connect_time)}</td>
-                <td>{formatDuration(s.duration_ms)}</td>
-                <td>{s.login_username || "-"}</td>
-              </tr>
-            ))
-          ) : (
+      <section className="panel table-panel">
+        <table className="sessions-table">
+          <thead>
             <tr>
-              <td colSpan={4}>
-                <EmptyState message="Aucune session" />
-              </td>
+              <SortableTableHeader columns={COLUMNS} sort={sort} order={order} onSort={handleSort} />
+              <th>Protocole</th>
+              <th>Mot de passe</th>
             </tr>
-          )}
-        </tbody>
-      </table>
-      <Pagination
-        page={page}
-        totalPages={totalPages}
-        onPrev={() => updateParams({ ...current, page: String(page - 1) })}
-        onNext={() => updateParams({ ...current, page: String(page + 1) })}
-      />
+          </thead>
+          <tbody>
+            {data.items.length ? (
+              data.items.map((s) => (
+                <tr key={s.session_id} className="session-row" onClick={() => handleRowClick(s.session_id)}>
+                  <td className="mono">
+                    <Link
+                      to={`/ip/${encodeURIComponent(s.src_ip)}`}
+                      className="ip-link"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {s.src_ip}
+                    </Link>
+                  </td>
+                  <td className="mono cell-muted">{formatTimestamp(s.connect_time)}</td>
+                  <td>{s.duration_ms ? formatDuration(s.duration_ms) : "-"}</td>
+                  <td className="mono">{s.login_username || "-"}</td>
+                  <td>{(s.protocol ?? "ssh").toUpperCase()}</td>
+                  <td>
+                    <span className="ip-cell">
+                      <span className="mono">{s.login_password ?? "-"}</span>
+                      {s.login_success ? <Badge label="Réussi" tone="danger" /> : null}
+                    </span>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={6}>
+                  <EmptyState message="Aucune session" />
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+        <div className="table-footer">
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            onPrev={() => updateParams({ ...current, page: String(page - 1) })}
+            onNext={() => updateParams({ ...current, page: String(page + 1) })}
+          />
+        </div>
+      </section>
       {sessionId ? <SessionDetailPanel sessionId={sessionId} onClose={closePanel} /> : null}
     </>
   );

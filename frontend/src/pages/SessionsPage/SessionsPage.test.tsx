@@ -43,6 +43,29 @@ describe("SessionsPage", () => {
     expect(screen.getByText("root")).toBeInTheDocument();
   });
 
+  it("shows protocol, password and a badge for successful logins", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        jsonResponse({
+          items: [
+            {
+              ...SESSIONS_PAGE_1.items[0],
+              protocol: "telnet",
+              login_password: "123456",
+              login_success: 1,
+            },
+          ],
+          total: 1,
+        })
+      )
+    );
+    renderWithProviders(<SessionsPage />, { route: "/sessions" });
+    expect(await screen.findByText("TELNET")).toBeInTheDocument();
+    expect(screen.getByText("123456")).toBeInTheDocument();
+    expect(screen.getByText("Réussi")).toHaveClass("badge-danger");
+  });
+
   it("toggles sort direction on column click and re-requests with the new order", async () => {
     const fetchMock = vi.fn(() => jsonResponse(SESSIONS_PAGE_1));
     vi.stubGlobal("fetch", fetchMock);

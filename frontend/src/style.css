@@ -252,17 +252,6 @@ main#content {
 .change-label.negative { color: var(--danger); background: var(--danger-subtle); }
 .change-label.neutral { color: var(--text-secondary); background: var(--bg-raised); }
 
-/* Legacy stat cards (IP page, correlation) share the metric look. */
-.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-3); }
-.card {
-  display: flex; flex-direction: column; gap: var(--space-2);
-  padding: var(--space-4) var(--space-6);
-  background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
-}
-.card span { font-weight: 700; }
-.card b { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
-.card-value-small { font-size: var(--text-lg) !important; }
-.card-danger b { color: var(--danger); }
 .reputation-row { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-3); }
 
 /* ---------- Panels ---------- */
@@ -422,3 +411,36 @@ main#content > table, main#content > .table-wrap {
   .metric-value { font-size: 28px; }
 }
 @media (prefers-reduced-motion: reduce) { .skeleton-line { animation: none; } }
+
+/* ---------- Table pages (Sessions, Commands, Correlation, IP) ---------- */
+.table-panel { padding: var(--space-2) var(--space-6) var(--space-4); }
+.table-panel table th { border-bottom: 1px solid var(--border); }
+.table-panel table th, .table-panel .sort-header { height: 48px; }
+.table-panel td { height: 48px; padding-top: 0; padding-bottom: 0; }
+.table-panel .panel-title { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding-top: var(--space-4); }
+.table-panel .panel-title h2 { margin: 0; }
+.table-footer { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding-top: var(--space-4); border-top: 1px solid var(--border); margin-top: var(--space-1); }
+.table-footer .result-count { font-size: var(--text-sm); }
+.pagination { margin-left: auto; }
+.btn-square { width: 36px; padding: 0; }
+.btn-sm { height: 30px; padding: 0 var(--space-2); font-size: var(--text-sm); }
+.cell-num { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+th.cell-num, th.cell-num .sort-header { justify-content: flex-end; text-align: right; }
+.cell-actions { text-align: right; width: 1%; white-space: nowrap; }
+.cell-muted { color: var(--text-secondary); }
+.ip-cell { display: inline-flex; align-items: center; gap: var(--space-2); }
+.page-description { margin: calc(-1 * var(--space-2)) 0 var(--space-1); color: var(--text-secondary); max-width: 80ch; }
+
+/* Key/value list (IP identity), Umami session-detail style */
+.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--space-3) var(--space-6); margin: 0; }
+.kv dt { color: var(--text-secondary); font-weight: 500; }
+.kv dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.score { display: flex; align-items: baseline; gap: var(--space-2); }
+.score b { font-size: var(--text-4xl); font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
+.score span { color: var(--text-secondary); }
+.score-bar { height: 8px; border-radius: 4px; background: var(--bg-sunken); overflow: hidden; margin: var(--space-3) 0; }
+.score-bar i { display: block; height: 100%; border-radius: 4px; }
+.header-actions { display: flex; align-items: center; gap: var(--space-3); }
+.metric-card .metric-value.small { font-size: var(--text-lg); line-height: 1.4; white-space: normal; }
+.page-header h1 .mono, .kv dd.mono { font-size: inherit; }
+.page-header h1 .flag { font-size: 22px; width: auto; }

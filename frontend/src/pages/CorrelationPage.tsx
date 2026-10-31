@@ -1,11 +1,13 @@
 import { useSearchParams, Link } from "react-router-dom";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Link2 } from "lucide-react";
 import { useCorrelation } from "../api/correlation";
 import { SkeletonBlock } from "../components/SkeletonBlock";
 import { ErrorState } from "../components/ErrorState";
 import { EmptyState } from "../components/EmptyState";
 import { Badge } from "../components/Badge";
 import { SortableTableHeader, type Column } from "../components/SortableTableHeader";
+import { PageHeader } from "../components/PageHeader";
+import { formatNumber } from "../utils/format";
 import type { CorrelationRow } from "../api/types";
 
 const COLUMNS: Column[] = [
@@ -51,56 +53,66 @@ export function CorrelationPage() {
 
   return (
     <>
-      <div className="topbar">
-        <h1>Corrélation</h1>
-      </div>
-      <table className="correlation-table">
-        <thead>
-          <tr>
-            <SortableTableHeader columns={COLUMNS} sort={sort} order={order} onSort={handleSort} />
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {rows.length ? (
-            rows.map((r) => (
-              <tr key={r.ip}>
-                <td className="mono">{r.ip}</td>
-                <td>{r.honeypot_sessions}</td>
-                <td>
-                  {r.fail2ban_banned ? (
-                    <Badge label="Banni" tone="success" />
-                  ) : (
-                    <Badge label="Non banni" tone="neutral" />
-                  )}
-                </td>
-                <td>
-                  {r.real_ssh_attempts > 0 ? (
-                    <Badge label={`${r.real_ssh_attempts} tentatives`} tone="warning" />
-                  ) : (
-                    <Badge label="Aucune" tone="neutral" />
-                  )}
-                </td>
-                <td>
-                  <Link
-                    className="btn-icon"
-                    to={`/ip/${encodeURIComponent(r.ip)}`}
-                    title="Voir le détail"
-                  >
-                    <ExternalLink />
-                  </Link>
+      <PageHeader
+        title={
+          <>
+            <Link2 />
+            Corrélation
+          </>
+        }
+      >
+        <span className="result-count">{formatNumber(rows.length)} IP</span>
+      </PageHeader>
+      <p className="page-description">
+        Les IP vues par le honeypot, croisées avec les bans fail2ban et les tentatives sur le vrai sshd.
+      </p>
+      <section className="panel table-panel">
+        <table className="correlation-table">
+          <thead>
+            <tr>
+              <SortableTableHeader columns={COLUMNS} sort={sort} order={order} onSort={handleSort} />
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length ? (
+              rows.map((r) => (
+                <tr key={r.ip}>
+                  <td className="mono">{r.ip}</td>
+                  <td>
+                    <b>{formatNumber(r.honeypot_sessions)}</b>
+                  </td>
+                  <td>
+                    {r.fail2ban_banned ? (
+                      <Badge label="Banni" tone="success" />
+                    ) : (
+                      <Badge label="Non banni" tone="neutral" />
+                    )}
+                  </td>
+                  <td>
+                    {r.real_ssh_attempts > 0 ? (
+                      <Badge label={`${r.real_ssh_attempts} tentatives`} tone="warning" />
+                    ) : (
+                      <Badge label="Aucune" tone="neutral" />
+                    )}
+                  </td>
+                  <td className="cell-actions">
+                    <Link className="btn-icon" to={`/ip/${encodeURIComponent(r.ip)}`} title="Voir le détail">
+                      <ExternalLink />
+                    </Link>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={5}>
+                  <EmptyState message="Aucune donnée" />
                 </td>
               </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan={5}>
-                <EmptyState message="Aucune donnée" />
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+            )}
+          </tbody>
+        </table>
+      </section>
     </>
   );
 }

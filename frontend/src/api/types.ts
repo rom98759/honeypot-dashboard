@@ -108,6 +108,7 @@ export type MapPeriod = "24h" | "7d" | "30d" | "all";
 export interface IpSummary {
   ip: string;
   country: string | null;
+  country_code?: string | null;
   city: string | null;
   latitude: number | null;
   longitude: number | null;

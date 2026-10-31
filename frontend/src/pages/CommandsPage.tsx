@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Search, Terminal } from "lucide-react";
+import { List as ListIcon, Terminal } from "lucide-react";
 import { useCommands, COMMANDS_PAGE_SIZE } from "../api/commands";
 import { usePeriod, type Period } from "../theme/PeriodContext";
 import { SkeletonBlock } from "../components/SkeletonBlock";
@@ -9,6 +9,8 @@ import { EmptyState } from "../components/EmptyState";
 import { Pagination } from "../components/Pagination";
 import { PageHeader } from "../components/PageHeader";
 import { PeriodSelect } from "../components/PeriodSelect";
+import { SearchField } from "../components/SearchField";
+import { formatNumber } from "../utils/format";
 import { formatTimestamp } from "../utils/formatDate";
 
 export function CommandsPage() {
@@ -66,55 +68,58 @@ export function CommandsPage() {
       >
         <PeriodSelect value={period} onChange={handlePeriodChange} />
       </PageHeader>
-      <div className="filter-bar">
-        <Search />
-        <input
-          className="filter-input"
-          placeholder="Filtrer par commande..."
-          value={qInput}
-          onChange={(e) => handleFilterChange(e.target.value)}
-        />
+      <div className="controls">
+        <SearchField value={qInput} placeholder="Filtrer par commande..." onChange={handleFilterChange} />
       </div>
-      <table className="plain-table">
-        <thead>
-          <tr>
-            <th>Commande</th>
-            <th>Occurrences</th>
-            <th>Dernière vue</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {data.items.length ? (
-            data.items.map((c) => (
-              <tr key={c.input_text}>
-                <td className="mono command-cell">
-                  <code title={c.input_text}>{c.input_text}</code>
-                </td>
-                <td>{c.n}</td>
-                <td className="mono">{formatTimestamp(c.last_seen)}</td>
-                <td>
-                  <Link to={`/sessions?command=${encodeURIComponent(c.input_text)}&period=${period}`}>
-                    Voir les sessions
-                  </Link>
+      <section className="panel table-panel">
+        <table className="plain-table">
+          <thead>
+            <tr>
+              <th>Commande</th>
+              <th className="cell-num">Occurrences</th>
+              <th>Dernière vue</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {data.items.length ? (
+              data.items.map((c) => (
+                <tr key={c.input_text}>
+                  <td className="mono command-cell">
+                    <code title={c.input_text}>{c.input_text}</code>
+                  </td>
+                  <td className="cell-num">{formatNumber(c.n)}</td>
+                  <td className="mono cell-muted">{formatTimestamp(c.last_seen)}</td>
+                  <td className="cell-actions">
+                    <Link
+                      className="btn btn-sm"
+                      to={`/sessions?command=${encodeURIComponent(c.input_text)}&period=${period}`}
+                    >
+                      <ListIcon />
+                      Voir les sessions
+                    </Link>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={4}>
+                  <EmptyState message="Aucune donnée" />
                 </td>
               </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan={4}>
-                <EmptyState message="Aucune donnée" />
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-      <Pagination
-        page={page}
-        totalPages={totalPages}
-        onPrev={() => updateParams({ q, page: String(page - 1), period })}
-        onNext={() => updateParams({ q, page: String(page + 1), period })}
-      />
+            )}
+          </tbody>
+        </table>
+        <div className="table-footer">
+          <span className="result-count">{formatNumber(data.total)} commandes distinctes</span>
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            onPrev={() => updateParams({ q, page: String(page - 1), period })}
+            onNext={() => updateParams({ q, page: String(page + 1), period })}
+          />
+        </div>
+      </section>
     </>
   );
 }

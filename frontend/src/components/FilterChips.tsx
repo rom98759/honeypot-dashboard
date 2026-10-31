@@ -11,9 +11,9 @@ export function FilterChips({ chips }: { chips: FilterChip[] }) {
     <div className="filter-chips">
       {chips.map((chip) => (
         <span className="filter-chip" key={chip.label}>
-          {chip.label}
+          <span>{chip.label}</span>
           <button className="btn-icon" onClick={chip.onClear} aria-label={`Effacer : ${chip.label}`}>
-            <X size={14} />
+            <X />
           </button>
         </span>
       ))}
