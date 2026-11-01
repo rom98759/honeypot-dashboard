@@ -4,7 +4,7 @@ import { X } from "lucide-react";
 import { useSessionDetail } from "../../api/sessions";
 import { SkeletonBlock } from "../../components/SkeletonBlock";
 import { ErrorState } from "../../components/ErrorState";
-import { Badge } from "../../components/Badge";
+import { AcceptedLoginBadge, Badge } from "../../components/Badge";
 import { ReplayPlayer } from "../../components/ReplayPlayer";
 import type { Session } from "../../api/types";
 import { formatTimestamp } from "../../utils/formatDate";
@@ -19,7 +19,7 @@ function SessionMeta({ session }: { session: Session }) {
   if (session.login_username == null) {
     authBadge = <Badge label="Aucune tentative" tone="neutral" />;
   } else if (session.login_success === 1) {
-    authBadge = <Badge label="Réussie" tone="danger" />;
+    authBadge = <AcceptedLoginBadge />;
   } else {
     authBadge = <Badge label="Échouée" tone="neutral" />;
   }

@@ -63,7 +63,10 @@ describe("SessionsPage", () => {
     renderWithProviders(<SessionsPage />, { route: "/sessions" });
     expect(await screen.findByText("TELNET")).toBeInTheDocument();
     expect(screen.getByText("123456")).toBeInTheDocument();
-    expect(screen.getByText("Réussi")).toHaveClass("badge-danger");
+    // Cowrie accepts logins on purpose: an accepted login is the decoy working, not a breach.
+    const accepted = screen.getByText("Accepté");
+    expect(accepted).toHaveClass("badge-neutral");
+    expect(accepted).toHaveAttribute("title", expect.stringContaining("leurre"));
   });
 
   it("toggles sort direction on column click and re-requests with the new order", async () => {

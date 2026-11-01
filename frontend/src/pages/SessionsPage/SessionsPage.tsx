@@ -11,7 +11,7 @@ import { Pagination } from "../../components/Pagination";
 import { SessionDetailPanel } from "./SessionDetailPanel";
 import { PageHeader } from "../../components/PageHeader";
 import { SearchField } from "../../components/SearchField";
-import { Badge } from "../../components/Badge";
+import { AcceptedLoginBadge } from "../../components/Badge";
 import { formatTimestamp } from "../../utils/formatDate";
 import { formatDuration, formatNumber } from "../../utils/format";
 
@@ -185,7 +185,7 @@ export function SessionsPage() {
                   <td>
                     <span className="ip-cell">
                       <span className="mono">{s.login_password ?? "-"}</span>
-                      {s.login_success ? <Badge label="Réussi" tone="danger" /> : null}
+                      {s.login_success ? <AcceptedLoginBadge /> : null}
                     </span>
                   </td>
                 </tr>
