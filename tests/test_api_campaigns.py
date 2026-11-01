@@ -97,3 +97,28 @@ def test_campaign_detail_unknown_or_malformed_id(tmp_path):
     client = _client(tmp_path)
     assert client.get(f"/api/campaigns/{'d' * 64}").status_code == 404
     assert client.get("/api/campaigns/not-a-hash").status_code == 404
+
+
+def test_campaign_page_and_detail_are_cached(tmp_path, monkeypatch):
+    import app.routers.campaigns as router
+
+    calls = {"page": 0, "detail": 0}
+    real_page, real_detail = router.campaign_page, router.campaign_detail
+
+    def counting_page(*args, **kwargs):
+        calls["page"] += 1
+        return real_page(*args, **kwargs)
+
+    def counting_detail(*args, **kwargs):
+        calls["detail"] += 1
+        return real_detail(*args, **kwargs)
+
+    monkeypatch.setattr(router, "campaign_page", counting_page)
+    monkeypatch.setattr(router, "campaign_detail", counting_detail)
+    client = _client(tmp_path)
+
+    for _ in range(2):
+        client.get("/api/campaigns?sort=ips")
+        client.get(f"/api/campaigns/{HASH_A}")
+
+    assert calls == {"page": 1, "detail": 1}
