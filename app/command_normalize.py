@@ -18,9 +18,12 @@ _SPACES = re.compile(r"\s+")
 # Bots probe for fake shells with a random sum like "$((593*647+9))".
 _ARITHMETIC = re.compile(r"\$\(\(([^()]*)\)\)")
 _DIGITS = re.compile(r"\d+")
+# Bots replay the password they just logged in with to escalate through sudo.
+_SUDO_PASSWORD = re.compile(r"echo\s+(['\"])[^'\"]*\1(\s*\|\s*sudo\s+-S)")
 
 
 def normalize_command(text: str) -> str:
+    text = _SUDO_PASSWORD.sub(r"echo '<PASS>'\2", text)
     text = _ARITHMETIC.sub(lambda m: "$((" + _DIGITS.sub("<N>", m[1]) + "))", text)
     text = _TEMP_ENTRY.sub(r"\1<TMP>", text)
     text = _IPV4.sub("<IP>", text)
@@ -28,10 +31,13 @@ def normalize_command(text: str) -> str:
     return _SPACES.sub(" ", text).strip()
 
 
+def normalize_sequence(commands: list[str]) -> tuple[str, ...]:
+    return tuple(normalize_command(c) for c in commands)
+
+
 def family_key(commands: list[str]) -> str | None:
     """Identity of a command sequence once normalized; order matters, a bot's
     script is a sequence. None when the session ran nothing."""
     if not commands:
         return None
-    joined = "\n".join(normalize_command(c) for c in commands)
-    return hashlib.sha256(joined.encode()).hexdigest()
+    return hashlib.sha256("\n".join(normalize_sequence(commands)).encode()).hexdigest()

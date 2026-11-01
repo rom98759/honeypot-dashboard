@@ -22,8 +22,9 @@ Backlog : `TODO.md`. Décisions de design : `docs/superpowers/specs/`.
   (données non lues depuis > 60 s ou fichier absent) ; `HealthBanner` (dans `App`) l'affiche sur toutes les pages.
 - Campagnes (`campaigns_stats.py`, `/api/campaigns`, page `CampaignsPage/`) : empreintes ttylog (nom =
   SHA-256 du contenu Cowrie) fusionnées en familles par séquence de commandes normalisée
-  (`command_normalize.py` : jetons hex, IP, /tmp, calculs `$((…))`) ; campagne = famille de ≥ 2 sessions,
-  les autres = « Sessions uniques ». Les séquences tronquées du même script restent des familles distinctes.
+  (`command_normalize.py` : jetons hex, IP, /tmp, calculs `$((…))`, mot de passe rejoué dans
+  `echo '…' | sudo -S`) ; une séquence d'au moins 3 commandes qui commence une séquence plus longue (run
+  tronqué) rejoint cette famille. Campagne = famille de ≥ 2 sessions, les autres = « Sessions uniques ».
   Agrégat, pages et fiches en cache 5 min (`stats_cache`), tri/pagination en Python.
 - Réimport ponctuel des logs sshd avec le parseur courant : `python -m app.reimport_sshd_auth [--dry-run] FICHIERS`
   (remplace les lignes de la plage couverte par les fichiers).

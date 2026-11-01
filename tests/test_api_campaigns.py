@@ -13,22 +13,10 @@ def _iso(dt):
     return dt.strftime("%Y-%m-%dT%H:%M:%S.000000Z")
 
 
-def _client(tmp_path):
+def _client(tmp_path, extra=()):
     db = connect(tmp_path / "db.sqlite3")
     now = datetime.now(timezone.utc)
-    sessions = [
-        ("s1", "109.160.32.14", _iso(now - timedelta(days=40)), HASH_A, ["uname -a", "id"]),
-        ("s2", "109.160.32.88", _iso(now - timedelta(hours=1)), HASH_A, ["uname -a", "id"]),
-        # Same commands, different terminal output: another variant of the same bot.
-        ("s7", "109.160.32.99", _iso(now - timedelta(minutes=30)), HASH_D, ["uname -a", "id"]),
-        ("s3", "203.0.113.5", _iso(now - timedelta(days=2)), HASH_B, ["echo OK"]),
-        ("s5", "203.0.113.6", _iso(now - timedelta(days=1)), HASH_B, ["echo OK"]),
-        # Random per-run marker: two fingerprints, one family once normalized.
-        ("s8", "80.94.92.55", _iso(now - timedelta(hours=6)), HASH_E, ["echo check_0123456789abcdef"]),
-        ("s9", "80.94.92.56", _iso(now - timedelta(hours=7)), HASH_F, ["echo check_fedcba9876543210"]),
-        ("s6", "192.0.2.9", _iso(now - timedelta(hours=5)), HASH_C, ["cat /etc/passwd", "w"]),
-        ("s4", "198.51.100.7", _iso(now - timedelta(hours=3)), None, []),  # login only, no shell
-    ]
+    sessions = [*extra(now), *_default_sessions(now)] if extra else _default_sessions(now)
     for sid, ip, ts, ttylog, commands in sessions:
         db.execute("INSERT INTO sessions (session_id, src_ip, connect_time) VALUES (?, ?, ?)", (sid, ip, ts))
         if ttylog:
@@ -45,6 +33,49 @@ def _client(tmp_path):
     )
     db.commit()
     return TestClient(create_app(db=db, start_background_tasks=False))
+
+
+def _default_sessions(now):
+    return [
+        ("s1", "109.160.32.14", _iso(now - timedelta(days=40)), HASH_A, ["uname -a", "id"]),
+        ("s2", "109.160.32.88", _iso(now - timedelta(hours=1)), HASH_A, ["uname -a", "id"]),
+        # Same commands, different terminal output: another variant of the same bot.
+        ("s7", "109.160.32.99", _iso(now - timedelta(minutes=30)), HASH_D, ["uname -a", "id"]),
+        ("s3", "203.0.113.5", _iso(now - timedelta(days=2)), HASH_B, ["echo OK"]),
+        ("s5", "203.0.113.6", _iso(now - timedelta(days=1)), HASH_B, ["echo OK"]),
+        # Random per-run marker: two fingerprints, one family once normalized.
+        ("s8", "80.94.92.55", _iso(now - timedelta(hours=6)), HASH_E, ["echo check_0123456789abcdef"]),
+        ("s9", "80.94.92.56", _iso(now - timedelta(hours=7)), HASH_F, ["echo check_fedcba9876543210"]),
+        ("s6", "192.0.2.9", _iso(now - timedelta(hours=5)), HASH_C, ["cat /etc/passwd", "w"]),
+        ("s4", "198.51.100.7", _iso(now - timedelta(hours=3)), None, []),  # login only, no shell
+    ]
+
+
+SCRIPT = ["echo check_0123456789abcdef", "nproc", "free -m", "uptime", "w"]
+
+
+def _truncated_runs(now):
+    # One script, cut after 5, 4 and 3 commands: one family. The 2-command run stays apart.
+    return [
+        ("t5", "45.0.0.1", _iso(now - timedelta(hours=2)), "1" * 64, SCRIPT),
+        ("t4", "45.0.0.2", _iso(now - timedelta(hours=3)), "2" * 64, SCRIPT[:4]),
+        ("t3", "45.0.0.3", _iso(now - timedelta(hours=4)), "3" * 64, SCRIPT[:3]),
+        ("t2", "45.0.0.4", _iso(now - timedelta(hours=5)), "4" * 64, SCRIPT[:2]),
+    ]
+
+
+def test_truncated_runs_of_one_script_form_one_family(tmp_path):
+    body = _client(tmp_path, extra=_truncated_runs).get("/api/campaigns").json()
+
+    script = next(c for c in body["items"] if c["variants"] == 3)
+    assert script["sessions"] == 3
+    assert script["sample_session_id"] == "t5"
+    assert script["sample_command"] == SCRIPT[0]
+
+
+def test_runs_shorter_than_the_minimum_prefix_are_not_merged(tmp_path):
+    body = _client(tmp_path, extra=_truncated_runs).get("/api/campaigns/unique").json()
+    assert "t2" in {s["session_id"] for s in body["items"]}
 
 
 def _by_command(body):

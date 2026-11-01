@@ -15,7 +15,7 @@ import sqlite3
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 
-from app.command_normalize import family_key
+from app.command_normalize import family_key, normalize_sequence
 
 CAMPAIGN_ID_RE = re.compile(r"^[0-9a-f]{64}$")
 # Most families hold a single session: a one-off exchange (often a human),
@@ -24,6 +24,9 @@ MIN_CAMPAIGN_SESSIONS = 2
 ACTIVITY_DAYS = 30
 NEW_WINDOW = timedelta(days=7)
 MAX_VARIANTS_LISTED = 20
+# A run cut short (timeout, dropped connection) repeats the start of its script.
+# Below 3 commands a shared start says too little: "uname" alone opens many scripts.
+MIN_SHARED_PREFIX = 3
 SORT_KEYS = {
     "sessions": lambda c: c["sessions"],
     "ips": lambda c: c["ips"],
@@ -59,6 +62,33 @@ def _commands_by_session(db: sqlite3.Connection, session_ids: list[str]) -> dict
     return commands
 
 
+def _absorb(target: dict, family: dict) -> None:
+    target["paths"] += family["paths"]
+    target["variant_sessions"].update(family["variant_sessions"])
+    target["ip_set"] |= family["ip_set"]
+    target["sessions"] += family["sessions"]
+    target["first_seen"] = min(target["first_seen"], family["first_seen"])
+    if family["last_seen"] > target["last_seen"]:
+        target["last_seen"] = family["last_seen"]
+        target["sample_session_id"] = family["sample_session_id"]
+
+
+def _merge_truncated_runs(families: dict[str, dict]) -> None:
+    """Fold a family whose sequence is the start of a longer one into it. Longest
+    sequences go first, so every candidate is still a root when a shorter one is
+    placed; a start shared by several scripts goes to the busiest."""
+    extended_by: dict[tuple, list[dict]] = defaultdict(list)
+    for family in sorted(families.values(), key=lambda f: (-len(f["seq"]), -f["sessions"], f["id"])):
+        seq = family["seq"]
+        candidates = extended_by.get(seq) if len(seq) >= MIN_SHARED_PREFIX else None
+        if candidates:
+            _absorb(max(candidates, key=lambda f: f["sessions"]), family)
+            del families[family["id"]]
+            continue
+        for length in range(MIN_SHARED_PREFIX, len(seq)):
+            extended_by[seq[:length]].append(family)
+
+
 def compute_campaigns(db: sqlite3.Connection) -> dict:
     """The full aggregate, meant to be cached: grouping every ttylog is the expensive part,
     sorting and paging the resulting families is not."""
@@ -85,7 +115,8 @@ def compute_campaigns(db: sqlite3.Connection) -> dict:
         fid = family_key(sample_commands) or _fingerprint(path)
         family = families.setdefault(
             fid,
-            {"id": fid, "paths": [], "variant_sessions": {}, "ip_set": set(), "sessions": 0,
+            {"id": fid, "seq": normalize_sequence(sample_commands),
+             "paths": [], "variant_sessions": {}, "ip_set": set(), "sessions": 0,
              "first_seen": r["first_seen"], "last_seen": "", "sample_session_id": None,
              "sample_command": sample_commands[0] if sample_commands else None},
         )
@@ -98,8 +129,10 @@ def compute_campaigns(db: sqlite3.Connection) -> dict:
             family["last_seen"] = r["last_seen"]
             family["sample_session_id"] = r["sample_session_id"]
 
+    _merge_truncated_runs(families)
     total_sessions = db.execute("SELECT COUNT(*) AS n FROM sessions").fetchone()["n"]
     for family in families.values():
+        del family["seq"]
         family["ips"] = len(family.pop("ip_set"))
         family["share"] = family["sessions"] / total_sessions if total_sessions else 0
 
