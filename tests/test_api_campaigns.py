@@ -5,9 +5,8 @@ from fastapi.testclient import TestClient
 from app.db import connect
 from app.main import create_app
 
-HASH_A = "a" * 64
-HASH_B = "b" * 64
-HASH_C = "c" * 64
+TTY = "var/lib/cowrie/tty/"
+HASH_A, HASH_B, HASH_C, HASH_D, HASH_E, HASH_F = (c * 64 for c in "abcdef")
 
 
 def _iso(dt):
@@ -17,27 +16,29 @@ def _iso(dt):
 def _client(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
     now = datetime.now(timezone.utc)
-    old = now - timedelta(days=40)
     sessions = [
-        ("s1", "109.160.32.14", _iso(old)),
-        ("s2", "109.160.32.88", _iso(now - timedelta(hours=1))),
-        ("s3", "203.0.113.5", _iso(now - timedelta(days=2))),
-        ("s4", "198.51.100.7", _iso(now - timedelta(hours=3))),  # login only, no shell
-        ("s5", "203.0.113.6", _iso(now - timedelta(days=1))),
-        ("s6", "192.0.2.9", _iso(now - timedelta(hours=5))),  # one-off behaviour, not a campaign
+        ("s1", "109.160.32.14", _iso(now - timedelta(days=40)), HASH_A, ["uname -a", "id"]),
+        ("s2", "109.160.32.88", _iso(now - timedelta(hours=1)), HASH_A, ["uname -a", "id"]),
+        # Same commands, different terminal output: another variant of the same bot.
+        ("s7", "109.160.32.99", _iso(now - timedelta(minutes=30)), HASH_D, ["uname -a", "id"]),
+        ("s3", "203.0.113.5", _iso(now - timedelta(days=2)), HASH_B, ["echo OK"]),
+        ("s5", "203.0.113.6", _iso(now - timedelta(days=1)), HASH_B, ["echo OK"]),
+        # Random per-run marker: two fingerprints, one family once normalized.
+        ("s8", "80.94.92.55", _iso(now - timedelta(hours=6)), HASH_E, ["echo check_0123456789abcdef"]),
+        ("s9", "80.94.92.56", _iso(now - timedelta(hours=7)), HASH_F, ["echo check_fedcba9876543210"]),
+        ("s6", "192.0.2.9", _iso(now - timedelta(hours=5)), HASH_C, ["cat /etc/passwd", "w"]),
+        ("s4", "198.51.100.7", _iso(now - timedelta(hours=3)), None, []),  # login only, no shell
     ]
-    db.executemany("INSERT INTO sessions (session_id, src_ip, connect_time) VALUES (?, ?, ?)", sessions)
-    db.executemany(
-        "INSERT INTO ttylogs (session_id, ttylog_path, close_time) VALUES (?, ?, 't')",
-        [("s1", f"var/lib/cowrie/tty/{HASH_A}"), ("s2", f"var/lib/cowrie/tty/{HASH_A}"),
-         ("s3", f"var/lib/cowrie/tty/{HASH_B}"), ("s5", f"var/lib/cowrie/tty/{HASH_B}"),
-         ("s6", f"var/lib/cowrie/tty/{HASH_C}")],
-    )
-    db.executemany(
-        "INSERT INTO commands (session_id, timestamp, input_text) VALUES (?, ?, ?)",
-        [("s1", "t1", "uname -a"), ("s2", "t1", "uname -a"), ("s2", "t2", "id"),
-         ("s3", "t1", "echo OK"), ("s6", "t1", "cat /etc/passwd"), ("s6", "t2", "w")],
-    )
+    for sid, ip, ts, ttylog, commands in sessions:
+        db.execute("INSERT INTO sessions (session_id, src_ip, connect_time) VALUES (?, ?, ?)", (sid, ip, ts))
+        if ttylog:
+            db.execute(
+                "INSERT INTO ttylogs (session_id, ttylog_path, close_time) VALUES (?, ?, 't')", (sid, TTY + ttylog)
+            )
+        for i, text in enumerate(commands):
+            db.execute(
+                "INSERT INTO commands (session_id, timestamp, input_text) VALUES (?, ?, ?)", (sid, f"t{i}", text)
+            )
     db.executemany(
         "INSERT INTO ip_enrichment (ip, asn, asn_org, status) VALUES (?, ?, ?, 'done')",
         [("109.160.32.14", 198364, "Banatsync Srl"), ("109.160.32.88", 198364, "Banatsync Srl")],
@@ -46,66 +47,73 @@ def _client(tmp_path):
     return TestClient(create_app(db=db, start_background_tasks=False))
 
 
-def test_campaign_list_groups_sessions_by_ttylog_hash(tmp_path):
+def _by_command(body):
+    return {c["sample_command"]: c for c in body["items"]}
+
+
+def test_campaigns_merge_variants_into_families(tmp_path):
     body = _client(tmp_path).get("/api/campaigns").json()
 
-    assert body["total"] == 2
+    assert body["total"] == 3
     assert body["totals"] == {
-        "campaigns": 2,
-        "sessions": 6,
-        "new_7d": 1,
+        "campaigns": 3,
+        "sessions": 9,
+        "new_7d": 2,
         "unique_sessions": 1,
-        "top_share": 2 / 6,
+        "top_share": 3 / 9,
         "login_only": {"sessions": 1, "ips": 1},
     }
-    first, second = body["items"]
-    assert first["id"] == HASH_A
-    assert first["sessions"] == 2
-    assert first["ips"] == 2
-    assert first["share"] == 2 / 6
-    assert first["sample_session_id"] == "s2"  # most recent session of the campaign
-    assert first["sample_command"] == "uname -a"
-    assert len(first["activity"]) == 30
-    assert sum(first["activity"]) == 1  # s1 is older than the 30-day window
-    assert second["id"] == HASH_B
+    uname = _by_command(body)["uname -a"]
+    assert uname["sessions"] == 3
+    assert uname["ips"] == 3
+    assert uname["variants"] == 2
+    assert uname["sample_session_id"] == "s7"  # most recent session across variants
+    assert len(uname["activity"]) == 30
+    assert sum(uname["activity"]) == 2  # s1 is older than the 30-day window
+    check = _by_command(body)["echo check_0123456789abcdef"]
+    assert (check["sessions"], check["variants"]) == (2, 2)
 
 
 def test_campaign_list_sorts_by_recency(tmp_path):
     client = _client(tmp_path)
-    body = client.get("/api/campaigns?sort=last_seen").json()
-    assert [c["id"] for c in body["items"]] == [HASH_A, HASH_B]
-    body = client.get("/api/campaigns?sort=first_seen").json()
-    assert [c["id"] for c in body["items"]] == [HASH_B, HASH_A]
+    by_last = client.get("/api/campaigns?sort=last_seen").json()["items"]
+    assert [c["sample_session_id"] for c in by_last] == ["s7", "s8", "s5"]
+    by_first = client.get("/api/campaigns?sort=first_seen").json()["items"]
+    assert [c["sample_session_id"] for c in by_first] == ["s8", "s5", "s7"]
 
 
 def test_campaign_list_rejects_unknown_sort(tmp_path):
     assert _client(tmp_path).get("/api/campaigns?sort=nope").status_code == 400
 
 
-def test_campaign_detail_reports_dominant_asn_and_prefix(tmp_path):
-    body = _client(tmp_path).get(f"/api/campaigns/{HASH_A}").json()
+def test_campaign_detail_reports_dominant_asn_prefix_and_variants(tmp_path):
+    client = _client(tmp_path)
+    family_id = _by_command(client.get("/api/campaigns").json())["uname -a"]["id"]
 
-    assert body["sessions"] == 2
-    assert body["top_asn"] == {"asn": 198364, "asn_org": "Banatsync Srl", "share": 1.0}
+    body = client.get(f"/api/campaigns/{family_id}").json()
+
+    assert body["sessions"] == 3
+    assert body["top_asn"] == {"asn": 198364, "asn_org": "Banatsync Srl", "share": 2 / 3}
     assert body["top_prefix"] == {"prefix": "109.160.32.0/24", "share": 1.0}
-    assert body["sample_session_id"] == "s2"
+    assert body["sample_session_id"] == "s7"
     assert [c["input_text"] for c in body["commands"]] == ["uname -a", "id"]
-    assert [ip["ip"] for ip in body["top_ips"]] == ["109.160.32.14", "109.160.32.88"]
+    assert [ip["ip"] for ip in body["top_ips"]] == ["109.160.32.14", "109.160.32.88", "109.160.32.99"]
+    assert body["variant_count"] == 2
+    assert {v["id"]: v["sessions"] for v in body["variants"]} == {HASH_A: 2, HASH_D: 1}
 
 
 def test_campaign_detail_unknown_or_malformed_id(tmp_path):
     client = _client(tmp_path)
-    assert client.get(f"/api/campaigns/{'d' * 64}").status_code == 404
+    assert client.get(f"/api/campaigns/{'9' * 64}").status_code == 404
     assert client.get("/api/campaigns/not-a-hash").status_code == 404
 
 
-def test_unique_sessions_lists_one_off_fingerprints_by_command_count(tmp_path):
+def test_unique_sessions_exclude_merged_variants(tmp_path):
     body = _client(tmp_path).get("/api/campaigns/unique").json()
 
     assert body["total"] == 1
     (item,) = body["items"]
     assert item["session_id"] == "s6"
-    assert item["src_ip"] == "192.0.2.9"
     assert item["commands"] == 2
     assert item["first_command"] == "cat /etc/passwd"
 
@@ -131,9 +139,10 @@ def test_campaign_page_and_detail_are_cached(tmp_path, monkeypatch):
     monkeypatch.setattr(router, "campaign_page", counting_page)
     monkeypatch.setattr(router, "campaign_detail", counting_detail)
     client = _client(tmp_path)
+    family_id = client.get("/api/campaigns").json()["items"][0]["id"]
 
     for _ in range(2):
         client.get("/api/campaigns?sort=ips")
-        client.get(f"/api/campaigns/{HASH_A}")
+        client.get(f"/api/campaigns/{family_id}")
 
-    assert calls == {"page": 1, "detail": 1}
+    assert calls == {"page": 2, "detail": 1}  # default sort page + sort=ips page, each once

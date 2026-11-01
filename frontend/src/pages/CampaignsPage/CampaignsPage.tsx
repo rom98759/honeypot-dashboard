@@ -37,6 +37,9 @@ function CampaignRow({ campaign, href }: { campaign: Campaign; href: string }) {
         <Link to={href} title={command}>
           {command}
         </Link>
+        {campaign.variants > 1 && (
+          <span className="variant-count">{formatNumber(campaign.variants)} variantes</span>
+        )}
       </td>
       <td className="cell-num cell-muted">{formatNumber(campaign.ips)}</td>
       <td>
@@ -144,7 +147,7 @@ export function CampaignsPage() {
         }
       />
       <div className="metrics-bar">
-        <MetricCard label="Campagnes" value={formatNumber(totals.campaigns)} note="empreintes partagées par 2 sessions ou plus" />
+        <MetricCard label="Campagnes" value={formatNumber(totals.campaigns)} note="comportements vus dans 2 sessions ou plus" />
         <MetricCard
           label="Concentration"
           value={`${Math.round(totals.top_share * 100)} %`}

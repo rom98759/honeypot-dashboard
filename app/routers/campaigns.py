@@ -61,8 +61,10 @@ async def list_unique_sessions(
 @router.get("/api/campaigns/{campaign_id}")
 async def get_campaign(request: Request, campaign_id: str):
     db = request.app.state.db
-    detail = request.app.state.stats_cache.get_or_compute(
-        ("campaign", campaign_id), CAMPAIGNS_TTL_SECONDS, lambda: campaign_detail(db, campaign_id)
+    cache = request.app.state.stats_cache
+    aggregate = cache.get_or_compute(("campaigns",), CAMPAIGNS_TTL_SECONDS, lambda: compute_campaigns(db))
+    detail = cache.get_or_compute(
+        ("campaign", campaign_id), CAMPAIGNS_TTL_SECONDS, lambda: campaign_detail(db, aggregate, campaign_id)
     )
     if detail is None:
         raise HTTPException(status_code=404, detail="campaign not found")

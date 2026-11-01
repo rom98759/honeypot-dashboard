@@ -186,6 +186,7 @@ export interface Campaign {
   last_seen: string;
   sample_session_id: string;
   sample_command: string | null;
+  variants: number;
   activity: number[];
 }
 
@@ -213,6 +214,8 @@ export interface CampaignDetail {
   top_prefix: { prefix: string; share: number } | null;
   top_ips: { ip: string; sessions: number }[];
   commands: { timestamp: string; input_text: string }[];
+  variant_count: number;
+  variants: { id: string; sessions: number }[];
 }
 
 export interface UniqueSession {

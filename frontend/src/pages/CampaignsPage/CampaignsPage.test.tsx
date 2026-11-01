@@ -22,6 +22,7 @@ const LIST: CampaignList = {
       last_seen: "2026-10-31T17:00:00Z",
       sample_session_id: "s2",
       sample_command: "uname -s -v -n -r -m",
+      variants: 2,
       activity: Array(30).fill(10),
     },
   ],
@@ -47,6 +48,11 @@ const DETAIL: CampaignDetail = {
   top_prefix: { prefix: "109.160.32.0/24", share: 0.76 },
   top_ips: [{ ip: "109.160.32.14", sessions: 5000 }],
   commands: [{ timestamp: "2026-10-31T17:00:01Z", input_text: "uname -s -v -n -r -m" }],
+  variant_count: 2,
+  variants: [
+    { id: "7ab552f01de999cb12092166cdc36fd68a0edbb33927e0ef3d26f4ee6449f804", sessions: 247000 },
+    { id: "0d9cab81aa", sessions: 599 },
+  ],
 };
 
 vi.mock("../SessionsPage/SessionDetailPanel", () => ({
@@ -91,6 +97,7 @@ describe("CampaignsPage", () => {
     expect(screen.getByText("215")).toBeInTheDocument();
     expect(screen.getByText("75%")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Sessions uniques" })).toBeInTheDocument();
+    expect(screen.getByText("2 variantes")).toBeInTheDocument();
     expect(screen.getByText("Login seul (pas de shell)")).toBeInTheDocument();
   });
 
@@ -111,6 +118,8 @@ describe("CampaignsPage", () => {
     expect(await within(panel).findByText(/Banatsync Srl/)).toBeInTheDocument();
     expect(within(panel).getByText(/109\.160\.32\.0\/24/)).toBeInTheDocument();
     expect(within(panel).getByText("replay s2")).toBeInTheDocument();
+    expect(within(panel).getByText("Variantes (2)")).toBeInTheDocument();
+    expect(within(panel).getByText("7ab552f0")).toBeInTheDocument();
     expect(within(panel).getByRole("link", { name: "109.160.32.14" })).toHaveAttribute("href", "/ip/109.160.32.14");
   });
 

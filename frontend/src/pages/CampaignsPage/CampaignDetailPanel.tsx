@@ -84,6 +84,19 @@ export function CampaignDetailPanel({ campaignId, onClose }: { campaignId: strin
                 <li className="cell-muted">Aucune commande</li>
               )}
             </ul>
+            {data.variant_count > 1 && (
+              <>
+                <h3>Variantes ({formatNumber(data.variant_count)})</h3>
+                <ul className="commands-list">
+                  {data.variants.map((v) => (
+                    <li key={v.id}>
+                      <span className="mono">{v.id.slice(0, 8)}</span>
+                      <span className="cell-muted">{formatNumber(v.sessions)} sessions</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
             <h3>IP principales</h3>
             <ul className="commands-list">
               {data.top_ips.map((ip) => (
