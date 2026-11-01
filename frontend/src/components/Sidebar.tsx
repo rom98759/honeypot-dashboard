@@ -67,7 +67,7 @@ export function Sidebar() {
       <GlobalSearch />
       <div className="sidebar-nav">
         {NAV_SECTIONS.map((section) => (
-          <div key={section.label}>
+          <div key={section.label} className="nav-group">
             <div className="nav-section">{section.label}</div>
             {section.items.map(({ to, label, Icon }) => (
               <NavLink key={to} to={to} className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}>
