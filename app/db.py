@@ -95,6 +95,12 @@ CREATE TABLE IF NOT EXISTS fingerprint_days (
     PRIMARY KEY (ttylog_path, day)
 );
 
+CREATE TABLE IF NOT EXISTS admin_networks (
+    cidr TEXT PRIMARY KEY,
+    note TEXT,
+    created_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_sessions_src_ip ON sessions(src_ip);
 CREATE INDEX IF NOT EXISTS idx_sessions_connect_time ON sessions(connect_time);
 CREATE INDEX IF NOT EXISTS idx_fail2ban_events_ip_timestamp ON fail2ban_events(ip, timestamp);

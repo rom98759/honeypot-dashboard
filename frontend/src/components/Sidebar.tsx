@@ -1,6 +1,18 @@
 import { type FormEvent, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { Shield, LayoutDashboard, List, Terminal, Fingerprint, Link2, Globe, Sun, Moon, Search } from "lucide-react";
+import {
+  Shield,
+  LayoutDashboard,
+  List,
+  Terminal,
+  Fingerprint,
+  Link2,
+  Globe,
+  Sun,
+  Moon,
+  Search,
+  Settings,
+} from "lucide-react";
 import { useTheme } from "../theme/ThemeContext";
 
 const NAV_SECTIONS = [
@@ -79,6 +91,9 @@ export function Sidebar() {
         ))}
       </div>
       <div className="sidebar-footer">
+        <NavLink to="/settings" className="btn-icon" title="Réglages" aria-label="Réglages">
+          <Settings />
+        </NavLink>
         <button className="btn-icon theme-toggle" onClick={toggleTheme} title={themeLabel} aria-label={themeLabel}>
           {theme === "dark" ? <Sun /> : <Moon />}
         </button>

@@ -104,7 +104,7 @@ async def get_ip_sshd_auth(
     return {"items": [dict(r) for r in rows], "total": total}
 
 
-def _verify_dashboard_origin(request: Request) -> None:
+def verify_dashboard_origin(request: Request) -> None:
     """
     NPM Basic Auth in front of this app is vulnerable to CSRF on write
     endpoints (browsers auto-attach cached credentials to same-origin
@@ -120,7 +120,7 @@ def _verify_dashboard_origin(request: Request) -> None:
 
 @router.post("/api/ip/{ip}/ban")
 async def ban_ip(request: Request, ip: str):
-    _verify_dashboard_origin(request)
+    verify_dashboard_origin(request)
     if is_admin_ip(request.app, ip):
         # Banning the owner's own address from the real sshd would lock them out of the VPS.
         raise HTTPException(status_code=403, detail="protected admin IP")
@@ -136,7 +136,7 @@ async def ban_ip(request: Request, ip: str):
 
 @router.post("/api/ip/{ip}/unban")
 async def unban_ip(request: Request, ip: str):
-    _verify_dashboard_origin(request)
+    verify_dashboard_origin(request)
     fban_control = request.app.state.fban_control
     try:
         await asyncio.to_thread(fban_control.request_unban, ip)

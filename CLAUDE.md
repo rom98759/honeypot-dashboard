@@ -52,7 +52,8 @@ Backlog : `TODO.md`. Décisions de design : `docs/superpowers/specs/`.
 - Ban/unban : `fban_control.py` parle à un worker systemd hôte (`scripts/fban-queue-worker.sh`) via un
   répertoire de queue bind-mounté (`FBAN_QUEUE_PATH`) ; repli sur l'heuristique logs après
   `FBAN_TIMEOUT_SECONDS` (2.0). `/ban` et `/unban` rejettent les requêtes cross-origin (Origin/Referer).
-  `/ban` refuse les IP de `ADMIN_IPS` (403, `admin_ips.py`) et le worker hôte refuse aussi celles de
+  `/ban` refuse les IP protégées (403, `admin_ips.py` = `ADMIN_IPS` du `.env` + table `admin_networks`
+  éditée depuis la page Réglages `/settings`, plages pas plus larges que /16 ou /48) ; le worker hôte refuse aussi celles de
   `/etc/honeypot/never-ban` ; le bouton demande une confirmation. Toutes les réponses portent
   `X-Frame-Options: DENY` + `frame-ancestors 'none'` (middleware dans `create_app`).
 - Enrichissement IP (ASN, rDNS, AbuseIPDB) : table `ip_enrichment` = file d'attente + résultats, drainée par

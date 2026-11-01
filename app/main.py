@@ -16,7 +16,7 @@ from app.fban_control import FbanControl
 from app.geoip import GeoLookup
 from app.ingester import CowrieIngester
 from app.ip_enrichment import AbuseIpDbClient, AsnLookup, IpEnrichment
-from app.routers import campaigns, commands, correlation, health, ip, overview, sessions
+from app.routers import campaigns, commands, correlation, health, ip, overview, sessions, settings
 from app.ttl_cache import TtlCache
 
 POLL_INTERVAL_SECONDS = 5
@@ -256,6 +256,7 @@ def create_app(
     app.include_router(commands.router)
     app.include_router(health.router)
     app.include_router(campaigns.router)
+    app.include_router(settings.router)
     if STATIC_DIR.exists():
         app.mount("/", NoCacheStaticFiles(directory=STATIC_DIR, html=True), name="static")
     return app
