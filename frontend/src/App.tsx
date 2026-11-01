@@ -12,6 +12,9 @@ const SessionsPage = lazy(() =>
   import("./pages/SessionsPage/SessionsPage").then((m) => ({ default: m.SessionsPage }))
 );
 const CommandsPage = lazy(() => import("./pages/CommandsPage").then((m) => ({ default: m.CommandsPage })));
+const CampaignsPage = lazy(() =>
+  import("./pages/CampaignsPage/CampaignsPage").then((m) => ({ default: m.CampaignsPage }))
+);
 const CorrelationPage = lazy(() =>
   import("./pages/CorrelationPage").then((m) => ({ default: m.CorrelationPage }))
 );
@@ -32,6 +35,7 @@ export default function App() {
                 <Route path="/overview" element={<OverviewPage />} />
                 <Route path="/sessions" element={<SessionsPage />} />
                 <Route path="/commands" element={<CommandsPage />} />
+                <Route path="/campaigns" element={<CampaignsPage />} />
                 <Route path="/correlation" element={<CorrelationPage />} />
                 <Route path="/map" element={<MapPage />} />
                 <Route path="/ip/:ip" element={<IpDetailPage />} />

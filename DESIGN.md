@@ -22,8 +22,21 @@ demo `cloud.umami.is/share/...`). Validated on 2026-10-31.
   primary, lightness interpolated by share (`lighten(0.4 * (1 - pct))`), hover tooltip.
 - **Weekly traffic**: day x hour dot grid, dot size and opacity by volume.
 
+## Campaigns page (validated 2026-11-01): direction A "Panneau Umami"
+
+Same grammar as the rest of the app: four metric cards (campaigns, concentration of the top campaign,
+new in 7 days, login-only sessions), one panel with sort tabs (by sessions / by IPs / recent) and a
+"typical command | IPs | 30-day sparkline | sessions | %" table where a pale primary bar behind the
+command shows its share; "Login seul" is a muted last row. A row opens a side panel (same pattern as
+the session detail): sessions, IPs, dominant ASN and /24 with their share, first/last seen, sample
+session replay, its commands, top IPs linking to the IP page.
+
 ## Rejected
 - Direction "Umami pur" loose interpretation (top navbar, generic metric strip): not close enough.
 - "Rapport de garde" (editorial bulletin, sentence filters, huge printed numbers).
 - "Radar nuit" (full-screen dark map with animated arcs, glass HUD).
 - Heatmap/point overlays on the map (previous simpleheat map): replaced by the choropleth.
+- Campaigns "Chronologie" (shared timeline axis with lifespan bars, Pareto concentration strip, ochre /
+  burgundy palette, Plex Condensed): kept in reserve for the future "families" layer, not chosen.
+- Campaigns "Mur de terminaux" (dark phosphor treemap of terminal tiles sized by log(sessions), no
+  table): too far from the rest of the app.

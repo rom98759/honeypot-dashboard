@@ -174,3 +174,43 @@ export interface HealthSource {
 export interface HealthData {
   sources: HealthSource[];
 }
+
+export type CampaignSort = "sessions" | "ips" | "first_seen" | "last_seen";
+
+export interface Campaign {
+  id: string;
+  sessions: number;
+  ips: number;
+  share: number;
+  first_seen: string;
+  last_seen: string;
+  sample_session_id: string;
+  sample_command: string | null;
+  activity: number[];
+}
+
+export interface CampaignList {
+  items: Campaign[];
+  total: number;
+  totals: {
+    campaigns: number;
+    sessions: number;
+    new_7d: number;
+    unique_sessions: number;
+    top_share: number;
+    login_only: { sessions: number; ips: number };
+  };
+}
+
+export interface CampaignDetail {
+  id: string;
+  sessions: number;
+  ips: number;
+  first_seen: string;
+  last_seen: string;
+  sample_session_id: string;
+  top_asn: { asn: number; asn_org: string | null; share: number } | null;
+  top_prefix: { prefix: string; share: number } | null;
+  top_ips: { ip: string; sessions: number }[];
+  commands: { timestamp: string; input_text: string }[];
+}

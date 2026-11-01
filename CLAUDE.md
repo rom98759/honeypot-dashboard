@@ -20,6 +20,9 @@ Backlog : `TODO.md`. Décisions de design : `docs/superpowers/specs/`.
   comme fichier : le bind-mount fige l'inode et l'ingestion s'arrête en silence à la rotation suivante.
   `/api/health` expose par source le retard de lecture (`lag_bytes`), le dernier événement et `stalled`
   (données non lues depuis > 60 s ou fichier absent) ; `HealthBanner` (dans `App`) l'affiche sur toutes les pages.
+- Campagnes (`campaigns_stats.py`, `/api/campaigns`, page `CampaignsPage/`) : sessions groupées par nom de
+  ttylog (= SHA-256 du contenu Cowrie) ; campagne = ≥ 2 sessions, les empreintes à 1 session comptent comme
+  « Sessions uniques ». L'agrégat complet est en cache 5 min (`stats_cache`), tri/pagination en Python.
 - Réimport ponctuel des logs sshd avec le parseur courant : `python -m app.reimport_sshd_auth [--dry-run] FICHIERS`
   (remplace les lignes de la plage couverte par les fichiers).
 - Cowrie : `parse_event` (dataclasses typées) puis `apply_cowrie_record` (tables `sessions`, `commands`,

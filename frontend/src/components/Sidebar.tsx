@@ -1,6 +1,6 @@
 import { type FormEvent, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { Shield, LayoutDashboard, List, Terminal, Link2, Globe, Sun, Moon, Search } from "lucide-react";
+import { Shield, LayoutDashboard, List, Terminal, Fingerprint, Link2, Globe, Sun, Moon, Search } from "lucide-react";
 import { useTheme } from "../theme/ThemeContext";
 
 const NAV_SECTIONS = [
@@ -10,6 +10,7 @@ const NAV_SECTIONS = [
       { to: "/overview", label: "Vue d'ensemble", Icon: LayoutDashboard },
       { to: "/sessions", label: "Sessions", Icon: List },
       { to: "/commands", label: "Commandes", Icon: Terminal },
+      { to: "/campaigns", label: "Campagnes", Icon: Fingerprint },
     ],
   },
   {
