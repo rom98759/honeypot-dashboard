@@ -128,6 +128,7 @@ export function OverviewPage() {
                 <ListTable
                   title="Utilisateur / mot de passe"
                   metric="Tentatives"
+                  total={data.login_attempts}
                   rows={data.top_credentials.map((c) => ({
                     key: `${c.login_username}\u0000${c.login_password ?? ""}`,
                     label: (
@@ -148,6 +149,7 @@ export function OverviewPage() {
                 <ListTable
                   title="Utilisateur"
                   metric="Tentatives"
+                  total={data.login_attempts}
                   rows={data.top_usernames.map((u) => ({
                     key: u.value,
                     label: <span className="mono">{u.value}</span>,
@@ -164,6 +166,7 @@ export function OverviewPage() {
                 <ListTable
                   title="Mot de passe"
                   metric="Tentatives"
+                  total={data.login_attempts}
                   rows={data.top_passwords.map((p) => ({
                     key: p.value,
                     label: <span className="mono">{p.value || "(vide)"}</span>,
@@ -184,6 +187,7 @@ export function OverviewPage() {
                 <ListTable
                   title="IP"
                   metric="Sessions"
+                  total={data.total_connections}
                   rows={data.top_offenders.map((o) => ({
                     key: o.src_ip,
                     label: (
@@ -211,7 +215,12 @@ export function OverviewPage() {
               id: "country",
               label: "Pays",
               content: (
-                <ListTable title="Pays" metric="Sessions" rows={countryRows(data, setFilter)} />
+                <ListTable
+                  title="Pays"
+                  metric="Sessions"
+                  total={data.total_connections}
+                  rows={countryRows(data, setFilter)}
+                />
               ),
             },
             {
@@ -221,6 +230,7 @@ export function OverviewPage() {
                 <ListTable
                   title="Protocole"
                   metric="Sessions"
+                  total={data.total_connections}
                   rows={data.protocol_split.map((p) => ({
                     key: p.protocol,
                     label: <span>{p.protocol.toUpperCase()}</span>,
@@ -245,6 +255,7 @@ export function OverviewPage() {
                 <ListTable
                   title="Commande"
                   metric="Exécutions"
+                  total={data.total_commands}
                   rows={data.top_commands.map((c) => ({
                     key: c.input_text,
                     label: <span className="mono">{c.input_text}</span>,

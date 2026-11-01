@@ -59,6 +59,7 @@ export interface OverviewData extends OverviewTotals {
   top_usernames: { value: string; n: number }[];
   top_passwords: { value: string; n: number }[];
   top_commands: { input_text: string; n: number }[];
+  total_commands: number;
   bans_timeline: { bucket: string; n: number }[];
   duration_distribution: { bucket: string; n: number }[];
 }

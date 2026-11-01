@@ -30,6 +30,26 @@ def test_totals_are_scoped_to_period(tmp_path):
     assert stats_all["unique_ips"] == 2
 
 
+def test_total_commands_counts_every_command_of_the_period(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    now = datetime.now(timezone.utc)
+    db.execute(
+        "INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('recent', '1.2.3.4', ?)", (_iso(now),)
+    )
+    db.execute(
+        "INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('old', '9.9.9.9', ?)",
+        (_iso(now - timedelta(days=10)),),
+    )
+    db.executemany(
+        "INSERT INTO commands (session_id, timestamp, input_text) VALUES (?, 't', ?)",
+        [(f"recent", f"cmd{i}") for i in range(12)] + [("old", "uname")],
+    )
+    db.commit()
+
+    assert get_overview_stats(db, "24h")["total_commands"] == 12
+    assert get_overview_stats(db, "all")["total_commands"] == 13
+
+
 def test_currently_banned_ignores_period(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
     now = datetime.now(timezone.utc)

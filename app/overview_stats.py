@@ -151,6 +151,12 @@ def get_overview_stats(db: sqlite3.Connection, period: str, filters: dict | None
         params,
     ).fetchall()
 
+    # Denominator for the commands list: a share of the top 10 alone would overstate every row.
+    total_commands = db.execute(
+        f"SELECT COUNT(*) AS n FROM {commands_from(sessions_first=bool(where))} WHERE 1=1" + where,
+        params,
+    ).fetchone()["n"]
+
     duration_rows = db.execute(
         "SELECT "
         "  CASE "
@@ -195,6 +201,7 @@ def get_overview_stats(db: sqlite3.Connection, period: str, filters: dict | None
         "top_usernames": top_values("login_username"),
         "top_passwords": top_values("login_password"),
         "top_commands": [dict(r) for r in top_commands],
+        "total_commands": total_commands,
         "duration_distribution": duration_distribution,
         "bans_timeline": [{"bucket": r["bucket"], "n": r["n"]} for r in bans_timeline],
     }

@@ -20,6 +20,22 @@ describe("ListTable", () => {
     expect(screen.getByText("24%")).toBeInTheDocument();
   });
 
+  it("computes shares against the real total when one is given", () => {
+    render(
+      <ListTable
+        title="Identifiants"
+        metric="Tentatives"
+        total={140686}
+        rows={[
+          { key: "a", label: "A", value: 1638 },
+          { key: "b", label: "B", value: 400 },
+        ]}
+      />
+    );
+    expect(screen.getByText("1.2%")).toBeInTheDocument();
+    expect(screen.getByText("<1%")).toBeInTheDocument();
+  });
+
   it("makes rows with a handler keyboard-activable buttons", async () => {
     const onClick = vi.fn();
     render(<ListTable title="T" metric="M" rows={[{ key: "a", label: "A", value: 1, onClick }]} />);
