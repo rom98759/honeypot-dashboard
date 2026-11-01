@@ -3,6 +3,7 @@ from urllib.parse import urlparse
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
+from app.admin_ips import is_admin_ip
 from app.correlation import is_currently_banned
 from app.fban_control import FbanControlError
 
@@ -65,6 +66,7 @@ async def get_ip_summary(request: Request, ip: str):
         "total_sessions": session_stats["total"],
         "total_commands": total_commands,
         "currently_banned": currently_banned,
+        "protected": is_admin_ip(request.app, ip),
         "asn": enrichment["asn"] if enrichment else None,
         "asn_org": enrichment["asn_org"] if enrichment else None,
         "reverse_dns": enrichment["reverse_dns"] if enrichment else None,
@@ -119,6 +121,9 @@ def _verify_dashboard_origin(request: Request) -> None:
 @router.post("/api/ip/{ip}/ban")
 async def ban_ip(request: Request, ip: str):
     _verify_dashboard_origin(request)
+    if is_admin_ip(request.app, ip):
+        # Banning the owner's own address from the real sshd would lock them out of the VPS.
+        raise HTTPException(status_code=403, detail="protected admin IP")
     fban_control = request.app.state.fban_control
     try:
         await asyncio.to_thread(fban_control.request_ban, ip)

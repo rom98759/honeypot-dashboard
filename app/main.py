@@ -1,4 +1,5 @@
 import asyncio
+import ipaddress
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -158,6 +159,21 @@ async def _poll_loop(app: FastAPI) -> None:
         await asyncio.sleep(POLL_INTERVAL_SECONDS)
 
 
+def parse_ip_list(raw: str) -> list:
+    """`ADMIN_IPS`: comma-separated IPs or CIDR ranges; unparsable entries are skipped
+    rather than failing startup over a typo."""
+    networks = []
+    for item in raw.split(","):
+        item = item.strip()
+        if not item:
+            continue
+        try:
+            networks.append(ipaddress.ip_network(item, strict=False))
+        except ValueError:
+            continue
+    return networks
+
+
 def create_app(
     db=None, start_background_tasks: bool = True, fban_control: FbanControl | None = None
 ) -> FastAPI:
@@ -184,6 +200,7 @@ def create_app(
     geoip_db_path = os.environ.get("GEOIP_DB_PATH")
     geoip_asn_db_path = os.environ.get("GEOIP_ASN_DB_PATH")
     abuseipdb_api_key = os.environ.get("ABUSEIPDB_API_KEY", "").strip() or None
+    admin_networks = parse_ip_list(os.environ.get("ADMIN_IPS", ""))
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -198,6 +215,19 @@ def create_app(
             task.cancel()
 
     app = FastAPI(lifespan=lifespan)
+    app.state.admin_networks = admin_networks
+
+    @app.middleware("http")
+    async def security_headers(request, call_next):
+        # The IP page carries a Ban button: refusing to be framed closes the clickjacking path,
+        # which an Origin check alone does not (a framed click is same-origin).
+        response = await call_next(request)
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Content-Security-Policy"] = "frame-ancestors 'none'"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Referrer-Policy"] = "same-origin"
+        return response
+
     app.state.db = db if db is not None else connect(db_path)
     app.state.stats_cache = TtlCache()
     app.state.fban_control = (

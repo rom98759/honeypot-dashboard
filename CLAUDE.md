@@ -52,6 +52,9 @@ Backlog : `TODO.md`. Décisions de design : `docs/superpowers/specs/`.
 - Ban/unban : `fban_control.py` parle à un worker systemd hôte (`scripts/fban-queue-worker.sh`) via un
   répertoire de queue bind-mounté (`FBAN_QUEUE_PATH`) ; repli sur l'heuristique logs après
   `FBAN_TIMEOUT_SECONDS` (2.0). `/ban` et `/unban` rejettent les requêtes cross-origin (Origin/Referer).
+  `/ban` refuse les IP de `ADMIN_IPS` (403, `admin_ips.py`) et le worker hôte refuse aussi celles de
+  `/etc/honeypot/never-ban` ; le bouton demande une confirmation. Toutes les réponses portent
+  `X-Frame-Options: DENY` + `frame-ancestors 'none'` (middleware dans `create_app`).
 - Enrichissement IP (ASN, rDNS, AbuseIPDB) : table `ip_enrichment` = file d'attente + résultats, drainée par
   `EnrichmentWorker`. Sans config, tout dégrade en no-op.
 - Le dashboard est déployé en conteneur durci (`read_only`, `cap_drop: ALL`, `no-new-privileges`) sur le
@@ -79,7 +82,7 @@ Pas de lint/format configuré : imiter le style existant. Après déploiement : 
 ## Pièges connus
 - Env vars : `COWRIE_JSON_PATH`, `COWRIE_VAR_PATH`, `DASHBOARD_DB_PATH`, `FAIL2BAN_LOG_PATH`,
   `SSHD_AUTH_LOG_PATH`, `GEOIP_DB_PATH`, `GEOIP_ASN_DB_PATH`, `ABUSEIPDB_API_KEY` (vide = désactivé),
-  `FBAN_QUEUE_PATH`, `FBAN_TIMEOUT_SECONDS`.
+  `FBAN_QUEUE_PATH`, `FBAN_TIMEOUT_SECONDS`, `ADMIN_IPS` (IP/CIDR séparés par des virgules, dans `.env`).
 - Les défauts de chemins sont ceux du conteneur (`/data/...`) ; importer `app.main` crée l'app au niveau module.
 - Le libellé « port 50022 » de la page Corrélation est codé en dur (voir `TODO.md`).
 - `docs/superpowers/` est dans `.gitignore` mais 26 fichiers déjà suivis restent versionnés.

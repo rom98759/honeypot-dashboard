@@ -16,6 +16,27 @@ QUEUE_DIR="/opt/honeypot/fban-queue"
 DASHBOARD_UID=1000
 DASHBOARD_GID=1000
 LINE_RE='^(ban|unban|status) (sshd) (([0-9]{1,3}\.){3}[0-9]{1,3}|[0-9a-fA-F:]+)$'
+# One IP or CIDR per line (# comments allowed): addresses that must never be banned,
+# checked here as well as in the dashboard so a request that bypasses the app is refused too.
+NEVER_BAN_FILE="/etc/honeypot/never-ban"
+
+is_protected() {
+  [[ -f "$NEVER_BAN_FILE" ]] || return 1
+  python3 -I -c '
+import ipaddress, sys
+ip = ipaddress.ip_address(sys.argv[1])
+for line in open(sys.argv[2]):
+    entry = line.split("#", 1)[0].strip()
+    if not entry:
+        continue
+    try:
+        if ip in ipaddress.ip_network(entry, strict=False):
+            sys.exit(0)
+    except ValueError:
+        continue
+sys.exit(1)
+' "$1" "$NEVER_BAN_FILE"
+}
 
 # Self-provision the queue directory (mirrors sshd-auth-export.sh provisioning its own
 # output file) so deployment doesn't depend on a manual mkdir/chown step. Idempotent.
@@ -46,7 +67,10 @@ for req in "$QUEUE_DIR"/req-*; do
 
   case "$action" in
     ban)
-      if fail2ban-client set "$jail" banip "$ip" >/dev/null 2>&1; then
+      if is_protected "$ip"; then
+        logger -t fban-queue-worker "refused to ban protected IP $ip" || true
+        echo "error: $ip is listed in $NEVER_BAN_FILE" > "$res.tmp" && mv "$res.tmp" "$res"
+      elif fail2ban-client set "$jail" banip "$ip" >/dev/null 2>&1; then
         echo "ok" > "$res.tmp" && mv "$res.tmp" "$res"
       else
         echo "error: fail2ban-client set $jail banip $ip failed" > "$res.tmp" && mv "$res.tmp" "$res"

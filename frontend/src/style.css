@@ -181,6 +181,14 @@ main#content {
 .btn svg { width: 16px; height: 16px; }
 .btn-primary { background: var(--text-primary); border-color: var(--text-primary); color: var(--bg-surface); }
 .btn-primary:hover { background: var(--gray-700); }
+.btn-danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+.btn-danger:hover { filter: brightness(0.92); }
+.confirm-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) var(--space-4); border: 1px solid var(--danger);
+  background: var(--danger-subtle); border-radius: var(--radius);
+}
+.confirm-bar > span:first-child { flex: 1; min-width: 0; }
 .btn-quiet { border-color: transparent; background: none; }
 .btn-icon {
   display: inline-flex; align-items: center; justify-content: center;

@@ -119,6 +119,7 @@ export interface IpSummary {
   total_sessions: number;
   total_commands: number;
   currently_banned: boolean;
+  protected: boolean;
   asn: number | null;
   asn_org: string | null;
   reverse_dns: string | null;

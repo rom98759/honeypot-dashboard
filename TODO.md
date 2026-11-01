@@ -97,10 +97,11 @@
       propriétaire : Nginx Proxy Manager impose un username/password (Access
       List / basic auth) avant tout accès au site. L'app elle-même n'a aucune
       auth : NPM est la seule barrière.
-- [ ] Défense en profondeur restante (audit 2026-10-31) : `/ban` et `/unban`
-      restent joignables sans auth depuis les autres conteneurs du réseau
-      `nginx-proxy-network` (contourne NPM) ; pas de `X-Frame-Options` / CSP
-      `frame-ancestors` (clickjacking du bouton Ban) ; ban sans confirmation ni
-      liste blanche d'IP admin (risque d'auto-lockout SSH).
+- [x] Verrou du bouton Ban : confirmation, `ADMIN_IPS` refusées par l'API et
+      `/etc/honeypot/never-ban` par le worker hôte (pas d'auto-lockout SSH),
+      `X-Frame-Options: DENY` + `frame-ancestors 'none'` (plus de clickjacking).
+- [ ] Reste : `/ban` et `/unban` joignables sans auth depuis les autres
+      conteneurs du réseau `nginx-proxy-network` (contourne NPM). Piste : réseau
+      Docker dédié dashboard ↔ NPM, ou secret partagé sur les routes d'écriture.
 - [ ] Fail2Ban peut deban des ip donc affiche toujours ban mais peut etre pas. Afficher reelement les informations en cours et historique des ip ban/unban
 - [ ] Ajouter un mecanisme de ban en cliqaint sur un bouton dans le dashboard pour bannir une ip directement depuis l'interface.

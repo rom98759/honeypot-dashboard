@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useIpSummary, useIpFail2ban, useIpSshdAuth, useBanIp, useUnbanIp, IP_PAGE_SIZE } from "../api/ip";
 import { useSessions, PAGE_SIZE } from "../api/sessions";
@@ -58,6 +59,8 @@ export function IpDetailPage() {
   const banMutation = useBanIp(ip);
   const unbanMutation = useUnbanIp(ip);
   const banActionError = banMutation.isError || unbanMutation.isError;
+  // A ban acts on the real server's firewall: never on a single stray click.
+  const [confirmingBan, setConfirmingBan] = useState(false);
 
   function updateParams(next: Record<string, string>) {
     const params = new URLSearchParams(searchParams);
@@ -107,21 +110,36 @@ export function IpDetailPage() {
           ) : (
             <Badge label="Non banni" tone="neutral" />
           )}
-          {data.currently_banned ? (
+          {data.protected ? (
+            <Badge label="Protégée" tone="neutral" title="IP d'administration (ADMIN_IPS) : jamais bannie." />
+          ) : data.currently_banned ? (
             <button className="btn" disabled={unbanMutation.isPending} onClick={() => unbanMutation.mutate()}>
               Débannir
             </button>
           ) : (
-            <button
-              className="btn btn-primary"
-              disabled={banMutation.isPending}
-              onClick={() => banMutation.mutate()}
-            >
+            <button className="btn" disabled={banMutation.isPending} onClick={() => setConfirmingBan(true)}>
               Bannir
             </button>
           )}
         </div>
       </PageHeader>
+      {confirmingBan && !data.protected && !data.currently_banned ? (
+        <div className="confirm-bar" role="alertdialog" aria-label="Confirmer le ban">
+          <span>
+            Bannir <span className="mono">{ip}</span> du vrai sshd (jail <span className="mono">sshd</span>) ?
+          </span>
+          <button
+            className="btn btn-danger"
+            disabled={banMutation.isPending}
+            onClick={() => banMutation.mutate(undefined, { onSettled: () => setConfirmingBan(false) })}
+          >
+            Confirmer le ban
+          </button>
+          <button className="btn" onClick={() => setConfirmingBan(false)}>
+            Annuler
+          </button>
+        </div>
+      ) : null}
       {banActionError ? (
         <ErrorState
           message="Échec de l'action, réessaie."

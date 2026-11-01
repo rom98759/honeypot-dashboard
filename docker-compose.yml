@@ -32,6 +32,8 @@ services:
       - GEOIP_DB_PATH=/geoip/GeoLite2-City.mmdb
       - GEOIP_ASN_DB_PATH=/geoip/GeoLite2-ASN.mmdb
       - ABUSEIPDB_API_KEY=${ABUSEIPDB_API_KEY:-}
+      # Owner's own IPs/CIDRs, comma-separated, set in .env (never committed): never banned.
+      - ADMIN_IPS=${ADMIN_IPS:-}
       - FBAN_QUEUE_PATH=/queue
 
 networks:
