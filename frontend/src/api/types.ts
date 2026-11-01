@@ -214,3 +214,17 @@ export interface CampaignDetail {
   top_ips: { ip: string; sessions: number }[];
   commands: { timestamp: string; input_text: string }[];
 }
+
+export interface UniqueSession {
+  session_id: string;
+  src_ip: string;
+  connect_time: string;
+  duration_ms: number | null;
+  commands: number;
+  first_command: string | null;
+}
+
+export interface UniqueSessionList {
+  items: UniqueSession[];
+  total: number;
+}

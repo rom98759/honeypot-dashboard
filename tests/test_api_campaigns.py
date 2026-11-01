@@ -36,7 +36,7 @@ def _client(tmp_path):
     db.executemany(
         "INSERT INTO commands (session_id, timestamp, input_text) VALUES (?, ?, ?)",
         [("s1", "t1", "uname -a"), ("s2", "t1", "uname -a"), ("s2", "t2", "id"),
-         ("s3", "t1", "echo OK")],
+         ("s3", "t1", "echo OK"), ("s6", "t1", "cat /etc/passwd"), ("s6", "t2", "w")],
     )
     db.executemany(
         "INSERT INTO ip_enrichment (ip, asn, asn_org, status) VALUES (?, ?, ?, 'done')",
@@ -97,6 +97,21 @@ def test_campaign_detail_unknown_or_malformed_id(tmp_path):
     client = _client(tmp_path)
     assert client.get(f"/api/campaigns/{'d' * 64}").status_code == 404
     assert client.get("/api/campaigns/not-a-hash").status_code == 404
+
+
+def test_unique_sessions_lists_one_off_fingerprints_by_command_count(tmp_path):
+    body = _client(tmp_path).get("/api/campaigns/unique").json()
+
+    assert body["total"] == 1
+    (item,) = body["items"]
+    assert item["session_id"] == "s6"
+    assert item["src_ip"] == "192.0.2.9"
+    assert item["commands"] == 2
+    assert item["first_command"] == "cat /etc/passwd"
+
+
+def test_unique_sessions_rejects_unknown_sort(tmp_path):
+    assert _client(tmp_path).get("/api/campaigns/unique?sort=nope").status_code == 400
 
 
 def test_campaign_page_and_detail_are_cached(tmp_path, monkeypatch):

@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../../test-utils";
 import { CampaignsPage } from "./CampaignsPage";
-import type { CampaignDetail, CampaignList } from "../../api/types";
+import type { CampaignDetail, CampaignList, UniqueSessionList } from "../../api/types";
 
 vi.mock("../../components/ReplayPlayer", () => ({
   ReplayPlayer: ({ sessionId }: { sessionId: string }) => <div>replay {sessionId}</div>,
@@ -49,11 +49,33 @@ const DETAIL: CampaignDetail = {
   commands: [{ timestamp: "2026-10-31T17:00:01Z", input_text: "uname -s -v -n -r -m" }],
 };
 
+vi.mock("../SessionsPage/SessionDetailPanel", () => ({
+  SessionDetailPanel: ({ sessionId }: { sessionId: string }) => <div role="dialog">session {sessionId}</div>,
+}));
+
+const UNIQUE: UniqueSessionList = {
+  items: [
+    {
+      session_id: "u1",
+      src_ip: "193.149.129.75",
+      connect_time: "2026-08-24T17:05:00Z",
+      duration_ms: 34000,
+      commands: 46,
+      first_command: "perl",
+    },
+  ],
+  total: 884,
+};
+
 beforeEach(() => {
   vi.stubGlobal(
     "fetch",
     vi.fn((url: string) => {
-      const body = url.startsWith(`/api/campaigns/${ID}`) ? DETAIL : LIST;
+      const body = url.startsWith("/api/campaigns/unique")
+        ? UNIQUE
+        : url.startsWith(`/api/campaigns/${ID}`)
+          ? DETAIL
+          : LIST;
       return Promise.resolve({ ok: true, json: () => Promise.resolve(body) } as Response);
     })
   );
@@ -68,7 +90,7 @@ describe("CampaignsPage", () => {
     expect(await screen.findByText("uname -s -v -n -r -m")).toBeInTheDocument();
     expect(screen.getByText("215")).toBeInTheDocument();
     expect(screen.getByText("75%")).toBeInTheDocument();
-    expect(screen.getByText("Sessions uniques")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Sessions uniques" })).toBeInTheDocument();
     expect(screen.getByText("Login seul (pas de shell)")).toBeInTheDocument();
   });
 
@@ -90,5 +112,18 @@ describe("CampaignsPage", () => {
     expect(within(panel).getByText(/109\.160\.32\.0\/24/)).toBeInTheDocument();
     expect(within(panel).getByText("replay s2")).toBeInTheDocument();
     expect(within(panel).getByRole("link", { name: "109.160.32.14" })).toHaveAttribute("href", "/ip/109.160.32.14");
+  });
+
+  it("lists one-off sessions from the pseudo row and opens the session panel", async () => {
+    renderWithProviders(<CampaignsPage />, { route: "/campaigns" });
+    await userEvent.click(await screen.findByRole("link", { name: "Sessions uniques" }));
+
+    expect(await screen.findByText("perl")).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledWith(expect.stringContaining("/api/campaigns/unique"));
+    expect(screen.getByText("46")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Sessions uniques" })).toHaveAttribute("aria-selected", "true");
+
+    await userEvent.click(screen.getByRole("link", { name: "perl" }));
+    expect(await screen.findByRole("dialog")).toHaveTextContent("session u1");
   });
 });

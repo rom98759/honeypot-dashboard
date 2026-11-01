@@ -1,6 +1,6 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { fetchJSON } from "./client";
-import type { CampaignDetail, CampaignList, CampaignSort } from "./types";
+import type { CampaignDetail, CampaignList, CampaignSort, UniqueSessionList } from "./types";
 
 export const CAMPAIGNS_PAGE_SIZE = 25;
 
@@ -16,6 +16,22 @@ export function useCampaigns({ sort, page }: { sort: CampaignSort; page: number 
       return fetchJSON<CampaignList>(`/api/campaigns?${query.toString()}`);
     },
     // The server caches the aggregate for 5 min; refetching sooner returns the same body.
+    staleTime: 5 * 60_000,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useUniqueSessions({ page, enabled }: { page: number; enabled: boolean }) {
+  return useQuery({
+    queryKey: ["campaigns", "unique", { page }],
+    queryFn: () => {
+      const query = new URLSearchParams({
+        limit: String(CAMPAIGNS_PAGE_SIZE),
+        offset: String((page - 1) * CAMPAIGNS_PAGE_SIZE),
+      });
+      return fetchJSON<UniqueSessionList>(`/api/campaigns/unique?${query.toString()}`);
+    },
+    enabled,
     staleTime: 5 * 60_000,
     placeholderData: keepPreviousData,
   });

@@ -69,6 +69,9 @@ def compute_campaigns(db: sqlite3.Connection) -> dict:
     ]
     return {
         "campaigns": campaigns,
+        "unique_session_ids": sorted(
+            {r["sample_session_id"] for r in rows if r["sessions"] < MIN_CAMPAIGN_SESSIONS}
+        ),
         "totals": {
             "campaigns": len(campaigns),
             "sessions": total_sessions,
@@ -118,6 +121,39 @@ def campaign_page(db: sqlite3.Connection, aggregate: dict, sort: str, limit: int
         for c in page
     ]
     return {"items": items, "total": len(ordered), "totals": aggregate["totals"]}
+
+
+UNIQUE_SORT_KEYS = {
+    # Most commands first: a long one-off exchange is the likeliest human at the keyboard.
+    "commands": lambda s: (s["commands"], s["connect_time"]),
+    "connect_time": lambda s: s["connect_time"],
+    "duration": lambda s: s["duration_ms"] or 0,
+}
+_SQL_VARS_PER_QUERY = 900
+
+
+def unique_sessions(db: sqlite3.Connection, session_ids: list[str]) -> list[dict]:
+    sessions = []
+    for start in range(0, len(session_ids), _SQL_VARS_PER_QUERY):
+        chunk = session_ids[start : start + _SQL_VARS_PER_QUERY]
+        placeholders = ",".join("?" * len(chunk))
+        sessions += [
+            dict(r)
+            for r in db.execute(
+                "SELECT s.session_id, s.src_ip, s.connect_time, s.duration_ms, "
+                "(SELECT COUNT(*) FROM commands c WHERE c.session_id = s.session_id) AS commands, "
+                "(SELECT input_text FROM commands c WHERE c.session_id = s.session_id "
+                " ORDER BY c.id LIMIT 1) AS first_command "
+                f"FROM sessions s WHERE s.session_id IN ({placeholders})",
+                chunk,
+            )
+        ]
+    return sessions
+
+
+def unique_sessions_page(sessions: list[dict], sort: str, limit: int, offset: int) -> dict:
+    ordered = sorted(sessions, key=UNIQUE_SORT_KEYS[sort], reverse=True)
+    return {"items": ordered[offset : offset + limit], "total": len(ordered)}
 
 
 def _prefix24(ip: str) -> str | None:
