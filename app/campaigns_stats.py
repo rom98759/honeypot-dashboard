@@ -139,6 +139,7 @@ def compute_campaigns(db: sqlite3.Connection) -> dict:
         "families": families,
         "campaigns": campaigns,
         "unique_session_ids": sorted({f["sample_session_id"] for f in unique}),
+        "campaign_by_path": {path: c["id"] for c in campaigns for path in c["paths"]},
         "totals": {
             "campaigns": len(campaigns),
             "sessions": total_sessions,
@@ -148,6 +149,16 @@ def compute_campaigns(db: sqlite3.Connection) -> dict:
             "login_only": {"sessions": login_only["sessions"], "ips": login_only["ips"]},
         },
     }
+
+
+def campaign_of_paths(aggregate: dict, ttylog_paths: list[str]) -> dict | None:
+    """The campaign a session belongs to, from its ttylogs; None for unique or login-only."""
+    for path in ttylog_paths:
+        fid = aggregate["campaign_by_path"].get(path)
+        if fid:
+            family = aggregate["families"][fid]
+            return {"id": fid, "sessions": family["sessions"], "sample_command": family["sample_command"]}
+    return None
 
 
 def _daily_activity(db: sqlite3.Connection, families: list[dict]) -> dict[str, list[int]]:

@@ -39,7 +39,10 @@ Backlog : `TODO.md`. Décisions de design : `docs/superpowers/specs/`.
   de handler `def` qui touche la base (threadpool → accès concurrent → 500) ; seul un appel bloquant sans
   base (ex. `fban_control`) passe par `asyncio.to_thread`.
 - Replay : `/api/sessions/{id}/replay` lit les ttylogs Cowrie (mount RO), `ttyplayer.py` les convertit en
-  asciinema v2 ; le routeur retire le préfixe `var/` des chemins Cowrie.
+  asciinema v2 ; le routeur retire le préfixe `var/` des chemins Cowrie. `?download=1` le sert en `.cast`.
+- Fiche session (`SessionDetailPanel`, mise en page validée dans `DESIGN.md`) : `/api/sessions/{id}` renvoie
+  aussi `ttylogs`, `ip` (pays, ASN, nb de sessions, banni d'après les logs, protégée) et `campaign` (via
+  l'agrégat campagnes en cache) ; `/api/sessions/{id}/export` = la même chose en pièce jointe JSON.
 - Design : clone fidèle d'Umami v3 (voir `DESIGN.md`) ; tokens dans `style.css`, couleurs Chart.js/carte dans
   `theme/chartTheme.ts`. La carte est une choroplèthe (`public/world.json` + `utils/isoCountries.ts`, repris
   d'Umami, MIT) alimentée par `countries` de `/api/overview` ; elle a besoin de `geo_cache.country_code`

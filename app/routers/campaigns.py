@@ -16,6 +16,13 @@ router = APIRouter()
 CAMPAIGNS_TTL_SECONDS = 300
 
 
+def cached_aggregate(app) -> dict:
+    db = app.state.db
+    return app.state.stats_cache.get_or_compute(
+        ("campaigns",), CAMPAIGNS_TTL_SECONDS, lambda: compute_campaigns(db)
+    )
+
+
 @router.get("/api/campaigns")
 async def list_campaigns(
     request: Request,
@@ -27,7 +34,7 @@ async def list_campaigns(
         raise HTTPException(status_code=400, detail=f"invalid sort: {sort}")
     db = request.app.state.db
     cache = request.app.state.stats_cache
-    aggregate = cache.get_or_compute(("campaigns",), CAMPAIGNS_TTL_SECONDS, lambda: compute_campaigns(db))
+    aggregate = cached_aggregate(request.app)
     # The page itself is costly too: the 30-day activity of the biggest campaign alone
     # scans ~100k sessions.
     return cache.get_or_compute(
@@ -49,7 +56,7 @@ async def list_unique_sessions(
         raise HTTPException(status_code=400, detail=f"invalid sort: {sort}")
     db = request.app.state.db
     cache = request.app.state.stats_cache
-    aggregate = cache.get_or_compute(("campaigns",), CAMPAIGNS_TTL_SECONDS, lambda: compute_campaigns(db))
+    aggregate = cached_aggregate(request.app)
     sessions = cache.get_or_compute(
         ("unique-sessions",),
         CAMPAIGNS_TTL_SECONDS,
@@ -62,7 +69,7 @@ async def list_unique_sessions(
 async def get_campaign(request: Request, campaign_id: str):
     db = request.app.state.db
     cache = request.app.state.stats_cache
-    aggregate = cache.get_or_compute(("campaigns",), CAMPAIGNS_TTL_SECONDS, lambda: compute_campaigns(db))
+    aggregate = cached_aggregate(request.app)
     detail = cache.get_or_compute(
         ("campaign", campaign_id), CAMPAIGNS_TTL_SECONDS, lambda: campaign_detail(db, aggregate, campaign_id)
     )

@@ -16,9 +16,29 @@ export interface Command {
   input_text: string;
 }
 
+export interface SessionIpContext {
+  ip: string;
+  country: string | null;
+  country_code: string | null;
+  asn: number | null;
+  asn_org: string | null;
+  sessions: number;
+  banned: boolean;
+  protected: boolean;
+}
+
+export interface SessionCampaign {
+  id: string;
+  sessions: number;
+  sample_command: string | null;
+}
+
 export interface SessionDetail {
   session: Session;
   commands: Command[];
+  ttylogs: string[];
+  ip: SessionIpContext;
+  campaign: SessionCampaign | null;
 }
 
 export interface PaginatedSessions {

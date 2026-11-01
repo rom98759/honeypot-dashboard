@@ -181,6 +181,9 @@ describe("SessionsPage", () => {
             login_success: 0,
           },
           commands: [],
+          ttylogs: ["var/lib/cowrie/tty/abc"],
+          ip: { ip: "1.2.3.4", country: null, country_code: null, asn: null, asn_org: null, sessions: 1, banned: false, protected: false },
+          campaign: null,
         });
       }
       return jsonResponse(SESSIONS_PAGE_1);
@@ -206,6 +209,9 @@ describe("SessionsPage", () => {
         return jsonResponse({
           session: { session_id: "s1", src_ip: "1.2.3.4", connect_time: "t", login_username: null },
           commands: [],
+          ttylogs: ["var/lib/cowrie/tty/abc"],
+          ip: { ip: "1.2.3.4", country: null, country_code: null, asn: null, asn_org: null, sessions: 1, banned: false, protected: false },
+          campaign: null,
         });
       }
       return jsonResponse(SESSIONS_PAGE_1);
@@ -230,6 +236,9 @@ describe("SessionsPage", () => {
         return jsonResponse({
           session: { session_id: "s1", src_ip: "1.2.3.4", connect_time: "t", login_username: null },
           commands: [],
+          ttylogs: ["var/lib/cowrie/tty/abc"],
+          ip: { ip: "1.2.3.4", country: null, country_code: null, asn: null, asn_org: null, sessions: 1, banned: false, protected: false },
+          campaign: null,
         });
       }
       return jsonResponse(SESSIONS_PAGE_1);

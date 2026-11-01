@@ -82,6 +82,9 @@ function stubFetch(
             login_success: null,
           },
           commands: [],
+          ttylogs: ["var/lib/cowrie/tty/abc"],
+          ip: { ip: "1.2.3.4", country: null, country_code: null, asn: null, asn_org: null, sessions: 1, banned: false, protected: false },
+          campaign: null,
         });
       }
       if (url.startsWith("/api/sessions")) return jsonResponse(overrides.sessions ?? SESSIONS);

@@ -1,8 +1,15 @@
+import json
+import re
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 
+from app.admin_ips import is_admin_ip
+from app.campaigns_stats import campaign_of_paths
+from app.correlation import is_currently_banned
 from app.periods import VALID_PERIODS, period_cutoff
+from app.routers.campaigns import cached_aggregate
 from app.ttyplayer import TTYLogError, ttylogs_to_asciicast
 
 router = APIRouter()
@@ -72,8 +79,12 @@ async def list_sessions(
     return {"items": [dict(r) for r in rows], "total": total}
 
 
-@router.get("/api/sessions/{session_id}")
-async def get_session(request: Request, session_id: str):
+def _attachment(session_id: str, extension: str) -> dict:
+    safe_id = re.sub(r"[^A-Za-z0-9_-]", "_", session_id)
+    return {"Content-Disposition": f'attachment; filename="session-{safe_id}.{extension}"'}
+
+
+def _session_detail(request: Request, session_id: str) -> dict:
     db = request.app.state.db
     session = db.execute(
         "SELECT * FROM sessions WHERE session_id = ?", (session_id,)
@@ -84,11 +95,56 @@ async def get_session(request: Request, session_id: str):
         "SELECT timestamp, input_text FROM commands WHERE session_id = ? ORDER BY timestamp",
         (session_id,),
     ).fetchall()
-    return {"session": dict(session), "commands": [dict(c) for c in commands]}
+    ttylog_paths = [
+        r["ttylog_path"]
+        for r in db.execute(
+            "SELECT ttylog_path FROM ttylogs WHERE session_id = ? ORDER BY close_time", (session_id,)
+        )
+    ]
+    ip = session["src_ip"]
+    geo = db.execute("SELECT country, country_code FROM geo_cache WHERE ip = ?", (ip,)).fetchone()
+    enrichment = db.execute("SELECT asn, asn_org FROM ip_enrichment WHERE ip = ?", (ip,)).fetchone()
+    ip_sessions = db.execute(
+        "SELECT COUNT(*) AS n FROM sessions WHERE src_ip = ?", (ip,)
+    ).fetchone()["n"]
+    return {
+        "session": dict(session),
+        "commands": [dict(c) for c in commands],
+        "ttylogs": ttylog_paths,
+        "ip": {
+            "ip": ip,
+            "country": geo["country"] if geo else None,
+            "country_code": geo["country_code"] if geo else None,
+            "asn": enrichment["asn"] if enrichment else None,
+            "asn_org": enrichment["asn_org"] if enrichment else None,
+            "sessions": ip_sessions,
+            # Log-derived only: asking the host worker would add up to FBAN_TIMEOUT_SECONDS
+            # to every panel opening; the IP page shows the live state.
+            "banned": is_currently_banned(db, ip),
+            "protected": is_admin_ip(request.app, ip),
+        },
+        "campaign": campaign_of_paths(cached_aggregate(request.app), ttylog_paths) if ttylog_paths else None,
+    }
+
+
+@router.get("/api/sessions/{session_id}")
+async def get_session(request: Request, session_id: str):
+    return _session_detail(request, session_id)
+
+
+@router.get("/api/sessions/{session_id}/export")
+async def export_session(request: Request, session_id: str):
+    detail = _session_detail(request, session_id)
+    detail["exported_at"] = datetime.now(timezone.utc).isoformat()
+    return Response(
+        content=json.dumps(detail, indent=2, ensure_ascii=False),
+        media_type="application/json",
+        headers=_attachment(session_id, "json"),
+    )
 
 
 @router.get("/api/sessions/{session_id}/replay")
-async def replay_session(request: Request, session_id: str):
+async def replay_session(request: Request, session_id: str, download: bool = False):
     db = request.app.state.db
     ttylog_rows = db.execute(
         "SELECT ttylog_path FROM ttylogs WHERE session_id = ? ORDER BY close_time",
@@ -115,4 +171,5 @@ async def replay_session(request: Request, session_id: str):
     except TTYLogError:
         raise HTTPException(status_code=404, detail="replay unavailable for this session")
 
-    return Response(content=cast, media_type="application/x-asciicast+json")
+    headers = _attachment(session_id, "cast") if download else None
+    return Response(content=cast, media_type="application/x-asciicast+json", headers=headers)

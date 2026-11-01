@@ -447,3 +447,62 @@ def test_list_sessions_combines_protocol_and_country_filters(tmp_path):
     body = response.json()
     assert body["total"] == 1
     assert body["items"][0]["session_id"] == "s1"
+
+
+def test_session_detail_includes_ip_context_and_campaign(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    _seed(db, tmp_path)
+    db.executescript(
+        """
+        INSERT INTO geo_cache (ip, country, country_code, looked_up_at) VALUES ('1.2.3.4', 'China', 'CN', 't');
+        INSERT INTO ip_enrichment (ip, asn, asn_org, status) VALUES ('1.2.3.4', 137718, 'Volcano', 'done');
+        INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('s9', '1.2.3.4', '2026-08-13T10:00:00Z');
+        INSERT INTO commands (session_id, timestamp, input_text) VALUES ('s9', '2026-08-13T10:00:01Z', 'whoami');
+        INSERT INTO ttylogs (session_id, ttylog_path, close_time, size, duration_ms)
+        VALUES ('s9', 'var/lib/cowrie/tty/abc123', '2026-08-13T10:00:02Z', 343, 100);
+        """
+    )
+    db.commit()
+    app = create_app(db=db, start_background_tasks=False)
+    client = TestClient(app)
+
+    body = client.get("/api/sessions/s1").json()
+    assert body["ip"] == {
+        "ip": "1.2.3.4", "country": "China", "country_code": "CN", "asn": 137718,
+        "asn_org": "Volcano", "sessions": 2, "banned": False, "protected": False,
+    }
+    assert body["ttylogs"] == ["var/lib/cowrie/tty/abc123"]
+    assert body["campaign"]["sessions"] == 2
+    assert body["campaign"]["sample_command"] == "whoami"
+
+
+def test_session_without_ttylog_has_no_campaign(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    _seed(db, tmp_path)
+    app = create_app(db=db, start_background_tasks=False)
+    body = TestClient(app).get("/api/sessions/s2").json()
+    assert body["campaign"] is None
+    assert body["ip"]["country"] is None
+
+
+def test_export_session_is_a_json_attachment(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    _seed(db, tmp_path)
+    app = create_app(db=db, start_background_tasks=False)
+    response = TestClient(app).get("/api/sessions/s1/export")
+    assert response.status_code == 200
+    assert response.headers["content-disposition"] == 'attachment; filename="session-s1.json"'
+    body = response.json()
+    assert body["commands"][0]["input_text"] == "whoami"
+    assert "exported_at" in body
+
+
+def test_replay_download_sets_attachment(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    _seed(db, tmp_path)
+    app = create_app(db=db, start_background_tasks=False)
+    app.state.cowrie_var_path = tmp_path
+    client = TestClient(app)
+    assert "content-disposition" not in client.get("/api/sessions/s1/replay").headers
+    response = client.get("/api/sessions/s1/replay", params={"download": 1})
+    assert response.headers["content-disposition"] == 'attachment; filename="session-s1.cast"'
