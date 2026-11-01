@@ -71,6 +71,30 @@ CREATE TABLE IF NOT EXISTS ingest_offsets (
     offset INTEGER NOT NULL
 );
 
+-- Per-ttylog counters kept up to date at ingestion (app/fingerprint_stats.py) so the
+-- campaigns page never re-aggregates the full ttylogs x sessions join.
+CREATE TABLE IF NOT EXISTS fingerprint_stats (
+    ttylog_path TEXT PRIMARY KEY,
+    sessions INTEGER NOT NULL,
+    first_seen TEXT NOT NULL,
+    last_seen TEXT NOT NULL,
+    sample_session_id TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS fingerprint_ips (
+    ttylog_path TEXT NOT NULL,
+    ip TEXT NOT NULL,
+    sessions INTEGER NOT NULL,
+    PRIMARY KEY (ttylog_path, ip)
+);
+
+CREATE TABLE IF NOT EXISTS fingerprint_days (
+    ttylog_path TEXT NOT NULL,
+    day TEXT NOT NULL,
+    sessions INTEGER NOT NULL,
+    PRIMARY KEY (ttylog_path, day)
+);
+
 CREATE INDEX IF NOT EXISTS idx_sessions_src_ip ON sessions(src_ip);
 CREATE INDEX IF NOT EXISTS idx_sessions_connect_time ON sessions(connect_time);
 CREATE INDEX IF NOT EXISTS idx_fail2ban_events_ip_timestamp ON fail2ban_events(ip, timestamp);

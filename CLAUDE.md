@@ -25,6 +25,8 @@ Backlog : `TODO.md`. Décisions de design : `docs/superpowers/specs/`.
   (`command_normalize.py` : jetons hex, IP, /tmp, calculs `$((…))`, mot de passe rejoué dans
   `echo '…' | sudo -S`) ; une séquence d'au moins 3 commandes qui commence une séquence plus longue (run
   tronqué) rejoint cette famille. Campagne = famille de ≥ 2 sessions, les autres = « Sessions uniques ».
+  Compteurs par empreinte tenus à l'ingestion (`fingerprint_stats.py` : tables `fingerprint_stats/_ips/_days`,
+  rattrapage au démarrage si vides) ; les familles restent calculées à la lecture depuis ces compteurs.
   Agrégat, pages et fiches en cache 5 min (`stats_cache`), tri/pagination en Python.
 - Réimport ponctuel des logs sshd avec le parseur courant : `python -m app.reimport_sshd_auth [--dry-run] FICHIERS`
   (remplace les lignes de la plage couverte par les fichiers).

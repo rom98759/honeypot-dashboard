@@ -10,6 +10,7 @@ from app.cowrie_parser import (
     TTYLogClosed,
     parse_event,
 )
+from app.fingerprint_stats import record_ttylog
 from app.tailer import LogTailer
 
 
@@ -38,6 +39,7 @@ def apply_cowrie_record(db: sqlite3.Connection, record, geo_lookup=None) -> None
             (record.session_id, record.timestamp, record.input_text),
         )
     elif isinstance(record, TTYLogClosed):
+        record_ttylog(db, record.session_id, record.ttylog_path)
         db.execute(
             "INSERT INTO ttylogs (session_id, ttylog_path, close_time, size, duration_ms) "
             "VALUES (?, ?, ?, ?, ?)",

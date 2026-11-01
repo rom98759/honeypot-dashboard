@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from app.correlation import FailbanIngester, SshdAuthIngester
 from app.db import connect
 from app.enrichment_worker import EnrichmentWorker
+from app.fingerprint_stats import ensure_fingerprint_stats
 from app.fban_control import FbanControl
 from app.geoip import GeoLookup
 from app.ingester import CowrieIngester
@@ -212,6 +213,7 @@ def create_app(
         AbuseIpDbClient(abuseipdb_api_key),
     )
     _backfill_missing_asn(app.state.db, app.state.ip_enrichment.asn_lookup)
+    ensure_fingerprint_stats(app.state.db)
     app.state.enrichment_worker = EnrichmentWorker(app.state.db, app.state.ip_enrichment)
     app.state.cowrie_ingester = CowrieIngester(app.state.db, cowrie_json_path, app.state.geo_lookup)
     app.state.fail2ban_ingester = FailbanIngester(app.state.db, fail2ban_log_path)

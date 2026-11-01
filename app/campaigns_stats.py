@@ -15,7 +15,7 @@ import sqlite3
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 
-from app.command_normalize import family_key, normalize_sequence
+from app.command_normalize import normalize_sequence, sequence_key
 
 CAMPAIGN_ID_RE = re.compile(r"^[0-9a-f]{64}$")
 # Most families hold a single session: a one-off exchange (often a human),
@@ -90,32 +90,24 @@ def _merge_truncated_runs(families: dict[str, dict]) -> None:
 
 
 def compute_campaigns(db: sqlite3.Connection) -> dict:
-    """The full aggregate, meant to be cached: grouping every ttylog is the expensive part,
-    sorting and paging the resulting families is not."""
-    # SQLite returns bare columns (session_id) from the row holding MAX(), so this
-    # picks each fingerprint's most recent session as its sample.
+    """Families from the per-fingerprint counters kept at ingestion; cached by the router."""
     rows = db.execute(
-        "SELECT t.ttylog_path, COUNT(DISTINCT t.session_id) AS sessions, "
-        "MIN(s.connect_time) AS first_seen, MAX(s.connect_time) AS last_seen, "
-        "t.session_id AS sample_session_id "
-        "FROM ttylogs t JOIN sessions s ON s.session_id = t.session_id "
-        "GROUP BY t.ttylog_path"
+        "SELECT ttylog_path, sessions, first_seen, last_seen, sample_session_id FROM fingerprint_stats"
     ).fetchall()
     ips_by_path: dict[str, set] = defaultdict(set)
-    for r in db.execute(
-        "SELECT DISTINCT t.ttylog_path, s.src_ip FROM ttylogs t JOIN sessions s ON s.session_id = t.session_id"
-    ):
-        ips_by_path[r["ttylog_path"]].add(r["src_ip"])
+    for r in db.execute("SELECT ttylog_path, ip FROM fingerprint_ips"):
+        ips_by_path[r["ttylog_path"]].add(r["ip"])
     commands = _commands_by_session(db, [r["sample_session_id"] for r in rows])
 
     families: dict[str, dict] = {}
     for r in rows:
         path = r["ttylog_path"]
         sample_commands = commands.get(r["sample_session_id"], [])
-        fid = family_key(sample_commands) or _fingerprint(path)
+        seq = normalize_sequence(sample_commands)
+        fid = sequence_key(seq) or _fingerprint(path)
         family = families.setdefault(
             fid,
-            {"id": fid, "seq": normalize_sequence(sample_commands),
+            {"id": fid, "seq": seq,
              "paths": [], "variant_sessions": {}, "ip_set": set(), "sessions": 0,
              "first_seen": r["first_seen"], "last_seen": "", "sample_session_id": None,
              "sample_command": sample_commands[0] if sample_commands else None},
@@ -166,10 +158,8 @@ def _daily_activity(db: sqlite3.Connection, families: list[dict]) -> dict[str, l
     for chunk in _chunks(list(family_of)):
         placeholders = ",".join("?" * len(chunk))
         for r in db.execute(
-            "SELECT t.ttylog_path, substr(s.connect_time, 1, 10) AS day, COUNT(DISTINCT t.session_id) AS n "
-            "FROM ttylogs t JOIN sessions s ON s.session_id = t.session_id "
-            f"WHERE t.ttylog_path IN ({placeholders}) AND s.connect_time >= ? "
-            "GROUP BY t.ttylog_path, day",
+            "SELECT ttylog_path, day, sessions AS n FROM fingerprint_days "
+            f"WHERE ttylog_path IN ({placeholders}) AND day >= ?",
             [*chunk, days[0]],
         ):
             counts = activity[family_of[r["ttylog_path"]]]
@@ -253,10 +243,9 @@ def campaign_detail(db: sqlite3.Connection, aggregate: dict, campaign_id: str) -
     for chunk in _chunks(family["paths"]):
         placeholders = ",".join("?" * len(chunk))
         for r in db.execute(
-            "SELECT s.src_ip AS ip, COUNT(DISTINCT t.session_id) AS sessions, e.asn, e.asn_org "
-            "FROM ttylogs t JOIN sessions s ON s.session_id = t.session_id "
-            "LEFT JOIN ip_enrichment e ON e.ip = s.src_ip "
-            f"WHERE t.ttylog_path IN ({placeholders}) GROUP BY s.src_ip",
+            "SELECT f.ip, f.sessions, e.asn, e.asn_org FROM fingerprint_ips f "
+            "LEFT JOIN ip_enrichment e ON e.ip = f.ip "
+            f"WHERE f.ttylog_path IN ({placeholders})",
             chunk,
         ):
             sessions_by_ip[r["ip"]] += r["sessions"]

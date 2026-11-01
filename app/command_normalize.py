@@ -9,6 +9,7 @@ embedded SSH key are kept on purpose: they are the bot's signature.
 
 import hashlib
 import re
+from functools import lru_cache
 
 # Bounded by non-alphanumerics so a hex-looking stretch inside a base64 key is left alone.
 _HEX_RUN = re.compile(r"(?<![0-9A-Za-z])[0-9a-fA-F]{8,}(?![0-9A-Za-z])")
@@ -26,6 +27,8 @@ _SUDO_PASSWORD = re.compile(r"echo\s+(['\"])[^'\"]*\1(\s*\|\s*sudo\s+-S)")
 _NEW_PASSWORD = re.compile(r"echo\s+(['\"])([^:'\"]+):[^'\"]*\1(\s*\|\s*chpasswd)")
 
 
+# The same bot lines recur across hundreds of sample sessions.
+@lru_cache(maxsize=65536)
 def normalize_command(text: str) -> str:
     text = _SUDO_PASSWORD.sub(r"echo '<PASS>'\2", text)
     text = _NEW_PASSWORD.sub(r"echo \1\2:<PASS>\1\3", text)
@@ -40,9 +43,14 @@ def normalize_sequence(commands: list[str]) -> tuple[str, ...]:
     return tuple(normalize_command(c) for c in commands)
 
 
+def sequence_key(sequence: tuple[str, ...]) -> str | None:
+    """Identity of an already normalized sequence; None when the session ran nothing."""
+    if not sequence:
+        return None
+    return hashlib.sha256("\n".join(sequence).encode()).hexdigest()
+
+
 def family_key(commands: list[str]) -> str | None:
     """Identity of a command sequence once normalized; order matters, a bot's
     script is a sequence. None when the session ran nothing."""
-    if not commands:
-        return None
-    return hashlib.sha256("\n".join(normalize_sequence(commands)).encode()).hexdigest()
+    return sequence_key(normalize_sequence(commands))
