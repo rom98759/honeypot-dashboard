@@ -22,8 +22,13 @@ _DIGITS = re.compile(r"\d+")
 _SUDO_PASSWORD = re.compile(r"echo\s+(['\"])[^'\"]*\1(\s*\|\s*sudo\s+-S)")
 
 
+# ...and set a random new one ("echo root:<random>|chpasswd"); the targeted user is kept.
+_NEW_PASSWORD = re.compile(r"echo\s+(['\"])([^:'\"]+):[^'\"]*\1(\s*\|\s*chpasswd)")
+
+
 def normalize_command(text: str) -> str:
     text = _SUDO_PASSWORD.sub(r"echo '<PASS>'\2", text)
+    text = _NEW_PASSWORD.sub(r"echo \1\2:<PASS>\1\3", text)
     text = _ARITHMETIC.sub(lambda m: "$((" + _DIGITS.sub("<N>", m[1]) + "))", text)
     text = _TEMP_ENTRY.sub(r"\1<TMP>", text)
     text = _IPV4.sub("<IP>", text)

