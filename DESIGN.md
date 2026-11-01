@@ -45,6 +45,12 @@ IP card (address:port, country, ASN, ban state, campaign link, link to the IP pa
 Replay / Commandes / Fichiers so the replay no longer pushes the command list off-screen. Commands show
 a time relative to the connection and a copy button.
 
+The campaign sheet uses the same layout (2026-11-01): title "Campagne <id>", first → last seen and
+"Copier le lien", the typical command in a code block, three metric cards (sessions, distinct IPs, commands),
+an origin card (dominant ASN and /24 with share), then tabs Session exemple (replay + link to open it) /
+Commandes / IP principales / Variantes, where IPs and variants are rows with a pale share bar.
+On phones, panel tabs and page tabs scroll sideways and the campaigns table drops the IP and 30-day columns.
+
 ## Rejected
 - Direction "Umami pur" loose interpretation (top navbar, generic metric strip): not close enough.
 - "Rapport de garde" (editorial bulletin, sentence filters, huge printed numbers).

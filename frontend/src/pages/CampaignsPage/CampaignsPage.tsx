@@ -9,7 +9,7 @@ import { Pagination } from "../../components/Pagination";
 import { PageHeader } from "../../components/PageHeader";
 import { MetricCard } from "../../components/MetricCard";
 import { Sparkline } from "../../components/Sparkline";
-import { formatDuration, formatNumber } from "../../utils/format";
+import { formatDuration, formatNumber, formatShare } from "../../utils/format";
 import { formatTimestamp } from "../../utils/formatDate";
 import { SessionDetailPanel } from "../SessionsPage/SessionDetailPanel";
 import { CampaignDetailPanel } from "./CampaignDetailPanel";
@@ -22,11 +22,6 @@ const SORT_TABS: { sort: CampaignSort; label: string }[] = [
   { sort: "first_seen", label: "Nouvelles" },
   { sort: "last_seen", label: "Actives récemment" },
 ];
-
-export function formatShare(share: number): string {
-  const pct = share * 100;
-  return pct > 0 && pct < 1 ? "<1%" : `${Math.round(pct)}%`;
-}
 
 function CampaignRow({ campaign, href }: { campaign: Campaign; href: string }) {
   const command = campaign.sample_command ?? "(aucune commande)";
@@ -41,8 +36,8 @@ function CampaignRow({ campaign, href }: { campaign: Campaign; href: string }) {
           <span className="variant-count">{formatNumber(campaign.variants)} variantes</span>
         )}
       </td>
-      <td className="cell-num cell-muted">{formatNumber(campaign.ips)}</td>
-      <td>
+      <td className="cell-num cell-muted hide-narrow">{formatNumber(campaign.ips)}</td>
+      <td className="hide-narrow">
         <Sparkline values={campaign.activity} />
       </td>
       <td className="cell-num">{formatNumber(campaign.sessions)}</td>
@@ -65,8 +60,8 @@ function PseudoRow({
   return (
     <tr className="pseudo-row">
       <td className="mono command-cell share-cell">{href ? <Link to={href}>{label}</Link> : label}</td>
-      <td className="cell-num cell-muted">{ips == null ? "—" : formatNumber(ips)}</td>
-      <td />
+      <td className="cell-num cell-muted hide-narrow">{ips == null ? "—" : formatNumber(ips)}</td>
+      <td className="hide-narrow" />
       <td className="cell-num">{formatNumber(sessions)}</td>
       <td className="cell-pct">—</td>
     </tr>
@@ -85,8 +80,8 @@ function UniqueSessionRow({ session, href }: { session: UniqueSession; href: str
       <td className="mono">
         <Link to={`/ip/${encodeURIComponent(session.src_ip)}`}>{session.src_ip}</Link>
       </td>
-      <td className="mono cell-muted">{formatTimestamp(session.connect_time)}</td>
-      <td className="cell-num cell-muted">{formatDuration(session.duration_ms)}</td>
+      <td className="mono cell-muted hide-narrow">{formatTimestamp(session.connect_time)}</td>
+      <td className="cell-num cell-muted hide-narrow">{formatDuration(session.duration_ms)}</td>
       <td className="cell-num">{formatNumber(session.commands)}</td>
     </tr>
   );
@@ -191,8 +186,8 @@ export function CampaignsPage() {
               <tr>
                 <th>Première commande</th>
                 <th>IP</th>
-                <th>Date</th>
-                <th className="cell-num">Durée</th>
+                <th className="hide-narrow">Date</th>
+                <th className="cell-num hide-narrow">Durée</th>
                 <th className="cell-num">Commandes</th>
               </tr>
             </thead>
@@ -215,8 +210,8 @@ export function CampaignsPage() {
             <thead>
               <tr>
                 <th>Commande type</th>
-                <th className="cell-num">IP</th>
-                <th>30 j</th>
+                <th className="cell-num hide-narrow">IP</th>
+                <th className="hide-narrow">30 j</th>
                 <th className="cell-num">Sessions</th>
                 <th />
               </tr>

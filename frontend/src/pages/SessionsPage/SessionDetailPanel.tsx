@@ -9,6 +9,7 @@ import { AcceptedLoginBadge, Badge } from "../../components/Badge";
 import { ReplayPlayer } from "../../components/ReplayPlayer";
 import type { Command, Session, SessionDetail } from "../../api/types";
 import { formatTimestamp } from "../../utils/formatDate";
+import { useCopy } from "../../utils/useCopy";
 import { countryLabel, flagEmoji, formatDuration, formatNumber } from "../../utils/format";
 
 function authBadge(session: Session) {
@@ -25,20 +26,6 @@ export function relativeTime(start: string, at: string): string {
   const s = diff % 60;
   const mmss = `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   return h ? `+${h}:${mmss}` : `+${mmss}`;
-}
-
-function useCopy(): [string | null, (key: string, text: string) => void] {
-  const [copied, setCopied] = useState<string | null>(null);
-  function copy(key: string, text: string) {
-    navigator.clipboard?.writeText(text).then(
-      () => {
-        setCopied(key);
-        window.setTimeout(() => setCopied((k) => (k === key ? null : k)), 1500);
-      },
-      () => setCopied(null)
-    );
-  }
-  return [copied, copy];
 }
 
 function ExportMenu({ detail }: { detail: SessionDetail }) {

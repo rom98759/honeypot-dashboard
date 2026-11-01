@@ -118,9 +118,15 @@ describe("CampaignsPage", () => {
     expect(await within(panel).findByText(/Banatsync Srl/)).toBeInTheDocument();
     expect(within(panel).getByText(/109\.160\.32\.0\/24/)).toBeInTheDocument();
     expect(within(panel).getByText("replay s2")).toBeInTheDocument();
-    expect(within(panel).getByText("Variantes (2)")).toBeInTheDocument();
-    expect(within(panel).getByText("7ab552f0")).toBeInTheDocument();
+    expect(within(panel).getByRole("link", { name: /Ouvrir la session s2/ })).toBeInTheDocument();
+
+    await userEvent.click(within(panel).getByRole("tab", { name: /IP principales/ }));
     expect(within(panel).getByRole("link", { name: "109.160.32.14" })).toHaveAttribute("href", "/ip/109.160.32.14");
+    expect(within(panel).queryByText("replay s2")).toBeNull();
+
+    await userEvent.click(within(panel).getByRole("tab", { name: /Variantes/ }));
+    expect(within(panel).getByRole("tab", { name: /Variantes/ })).toHaveTextContent("Variantes2");
+    expect(within(panel).getByText("7ab552f01de9")).toBeInTheDocument();
   });
 
   it("lists one-off sessions from the pseudo row and opens the session panel", async () => {

@@ -57,3 +57,9 @@ export function flagEmoji(code: string | null | undefined): string {
   if (!code || !/^[A-Za-z]{2}$/.test(code)) return "🏳";
   return String.fromCodePoint(...[...code.toUpperCase()].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
 }
+
+/** A 0–1 share as a whole percent, "<1%" rather than a misleading "0%". */
+export function formatShare(share: number): string {
+  const pct = share * 100;
+  return pct > 0 && pct < 1 ? "<1%" : `${Math.round(pct)}%`;
+}
