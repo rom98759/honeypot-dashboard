@@ -56,6 +56,8 @@ Backlog : `TODO.md`. Décisions de design : `docs/superpowers/specs/`.
   éditée depuis la page Réglages `/settings`, plages pas plus larges que /16 ou /48) ; le worker hôte refuse aussi celles de
   `/etc/honeypot/never-ban` ; le bouton demande une confirmation. Toutes les réponses portent
   `X-Frame-Options: DENY` + `frame-ancestors 'none'` (middleware dans `create_app`).
+  Choix du propriétaire (2026-11-01) : les IP protégées ne sont PAS exclues des statistiques (Overview,
+  campagnes, sessions uniques, Corrélation) ; elles servent seulement à interdire le ban. Ne pas le reproposer.
 - Enrichissement IP (ASN, rDNS, AbuseIPDB) : table `ip_enrichment` = file d'attente + résultats, drainée par
   `EnrichmentWorker`. Sans config, tout dégrade en no-op.
 - Le dashboard est déployé en conteneur durci (`read_only`, `cap_drop: ALL`, `no-new-privileges`) sur le

@@ -98,6 +98,9 @@
 - [x] Verrou du bouton Ban : confirmation, `ADMIN_IPS` refusées par l'API et
       `/etc/honeypot/never-ban` par le worker hôte (pas d'auto-lockout SSH),
       `X-Frame-Options: DENY` + `frame-ancestors 'none'` (plus de clickjacking).
+- [x] Exclure l'IP admin des statistiques : décidé de NE PAS le faire (2026-11-01).
+      Les sessions de test du propriétaire restent visibles ; la liste des IP
+      protégées (page Réglages) ne sert qu'à interdire le ban.
 - [ ] Reste : `/ban` et `/unban` joignables sans auth depuis les autres
       conteneurs du réseau `nginx-proxy-network` (contourne NPM). Piste : réseau
       Docker dédié dashboard ↔ NPM, ou secret partagé sur les routes d'écriture.
