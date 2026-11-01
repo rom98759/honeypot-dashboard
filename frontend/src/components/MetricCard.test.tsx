@@ -9,6 +9,11 @@ describe("MetricCard", () => {
     expect(screen.queryByTestId("change-label")).toBeNull();
   });
 
+  it("renders an optional note under the value", () => {
+    render(<MetricCard label="IP bannies" value="17" note="dernier ban il y a 29 j" />);
+    expect(screen.getByText("dernier ban il y a 29 j")).toBeInTheDocument();
+  });
+
   it("colors rises green by default and red when reversed", () => {
     const { rerender } = render(<ChangeLabel change={14.4} />);
     expect(screen.getByTestId("change-label")).toHaveClass("positive");

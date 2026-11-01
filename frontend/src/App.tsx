@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+import { HealthBanner } from "./components/HealthBanner";
 import { Sidebar } from "./components/Sidebar";
 import { SkeletonBlock } from "./components/SkeletonBlock";
 import { ThemeProvider } from "./theme/ThemeContext";
@@ -24,6 +25,7 @@ export default function App() {
         <div className="layout">
           <Sidebar />
           <main id="content">
+            <HealthBanner />
             <Suspense fallback={<SkeletonBlock rows={6} />}>
               <Routes>
                 <Route path="/" element={<Navigate to="/overview" replace />} />

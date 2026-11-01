@@ -45,6 +45,25 @@ def test_currently_banned_ignores_period(tmp_path):
     assert stats_all["currently_banned"] == 1
 
 
+def test_last_ban_at_is_latest_ban_as_utc_iso(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    db.executescript(
+        """
+        INSERT INTO fail2ban_events (ip, action, jail, timestamp) VALUES ('9.9.9.9', 'Ban', 'sshd', '2026-10-02 23:51:04,355');
+        INSERT INTO fail2ban_events (ip, action, jail, timestamp) VALUES ('8.8.8.8', 'Restore Ban', 'sshd', '2026-10-03 00:03:19,852');
+        INSERT INTO fail2ban_events (ip, action, jail, timestamp) VALUES ('9.9.9.9', 'Unban', 'sshd', '2026-10-04 00:00:00,000');
+        """
+    )
+    db.commit()
+
+    assert get_overview_stats(db, "24h")["last_ban_at"] == "2026-10-03T00:03:19.852Z"
+
+
+def test_last_ban_at_is_null_without_bans(tmp_path):
+    db = connect(tmp_path / "db.sqlite3")
+    assert get_overview_stats(db, "24h")["last_ban_at"] is None
+
+
 def test_protocol_split_defaults_null_protocol_to_ssh(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
     now = datetime.now(timezone.utc)

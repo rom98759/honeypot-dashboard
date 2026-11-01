@@ -1,3 +1,6 @@
+import os
+import time
+
 from fastapi.testclient import TestClient
 
 from app.db import connect
@@ -34,6 +37,23 @@ def test_health_reports_lag_and_last_event_per_source(tmp_path, monkeypatch):
     assert after["fail2ban.log"]["last_event"] == "2026-10-30 10:00:00,123"
     assert after["sshd-auth.log"]["file_present"] is False
     assert after["sshd-auth.log"]["lag_bytes"] is None
+
+
+def test_health_flags_stalled_only_when_unread_data_is_old(tmp_path, monkeypatch):
+    f2b = tmp_path / "fail2ban.log"
+    f2b.write_text("line\n")
+    monkeypatch.setenv("FAIL2BAN_LOG_PATH", str(f2b))
+    monkeypatch.setenv("SSHD_AUTH_LOG_PATH", str(tmp_path / "missing-sshd.log"))
+    db = connect(tmp_path / "db.sqlite3")
+    client = TestClient(create_app(db=db, start_background_tasks=False))
+
+    sources = _sources_by_name(client)
+    assert sources["fail2ban.log"]["stalled"] is False  # unread but just written
+    assert sources["sshd-auth.log"]["stalled"] is True  # missing file
+
+    old = time.time() - 120
+    os.utime(f2b, (old, old))
+    assert _sources_by_name(client)["fail2ban.log"]["stalled"] is True
 
 
 def test_health_counts_whole_file_as_lag_after_rotation(tmp_path, monkeypatch):

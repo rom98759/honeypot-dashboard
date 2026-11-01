@@ -14,6 +14,9 @@ beforeEach(() => {
   vi.stubGlobal(
     "fetch",
     vi.fn((url: string) => {
+      if (url.startsWith("/api/health")) {
+        return jsonResponse({ sources: [] });
+      }
       if (url.startsWith("/api/overview/heatmap")) {
         return jsonResponse({ cells: [] });
       }

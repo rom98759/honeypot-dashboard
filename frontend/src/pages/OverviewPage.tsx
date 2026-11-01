@@ -18,6 +18,7 @@ import { ErrorState } from "../components/ErrorState";
 import { EmptyState } from "../components/EmptyState";
 import { buildSeries } from "../utils/timeSeries";
 import { bucketRangeToDates } from "../utils/bucket";
+import { formatDaysAgo } from "../utils/formatDate";
 import { countryLabel, flagEmoji, formatDuration, formatNumber, percentChange } from "../utils/format";
 import type { Filters, OverviewData } from "../api/types";
 
@@ -98,7 +99,11 @@ export function OverviewPage() {
           }
           reverseColors
         />
-        <MetricCard label="IP bannies" value={formatNumber(data.currently_banned)} />
+        <MetricCard
+          label="IP bannies"
+          value={formatNumber(data.currently_banned)}
+          note={data.last_ban_at ? `dernier ban ${formatDaysAgo(data.last_ban_at)}` : "aucun ban enregistré"}
+        />
       </div>
 
       <section className="panel">

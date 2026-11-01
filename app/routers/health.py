@@ -1,6 +1,9 @@
+import time
+
 from fastapi import APIRouter, Request
 
 router = APIRouter()
+STALL_AFTER_SECONDS = 60
 
 # (app.state ingester attribute, table, column holding the newest event time)
 _SOURCES = (
@@ -34,7 +37,11 @@ def _source_health(db, tailer, table: str, column: str) -> dict:
         lag = max(stat.st_size - row["offset"], 0)
 
     last_event = db.execute(f"SELECT MAX({column}) AS t FROM {table}").fetchone()["t"]
+    # The poll loop reads every few seconds, so unread bytes are normal right
+    # after a write; only data left unread past this delay means ingestion stopped.
+    stalled = stat is None or (lag > 0 and time.time() - stat.st_mtime > STALL_AFTER_SECONDS)
     return {
+        "stalled": stalled,
         "source": tailer.source_name,
         "path": str(tailer.path),
         "file_present": stat is not None,

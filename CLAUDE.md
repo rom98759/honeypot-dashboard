@@ -18,7 +18,10 @@ Backlog : `TODO.md`. Décisions de design : `docs/superpowers/specs/`.
 - fail2ban et sshd : l'hôte exporte vers `/var/log/honeypot-export/` (`scripts/fail2ban-export.sh` +
   `sshd-auth-export.sh`, timers systemd), et le conteneur monte ce *répertoire*. Ne jamais remonter un log
   comme fichier : le bind-mount fige l'inode et l'ingestion s'arrête en silence à la rotation suivante.
-  `/api/health` expose par source le retard de lecture (`lag_bytes`) et le dernier événement.
+  `/api/health` expose par source le retard de lecture (`lag_bytes`), le dernier événement et `stalled`
+  (données non lues depuis > 60 s ou fichier absent) ; `HealthBanner` (dans `App`) l'affiche sur toutes les pages.
+- Réimport ponctuel des logs sshd avec le parseur courant : `python -m app.reimport_sshd_auth [--dry-run] FICHIERS`
+  (remplace les lignes de la plage couverte par les fichiers).
 - Cowrie : `parse_event` (dataclasses typées) puis `apply_cowrie_record` (tables `sessions`, `commands`,
   `ttylogs`). Un nouveau type d'événement = étendre les deux.
 - `create_app(db=..., start_background_tasks=...)` injectable pour `TestClient` sans I/O ; `tests/conftest.py`

@@ -1,5 +1,15 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { formatTimestamp } from "./formatDate";
+import { formatDaysAgo, formatTimestamp } from "./formatDate";
+
+describe("formatDaysAgo", () => {
+  const now = new Date("2026-11-01T12:00:00Z");
+
+  it("says today, yesterday, or the number of days", () => {
+    expect(formatDaysAgo("2026-11-01T08:00:00Z", now)).toBe("aujourd'hui");
+    expect(formatDaysAgo("2026-10-31T08:00:00Z", now)).toBe("hier");
+    expect(formatDaysAgo("2026-10-03T00:03:19.852Z", now)).toBe("il y a 29 j");
+  });
+});
 
 describe("formatTimestamp", () => {
   afterEach(() => {

@@ -1,3 +1,4 @@
+import re
 import sqlite3
 from datetime import datetime, timedelta, timezone
 
@@ -9,6 +10,16 @@ DURATION_BUCKETS = ["<10s", "10-60s", "1-5min", "5-30min", ">30min"]
 FILTER_KEYS = ("country", "protocol", "ip", "username")
 # A Cowrie session with no closed event yet; older ones are crashed/rotated, not live.
 ACTIVE_WINDOW = timedelta(hours=1)
+FAIL2BAN_TS_RE = re.compile(r"^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}),(\d{3})$")
+
+
+def _fail2ban_ts_to_iso(raw: str | None) -> str | None:
+    """fail2ban writes host-local time with no zone; the VPS runs in UTC, so
+    reading it as UTC gives the browser a timestamp it can localize."""
+    if raw is None:
+        return None
+    m = FAIL2BAN_TS_RE.match(raw)
+    return f"{m[1]}T{m[2]}.{m[3]}Z" if m else raw
 
 
 def _filter_clause(filters: dict | None) -> tuple[str, list]:
@@ -75,6 +86,11 @@ def get_overview_stats(db: sqlite3.Connection, period: str, filters: dict | None
     currently_banned = db.execute(
         f"SELECT COUNT(*) AS n FROM ({CURRENTLY_BANNED_IPS_SQL})"
     ).fetchone()["n"]
+    last_ban_at = _fail2ban_ts_to_iso(
+        db.execute(
+            "SELECT MAX(timestamp) AS t FROM fail2ban_events WHERE action IN ('Ban', 'Restore Ban')"
+        ).fetchone()["t"]
+    )
 
     top_offenders = db.execute(
         "SELECT s.src_ip, COUNT(*) AS n, MAX(s.connect_time) AS last_seen, g.country, g.country_code "
@@ -169,6 +185,7 @@ def get_overview_stats(db: sqlite3.Connection, period: str, filters: dict | None
         "previous": previous,
         "active_sessions": active_sessions,
         "currently_banned": currently_banned,
+        "last_ban_at": last_ban_at,
         "top_offenders": [dict(r) for r in top_offenders],
         "top_countries": countries[:10],
         "countries": countries,

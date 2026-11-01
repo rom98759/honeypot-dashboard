@@ -19,18 +19,21 @@ export function MetricCard({
   change,
   reverseColors,
   small = false,
+  note,
 }: {
   label: string;
   value: string;
   change?: number | null;
   reverseColors?: boolean;
   small?: boolean;
+  note?: string;
 }) {
   return (
     <div className="metric-card">
       <div className="metric-label">{label}</div>
       <div className={`metric-value${small ? " small" : ""}`}>{value}</div>
       {change != null && <ChangeLabel change={change} reverseColors={reverseColors} />}
+      {note && <div className="metric-note">{note}</div>}
     </div>
   );
 }

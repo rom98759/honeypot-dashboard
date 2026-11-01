@@ -43,6 +43,7 @@ export interface OverviewData extends OverviewTotals {
   previous: OverviewTotals | null;
   active_sessions: number;
   currently_banned: number;
+  last_ban_at: string | null;
   top_offenders: {
     src_ip: string;
     n: number;
@@ -157,4 +158,19 @@ export interface CommandRow {
 export interface PaginatedCommands {
   items: CommandRow[];
   total: number;
+}
+
+export interface HealthSource {
+  source: string;
+  path: string;
+  file_present: boolean;
+  file_size: number | null;
+  ingested_offset: number | null;
+  lag_bytes: number | null;
+  last_event: string | null;
+  stalled: boolean;
+}
+
+export interface HealthData {
+  sources: HealthSource[];
 }
