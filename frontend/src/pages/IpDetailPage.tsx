@@ -110,7 +110,7 @@ export function IpDetailPage() {
           ) : (
             <Badge label="Non banni" tone="neutral" />
           )}
-          {data.protected ? (
+          {!data.ban_enabled ? null : data.protected ? (
             <Badge label="Protégée" tone="neutral" title="IP d'administration (ADMIN_IPS) : jamais bannie." />
           ) : data.currently_banned ? (
             <button className="btn" disabled={unbanMutation.isPending} onClick={() => unbanMutation.mutate()}>
@@ -123,7 +123,7 @@ export function IpDetailPage() {
           )}
         </div>
       </PageHeader>
-      {confirmingBan && !data.protected && !data.currently_banned ? (
+      {confirmingBan && data.ban_enabled && !data.protected && !data.currently_banned ? (
         <div className="confirm-bar" role="alertdialog" aria-label="Confirmer le ban">
           <span>
             Bannir <span className="mono">{ip}</span> du vrai sshd (jail <span className="mono">sshd</span>) ?

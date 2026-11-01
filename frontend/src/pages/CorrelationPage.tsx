@@ -1,6 +1,7 @@
 import { useSearchParams, Link } from "react-router-dom";
 import { ExternalLink, Link2 } from "lucide-react";
 import { useCorrelation } from "../api/correlation";
+import { useAppConfig } from "../api/config";
 import { SkeletonBlock } from "../components/SkeletonBlock";
 import { ErrorState } from "../components/ErrorState";
 import { EmptyState } from "../components/EmptyState";
@@ -10,12 +11,17 @@ import { PageHeader } from "../components/PageHeader";
 import { formatNumber } from "../utils/format";
 import type { CorrelationRow } from "../api/types";
 
-const COLUMNS: Column[] = [
-  { key: "ip", label: "IP" },
-  { key: "honeypot_sessions", label: "Sessions honeypot" },
-  { key: "fail2ban_banned", label: "Banni fail2ban" },
-  { key: "real_ssh_attempts", label: "Tentatives port 50022" },
-];
+function columns(sshdPort: number | null | undefined): Column[] {
+  return [
+    { key: "ip", label: "IP" },
+    { key: "honeypot_sessions", label: "Sessions honeypot" },
+    { key: "fail2ban_banned", label: "Banni fail2ban" },
+    {
+      key: "real_ssh_attempts",
+      label: typeof sshdPort === "number" ? `Tentatives sshd (port ${sshdPort})` : "Tentatives sshd réel",
+    },
+  ];
+}
 
 function comparableValue(v: string | number | boolean): string | number {
   return typeof v === "boolean" ? Number(v) : v;
@@ -38,6 +44,8 @@ export function CorrelationPage() {
   const order = searchParams.get("order") === "asc" ? "asc" : "desc";
 
   const { data, isPending, isError, refetch } = useCorrelation();
+  const { data: config } = useAppConfig();
+  const tableColumns = columns(config?.sshd_port);
 
   if (isPending) return <SkeletonBlock rows={6} />;
   if (isError) {
@@ -70,7 +78,7 @@ export function CorrelationPage() {
         <table className="correlation-table">
           <thead>
             <tr>
-              <SortableTableHeader columns={COLUMNS} sort={sort} order={order} onSort={handleSort} />
+              <SortableTableHeader columns={tableColumns} sort={sort} order={order} onSort={handleSort} />
               <th />
             </tr>
           </thead>

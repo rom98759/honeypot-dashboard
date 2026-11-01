@@ -120,6 +120,7 @@ export interface IpSummary {
   total_commands: number;
   currently_banned: boolean;
   protected: boolean;
+  ban_enabled: boolean;
   asn: number | null;
   asn_org: string | null;
   reverse_dns: string | null;

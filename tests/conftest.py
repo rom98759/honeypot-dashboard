@@ -28,4 +28,6 @@ os.environ.setdefault("COWRIE_JSON_PATH", str(_DATA_DIR / "cowrie.json"))
 os.environ.setdefault("FAIL2BAN_LOG_PATH", str(_DATA_DIR / "fail2ban.log"))
 os.environ.setdefault("SSHD_AUTH_LOG_PATH", str(_DATA_DIR / "sshd-auth.log"))
 os.environ.setdefault("FBAN_QUEUE_PATH", str(_DATA_DIR / "fban-queue"))
+# Most API tests exercise ban/unban; tests about the disabled switch pass ban_enabled=False.
+os.environ.setdefault("FBAN_ENABLED", "1")
 os.environ.setdefault("FBAN_TIMEOUT_SECONDS", "0.1")

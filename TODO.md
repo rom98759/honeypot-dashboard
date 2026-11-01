@@ -31,10 +31,8 @@
 
 ## Frontend / refonte visuelle
 
-- [ ] Vérifier le libellé "Tentatives port 50022" (page Corrélation) — c'est un
-      texte en dur qui suppose que le port réel du sshd est 50022
-      (`frontend/src/pages/CorrelationPage.tsx`). À rendre dynamique
-      ou au moins vérifier qu'il correspond toujours à la conf actuelle du VPS.
+- [x] Libellé « Tentatives sshd » de la page Corrélation : port lu depuis `SSHD_PORT`
+      (`/api/config`) au lieu d'un texte en dur.
 
 ## Backend / perf
 

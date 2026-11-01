@@ -16,7 +16,7 @@ from app.fban_control import FbanControl
 from app.geoip import GeoLookup
 from app.ingester import CowrieIngester
 from app.ip_enrichment import AbuseIpDbClient, AsnLookup, IpEnrichment
-from app.routers import campaigns, commands, correlation, health, ip, overview, sessions, settings
+from app.routers import campaigns, commands, config, correlation, health, ip, overview, sessions, settings
 from app.ttl_cache import TtlCache
 
 POLL_INTERVAL_SECONDS = 5
@@ -174,8 +174,24 @@ def parse_ip_list(raw: str) -> list:
     return networks
 
 
+def parse_port(raw: str | None) -> int | None:
+    try:
+        port = int(raw or "")
+    except ValueError:
+        return None
+    return port if 0 < port < 65536 else None
+
+
+def parse_bool(raw: str | None) -> bool:
+    return (raw or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def create_app(
-    db=None, start_background_tasks: bool = True, fban_control: FbanControl | None = None
+    db=None,
+    start_background_tasks: bool = True,
+    fban_control: FbanControl | None = None,
+    sshd_port: int | None = None,
+    ban_enabled: bool | None = None,
 ) -> FastAPI:
     """
     Build the FastAPI app. `db` and `start_background_tasks=False` let tests
@@ -216,6 +232,10 @@ def create_app(
 
     app = FastAPI(lifespan=lifespan)
     app.state.admin_networks = admin_networks
+    app.state.sshd_port = sshd_port if sshd_port is not None else parse_port(os.environ.get("SSHD_PORT"))
+    app.state.ban_enabled = (
+        ban_enabled if ban_enabled is not None else parse_bool(os.environ.get("FBAN_ENABLED"))
+    )
 
     @app.middleware("http")
     async def security_headers(request, call_next):
@@ -257,6 +277,7 @@ def create_app(
     app.include_router(health.router)
     app.include_router(campaigns.router)
     app.include_router(settings.router)
+    app.include_router(config.router)
     if STATIC_DIR.exists():
         app.mount("/", NoCacheStaticFiles(directory=STATIC_DIR, html=True), name="static")
     return app

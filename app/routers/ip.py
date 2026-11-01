@@ -51,7 +51,9 @@ async def get_ip_summary(request: Request, ip: str):
     ).fetchone()["n"]
 
     log_derived_banned = is_currently_banned(db, ip)
-    live_banned = await asyncio.to_thread(request.app.state.fban_control.request_status, ip)
+    live_banned = None
+    if request.app.state.ban_enabled:
+        live_banned = await asyncio.to_thread(request.app.state.fban_control.request_status, ip)
     currently_banned = live_banned if live_banned is not None else log_derived_banned
 
     return {
@@ -67,6 +69,7 @@ async def get_ip_summary(request: Request, ip: str):
         "total_commands": total_commands,
         "currently_banned": currently_banned,
         "protected": is_admin_ip(request.app, ip),
+        "ban_enabled": request.app.state.ban_enabled,
         "asn": enrichment["asn"] if enrichment else None,
         "asn_org": enrichment["asn_org"] if enrichment else None,
         "reverse_dns": enrichment["reverse_dns"] if enrichment else None,
@@ -118,8 +121,14 @@ def verify_dashboard_origin(request: Request) -> None:
         raise HTTPException(status_code=403, detail="cross-origin request rejected")
 
 
+def require_ban_enabled(request: Request) -> None:
+    if not request.app.state.ban_enabled:
+        raise HTTPException(status_code=404, detail="ban control disabled (FBAN_ENABLED)")
+
+
 @router.post("/api/ip/{ip}/ban")
 async def ban_ip(request: Request, ip: str):
+    require_ban_enabled(request)
     verify_dashboard_origin(request)
     if is_admin_ip(request.app, ip):
         # Banning the owner's own address from the real sshd would lock them out of the VPS.
@@ -136,6 +145,7 @@ async def ban_ip(request: Request, ip: str):
 
 @router.post("/api/ip/{ip}/unban")
 async def unban_ip(request: Request, ip: str):
+    require_ban_enabled(request)
     verify_dashboard_origin(request)
     fban_control = request.app.state.fban_control
     try:

@@ -28,6 +28,8 @@ const SUMMARY = {
   abuseipdb_last_reported_at: "2026-10-01T00:00:00Z",
   abuseipdb_configured: true,
   enrichment_status: "done",
+  protected: false,
+  ban_enabled: true,
 };
 
 const SESSIONS = {
@@ -135,6 +137,14 @@ describe("IpDetailPage", () => {
     renderPage();
     expect(await screen.findByText("Protégée")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Bannir" })).toBeNull();
+  });
+
+  it("hides ban controls when ban control is disabled on the server", async () => {
+    stubFetch({ summary: { ...SUMMARY, currently_banned: false, ban_enabled: false } });
+    renderPage();
+    expect(await screen.findByText("Non banni")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Bannir" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Débannir" })).toBeNull();
   });
 
   it("renders the sessions section and opens the detail panel on row click", async () => {

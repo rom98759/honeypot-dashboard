@@ -45,4 +45,22 @@ describe("CorrelationPage", () => {
     const link = screen.getAllByTitle("Voir le détail")[0];
     expect(link).toHaveAttribute("href", "/ip/5.6.7.8");
   });
+
+  function routedFetch(config: unknown) {
+    return vi.fn((url: string) => jsonResponse(url === "/api/config" ? config : ROWS));
+  }
+
+  it("labels the real sshd column with the configured port", async () => {
+    vi.stubGlobal("fetch", routedFetch({ sshd_port: 50022, ban_enabled: false }));
+    renderWithProviders(<CorrelationPage />, { route: "/correlation" });
+    expect(await screen.findByRole("button", { name: /Tentatives sshd \(port 50022\)/ })).toBeInTheDocument();
+  });
+
+  it("falls back to a generic label when no port is configured", async () => {
+    vi.stubGlobal("fetch", routedFetch({ sshd_port: null, ban_enabled: false }));
+    renderWithProviders(<CorrelationPage />, { route: "/correlation" });
+    await waitFor(() => expect(screen.getByText("1.2.3.4")).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: /Tentatives sshd réel/ })).toBeInTheDocument();
+    expect(screen.queryByText(/50022/)).toBeNull();
+  });
 });

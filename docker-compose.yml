@@ -34,6 +34,8 @@ services:
       - ABUSEIPDB_API_KEY=${ABUSEIPDB_API_KEY:-}
       # Owner's own IPs/CIDRs, comma-separated, set in .env (never committed): never banned.
       - ADMIN_IPS=${ADMIN_IPS:-}
+      - SSHD_PORT=${SSHD_PORT:-}
+      - FBAN_ENABLED=${FBAN_ENABLED:-0}
       - FBAN_QUEUE_PATH=/queue
 
 networks:

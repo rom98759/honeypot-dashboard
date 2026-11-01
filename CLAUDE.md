@@ -83,7 +83,7 @@ Pas de lint/format configuré : imiter le style existant. Après déploiement : 
 ## Pièges connus
 - Env vars : `COWRIE_JSON_PATH`, `COWRIE_VAR_PATH`, `DASHBOARD_DB_PATH`, `FAIL2BAN_LOG_PATH`,
   `SSHD_AUTH_LOG_PATH`, `GEOIP_DB_PATH`, `GEOIP_ASN_DB_PATH`, `ABUSEIPDB_API_KEY` (vide = désactivé),
-  `FBAN_QUEUE_PATH`, `FBAN_TIMEOUT_SECONDS`, `ADMIN_IPS` (IP/CIDR séparés par des virgules, dans `.env`).
+  `FBAN_QUEUE_PATH`, `FBAN_TIMEOUT_SECONDS`, `FBAN_ENABLED` (défaut 0 : ban masqué, worker hôte jamais
+  interrogé), `SSHD_PORT` (libellé Corrélation, via `/api/config`), `ADMIN_IPS` (IP/CIDR séparés par des virgules, dans `.env`).
 - Les défauts de chemins sont ceux du conteneur (`/data/...`) ; importer `app.main` crée l'app au niveau module.
-- Le libellé « port 50022 » de la page Corrélation est codé en dur (voir `TODO.md`).
 - `docs/superpowers/` est dans `.gitignore` mais 26 fichiers déjà suivis restent versionnés.
