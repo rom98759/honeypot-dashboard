@@ -1,103 +1,131 @@
-#!/bin/bash
-# Reconstruit la chain DOCKER-USER (vidée par Docker a chaque redemarrage du
-# daemon) : restriction Cloudflare-only sur 80/443, blocage du port 81 (admin
-# NPM), et blocage de toute sortie du honeypot. Lance par le service systemd
-# docker-user-firewall.service (au boot + a chaque restart de docker.service
-# via PartOf=), et periodiquement par docker-user-firewall.timer en filet de
-# securite.
+#!/usr/bin/env bash
+# /usr/local/sbin/docker-user-firewall.sh
+# Rebuilds the iptables DOCKER-USER chain, which Docker empties on every daemon
+# restart. Run by docker-user-firewall.service (at boot and on every
+# docker.service restart through PartOf=) and by docker-user-firewall.timer as
+# a safety net.
 #
-# Les regles Cloudflare-only et le blocage du port 81 sont scopees a
-# "-i $WAN_IFACE" (interface WAN reelle du VPS) : elles ne doivent filtrer
-# que le trafic ENTRANT depuis Internet vers un port publie par un
-# container, pas le trafic SORTANT d'un container vers Internet (ex: pip
-# install, apt-get). Sans ce -i, le DROP matchait par port de destination
-# seul et bloquait aussi bien l'entrant non-Cloudflare que tout trafic
-# client sortant d'un container vers un service externe en 80/443/81.
+# Rules, all in DOCKER-USER (traffic to/from containers only; the host's INPUT
+# chain, hence the real sshd, is never touched):
+#   - always: the honeypot subnet may not open any new outbound connection, so a
+#     compromised Cowrie cannot be used to attack anyone else;
+#   - CLOUDFLARE_ONLY=1: published 80/443 only reachable from Cloudflare ranges;
+#   - BLOCK_PORTS: published container ports dropped when coming from the WAN
+#     (e.g. a reverse proxy admin UI).
+# Docker-published ports bypass ufw entirely, which is why this lives here.
 #
-# Le blocage d'egress du honeypot matche par SOUS-RESEAU FIXE
-# ($HONEYPOT_SUBNET_V4), pas par nom d'interface bridge. Le nom du bridge
-# Docker (br-<network-id>) change a chaque fois que le reseau
-# honeypot_honeypot-net est recree (ex: `docker compose down && up` sur la
-# stack honeypot, sans toucher au daemon Docker) - une regle basee sur le
-# nom d'interface se retrouve alors a pointer vers un bridge qui n'existe
-# plus, et le blocage d'egress disparait silencieusement. Le sous-reseau,
-# lui, ne change pas tant qu'il reste fige explicitement cote compose.
-# IMPORTANT: $HONEYPOT_SUBNET_V4 DOIT rester synchronise avec
-# networks.honeypot-net.ipam.config.subnet dans
-# /home/user/honeypot/docker-compose.yml. Si l'un change, changer l'autre.
+# WAN-scoped rules use "-i $WAN_IFACE": they must filter inbound traffic from
+# the Internet to a published port, not outbound container traffic to an
+# external service on 80/443 (pip install, apt-get...).
 #
-# Pas de regle IPv6 equivalente pour l'egress honeypot : EnableIPv6 est
-# `false` sur honeypot-net (confirme en prod), donc aucune adresse v6 n'est
-# possible sur ce reseau. Si IPv6 y est active un jour, ajouter une regle
-# miroir ici avec le sous-reseau v6 alors choisi.
+# The egress rule matches the subnet, not the bridge name: recreating the
+# network (`docker compose down && up`) changes the bridge name, and a rule
+# bound to it would silently stop matching. The subnet is pinned in compose.
+# HONEYPOT_SUBNET here MUST equal HONEYPOT_SUBNET in the repo's .env.
 #
-# Application atomique : le ruleset est construit dans un dump complet de
-# la table filter (iptables-save), puis applique via iptables-restore, qui
-# remplace la table en une seule operation noyau. Contrairement a un
-# flush+ajout ligne par ligne, un crash du script avant ce point laisse les
-# regles ACTUELLEMENT ACTIVES en place (fail-closed) plutot que de laisser
-# la chain vide ou partielle (fail-open).
+# No IPv6 egress rule: honeypot-net has IPv6 disabled, so no v6 address can
+# exist on it. If IPv6 is ever enabled there, add a mirror rule.
 #
-# Rafraichir la liste d'IPs Cloudflare (statique, a mettre a jour a la main
-# de temps en temps) :
-#   curl -s https://www.cloudflare.com/ips-v4
-#   curl -s https://www.cloudflare.com/ips-v6
-# Derniere mise a jour de la liste ci-dessous : 2026-08-12.
+# Atomic apply: the new DOCKER-USER is fed to `iptables-restore --noflush` as
+# one transaction. With --noflush only the declared chain (DOCKER-USER) is
+# flushed; INPUT, FORWARD, ufw and fail2ban chains are not even part of the
+# payload, so rules other tools add meanwhile are never lost. A failure leaves
+# the CURRENT rules in place (fail-closed) instead of an empty chain.
+#
+# Cloudflare ranges are static; refresh by hand from
+#   https://www.cloudflare.com/ips-v4 and https://www.cloudflare.com/ips-v6
+# Last refreshed: 2026-08-12.
+#
+# Usage: docker-user-firewall.sh [--dry-run | --print-rules | --print-restore]
+#   --dry-run        validate the ruleset against the live tables (iptables-restore --test), apply nothing
+#   --print-rules    print the DOCKER-USER rules from the config, no root, no iptables
+#   --print-restore  print the exact iptables-restore payload (IPv4), no root
 set -euo pipefail
 
-WAN_IFACE="eth0"
-HONEYPOT_SUBNET_V4="172.21.0.0/16"
+HOST_ENV="${HONEYPOT_HOST_ENV:-/etc/honeypot-dashboard/host.env}"
+if [[ -r "$HOST_ENV" ]]; then
+  # Sourced as root by a systemd timer: a file others can write would be a root shell.
+  read -r env_owner env_mode < <(stat -c '%u %a' "$HOST_ENV")
+  if [[ "$env_owner" != 0 && "$env_owner" != "$(id -u)" ]] || (( 8#$env_mode & 8#022 )); then
+    echo "$HOST_ENV must be owned by root and not group/world-writable" >&2
+    exit 1
+  fi
+  # shellcheck source=/dev/null
+  source "$HOST_ENV"
+fi
+
+HONEYPOT_SUBNET="${HONEYPOT_SUBNET:-172.21.0.0/16}"
+CLOUDFLARE_ONLY="${CLOUDFLARE_ONLY:-0}"
+BLOCK_PORTS="${BLOCK_PORTS:-}"
 LOCKFILE="/run/docker-user-firewall.lock"
 
 CF_V4="173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13"
 CF_V6="2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 2405:8100::/32 2a06:98c0::/29"
 
-DRY_RUN=0
+MODE=apply
 
 usage() {
-  cat <<'EOF'
-Usage: docker-user-firewall.sh [--dry-run]
-
-  --dry-run   Construit le ruleset et le valide (iptables-restore --test)
-              sans l'appliquer. Affiche les regles qui seraient posees.
-EOF
+  sed -n '/^# Usage:/,/^set -euo/p' "$0" | sed '$d; s/^# \{0,1\}//'
 }
 
 log() {
-  local ts
-  ts="$(date '+%Y-%m-%d %H:%M:%S')"
-  echo "[$ts] $*"
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
   logger -t docker-user-firewall "$*" 2>/dev/null || true
 }
 
 err() {
-  local ts
-  ts="$(date '+%Y-%m-%d %H:%M:%S')"
-  echo "[$ts] ERREUR: $*" >&2
-  logger -t docker-user-firewall "ERREUR: $*" 2>/dev/null || true
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2
+  logger -t docker-user-firewall "ERROR: $*" 2>/dev/null || true
+}
+
+default_wan_iface() {
+  ip route show default 2>/dev/null | awk '{for (i = 1; i < NF; i++) if ($i == "dev") { print $(i + 1); exit }}'
+}
+
+validate_config() {
+  local p
+  for p in $BLOCK_PORTS; do
+    if ! [[ "$p" =~ ^[0-9]+$ ]] || (( p < 1 || p > 65535 )); then
+      err "BLOCK_PORTS: '$p' is not a TCP port"
+      exit 1
+    fi
+  done
+  if ! [[ "$HONEYPOT_SUBNET" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}/[0-9]{1,2}$ ]]; then
+    err "HONEYPOT_SUBNET: '$HONEYPOT_SUBNET' is not an IPv4 CIDR"
+    exit 1
+  fi
+  if [[ "$CLOUDFLARE_ONLY" != 0 && "$CLOUDFLARE_ONLY" != 1 ]]; then
+    err "CLOUDFLARE_ONLY must be 0 or 1"
+    exit 1
+  fi
+  if [[ -z "$WAN_IFACE" ]]; then
+    err "WAN_IFACE is empty and no default route was found: set it in $HOST_ENV"
+    exit 1
+  fi
 }
 
 require_root() {
-  if [ "$(id -u)" -ne 0 ]; then
-    err "doit etre execute en root (sudo)."
+  if [[ "$(id -u)" -ne 0 ]]; then
+    err "must run as root"
     exit 1
   fi
 }
 
 require_cmds() {
   local missing=() c
-  for c in iptables iptables-save iptables-restore ip6tables ip6tables-save ip6tables-restore ip flock; do
+  for c in iptables-restore ip6tables-restore ip flock; do
     command -v "$c" >/dev/null 2>&1 || missing+=("$c")
   done
-  if [ "${#missing[@]}" -gt 0 ]; then
-    err "commandes manquantes: ${missing[*]}"
+  if [[ "${#missing[@]}" -gt 0 ]]; then
+    err "missing commands: ${missing[*]}"
     exit 1
   fi
 }
 
 require_wan_iface() {
   if ! ip link show "$WAN_IFACE" >/dev/null 2>&1; then
-    err "interface WAN '$WAN_IFACE' introuvable sur cet hote (renommage d'interface, rescue mode OVH, etc.). Verifier la constante WAN_IFACE en tete de script avant de continuer - sinon les regles Cloudflare-only et le blocage du port 81 ne matcheraient plus rien, et tout passerait en clair sur 80/443/81."
+    # Applying anyway would make the WAN rules match nothing: everything would pass.
+    err "WAN interface '$WAN_IFACE' not found (renamed interface, rescue mode...). Fix WAN_IFACE in $HOST_ENV."
     exit 1
   fi
 }
@@ -105,117 +133,98 @@ require_wan_iface() {
 acquire_lock() {
   exec 200>"$LOCKFILE"
   if ! flock -n 200; then
-    err "une autre execution est deja en cours (lock $LOCKFILE), abandon."
+    err "another run holds $LOCKFILE, giving up"
     exit 1
   fi
 }
 
-# Assure que la chain DOCKER-USER existe dans le dump avant d'y inserer des
-# regles (cas normalement couvert par Docker au demarrage du daemon, mais
-# garde-fou explicite plutot que de supposer).
-ensure_chain_decl() {
-  local dump="$1"
-  if printf '%s\n' "$dump" | grep -q '^:DOCKER-USER '; then
-    printf '%s\n' "$dump"
-  else
-    printf '%s\n' "$dump" | awk '
-      !inserted && /^-A / { print ":DOCKER-USER - [0:0]"; inserted=1 }
-      { print }
-    '
+wan_rules() {
+  local cf_ranges="$1" r p
+  if [[ "$CLOUDFLARE_ONLY" == 1 ]]; then
+    for r in $cf_ranges; do
+      echo "-A DOCKER-USER -i ${WAN_IFACE} -s ${r} -p tcp -m multiport --dports 80,443 -j RETURN"
+    done
+    echo "-A DOCKER-USER -i ${WAN_IFACE} -p tcp -m multiport --dports 80,443 -j DROP"
   fi
+  for p in $BLOCK_PORTS; do
+    echo "-A DOCKER-USER -i ${WAN_IFACE} -p tcp -m tcp --dport ${p} -j DROP"
+  done
 }
 
 build_rules_v4() {
-  local out=""
-  out+="-A DOCKER-USER -i lo -j RETURN"$'\n'
-  out+="-A DOCKER-USER -s ${HONEYPOT_SUBNET_V4} -m conntrack --ctstate NEW -m comment --comment \"honeypot: no egress\" -j DROP"$'\n'
-  local r
-  for r in $CF_V4; do
-    out+="-A DOCKER-USER -i ${WAN_IFACE} -s ${r} -p tcp -m multiport --dports 80,443 -j RETURN"$'\n'
-  done
-  out+="-A DOCKER-USER -i ${WAN_IFACE} -p tcp -m multiport --dports 80,443 -j DROP"$'\n'
-  out+="-A DOCKER-USER -i ${WAN_IFACE} -p tcp -m tcp --dport 81 -j DROP"$'\n'
-  out+="-A DOCKER-USER -j RETURN"
-  printf '%s' "$out"
+  echo "-A DOCKER-USER -i lo -j RETURN"
+  echo "-A DOCKER-USER -s ${HONEYPOT_SUBNET} -m conntrack --ctstate NEW -m comment --comment \"honeypot: no egress\" -j DROP"
+  wan_rules "$CF_V4"
+  echo "-A DOCKER-USER -j RETURN"
 }
 
 build_rules_v6() {
-  local out=""
-  out+="-A DOCKER-USER -i lo -j RETURN"$'\n'
-  local r
-  for r in $CF_V6; do
-    out+="-A DOCKER-USER -i ${WAN_IFACE} -s ${r} -p tcp -m multiport --dports 80,443 -j RETURN"$'\n'
-  done
-  out+="-A DOCKER-USER -i ${WAN_IFACE} -p tcp -m multiport --dports 80,443 -j DROP"$'\n'
-  out+="-A DOCKER-USER -i ${WAN_IFACE} -p tcp -m tcp --dport 81 -j DROP"$'\n'
-  out+="-A DOCKER-USER -j RETURN"
-  printf '%s' "$out"
+  echo "-A DOCKER-USER -i lo -j RETURN"
+  wan_rules "$CF_V6"
+  echo "-A DOCKER-USER -j RETURN"
 }
 
-# Construit le nouveau dump de la table filter (chain DOCKER-USER remplacee,
-# tout le reste - INPUT/FORWARD/OUTPUT, chains Docker, chains ufw - inchange)
-# et l'applique (ou le valide en --dry-run) de facon atomique.
+restore_payload() {
+  local family="$1"
+  echo "*filter"
+  echo ":DOCKER-USER - [0:0]"
+  if [[ "$family" == v4 ]]; then build_rules_v4; else build_rules_v6; fi
+  echo "COMMIT"
+}
+
 apply_table() {
-  local family="$1" save_bin restore_bin new_rules base without_old new_dump
+  local family="$1" restore_bin
+  if [[ "$family" == v4 ]]; then restore_bin="iptables-restore"; else restore_bin="ip6tables-restore"; fi
 
-  if [ "$family" = v4 ]; then
-    save_bin="iptables-save"
-    restore_bin="iptables-restore"
-    new_rules="$(build_rules_v4)"
-  else
-    save_bin="ip6tables-save"
-    restore_bin="ip6tables-restore"
-    new_rules="$(build_rules_v6)"
-  fi
-
-  base="$("$save_bin" -t filter)"
-  without_old="$(printf '%s\n' "$base" | grep -v '^-A DOCKER-USER ' || true)"
-  without_old="$(ensure_chain_decl "$without_old")"
-  new_dump="$(printf '%s\n' "$without_old" | awk -v rules="$new_rules" '
-    !done && /^COMMIT$/ { print rules; done=1 }
-    { print }
-  ')"
-
-  if [ "$DRY_RUN" -eq 1 ]; then
-    if printf '%s\n' "$new_dump" | "$restore_bin" --test; then
-      log "[$family] dry-run OK. Regles DOCKER-USER qui seraient appliquees :"
-      printf '%s\n' "$new_rules" | while IFS= read -r line; do log "  $line"; done
+  if [[ "$MODE" == dry-run ]]; then
+    if restore_payload "$family" | "$restore_bin" --noflush --test; then
+      log "[$family] dry-run OK. DOCKER-USER rules that would be applied:"
+      restore_payload "$family" | grep '^-A' | while IFS= read -r line; do log "  $line"; done
     else
-      err "[$family] dry-run: validation du ruleset echouee"
+      err "[$family] dry-run: ruleset validation failed"
       return 1
     fi
   else
-    printf '%s\n' "$new_dump" | "$restore_bin"
-    log "[$family] DOCKER-USER reconstruite avec succes (application atomique via $restore_bin)"
+    restore_payload "$family" | "$restore_bin" --noflush
+    log "[$family] DOCKER-USER rebuilt (atomic, --noflush: other chains untouched)"
   fi
 }
 
 main() {
+  local arg
   for arg in "$@"; do
     case "$arg" in
-      --dry-run) DRY_RUN=1 ;;
+      --dry-run) MODE=dry-run ;;
+      --print-rules) MODE=print ;;
+      --print-restore) MODE=print-restore ;;
       -h|--help) usage; exit 0 ;;
-      *) err "argument inconnu: $arg"; usage >&2; exit 1 ;;
+      *) err "unknown argument: $arg"; usage >&2; exit 1 ;;
     esac
   done
+
+  WAN_IFACE="${WAN_IFACE:-$(default_wan_iface)}"
+  validate_config
+
+  if [[ "$MODE" == print-restore ]]; then
+    restore_payload v4
+    exit 0
+  fi
+  if [[ "$MODE" == print ]]; then
+    echo "# IPv4"
+    build_rules_v4
+    echo "# IPv6"
+    build_rules_v6
+    exit 0
+  fi
 
   require_root
   require_cmds
   require_wan_iface
   acquire_lock
 
-  if [ "$DRY_RUN" -eq 1 ]; then
-    log "Dry-run (aucune modification appliquee). Sous-reseau honeypot: ${HONEYPOT_SUBNET_V4}"
-  else
-    log "Application du ruleset DOCKER-USER (v4+v6). Sous-reseau honeypot: ${HONEYPOT_SUBNET_V4}"
-  fi
-
+  log "Mode $MODE, WAN $WAN_IFACE, honeypot subnet $HONEYPOT_SUBNET, cloudflare-only $CLOUDFLARE_ONLY, blocked ports: ${BLOCK_PORTS:-none}"
   apply_table v4
   apply_table v6
-
-  if [ "$DRY_RUN" -eq 0 ]; then
-    log "DOCKER-USER (v4+v6) reconstruite avec succes"
-  fi
 }
 
 main "$@"

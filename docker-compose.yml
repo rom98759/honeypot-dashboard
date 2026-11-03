@@ -1,19 +1,49 @@
-# docker-compose.yml
+# Cowrie honeypot + dashboard. Every tunable lives in .env (copy .env.example).
+# The host side (log exporters, firewall, optional ban worker) is installed by
+# scripts/install-host.sh: see docs/install.md.
 services:
+  cowrie:
+    image: ${COWRIE_IMAGE:-cowrie/cowrie:latest}
+    container_name: honeypot-cowrie
+    restart: unless-stopped
+    networks:
+      - honeypot-net
+    ports:
+      # Port 22 belongs to the honeypot: the real sshd must already listen elsewhere
+      # (SSHD_PORT), otherwise this publish fails or, worse, you lose SSH access.
+      - "${COWRIE_PORT:-22}:2222"
+    volumes:
+      - cowrie-etc:/cowrie/cowrie-git/etc
+      - cowrie-var:/cowrie/cowrie-git/var
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    mem_limit: 256m
+    cpus: "0.5"
+    # A mass scan must not starve the real services on the host.
+    pids_limit: 128
+
   dashboard:
     build: .
     container_name: honeypot-dashboard
     restart: unless-stopped
     networks:
-      - nginx-proxy-network
+      - proxy
     volumes:
       - cowrie-var:/cowrie-var:ro
       - dashboard-data:/data
+      # A directory, never a single log file: a file bind-mount pins the inode and
+      # ingestion silently stops at the next logrotate.
       - /var/log/honeypot-export:/var/log/honeypot-export:ro
-      - ./geoip:/geoip:ro
+      - ${GEOIP_DIR:-./geoip}:/geoip:ro
       - /opt/honeypot/fban-queue:/queue
     group_add:
-      - "4" # adm on the VPS host: read access to /var/log/honeypot-export
+      # Host group owning /var/log/honeypot-export (adm on Debian), so the non-root container can read it.
+      - "${ADM_GID:-4}"
     cap_drop:
       - ALL
     security_opt:
@@ -32,18 +62,31 @@ services:
       - GEOIP_DB_PATH=/geoip/GeoLite2-City.mmdb
       - GEOIP_ASN_DB_PATH=/geoip/GeoLite2-ASN.mmdb
       - ABUSEIPDB_API_KEY=${ABUSEIPDB_API_KEY:-}
-      # Owner's own IPs/CIDRs, comma-separated, set in .env (never committed): never banned.
+      - FBAN_QUEUE_PATH=/queue
       - ADMIN_IPS=${ADMIN_IPS:-}
       - SSHD_PORT=${SSHD_PORT:-}
       - FBAN_ENABLED=${FBAN_ENABLED:-0}
-      - FBAN_QUEUE_PATH=/queue
 
 networks:
-  nginx-proxy-network:
+  honeypot-net:
+    driver: bridge
+    # Not `internal: true`: Docker does not publish ports on an internal network.
+    # Egress is blocked instead by scripts/docker-user-firewall.sh, which matches
+    # this subnet (bridge interface names change on every network recreation).
+    # Keep HONEYPOT_SUBNET identical in .env and /etc/honeypot-dashboard/host.env.
+    ipam:
+      config:
+        - subnet: ${HONEYPOT_SUBNET:-172.21.0.0/16}
+  proxy:
+    # The reverse proxy's Docker network (e.g. Nginx Proxy Manager's). The dashboard
+    # has no authentication of its own: the proxy must add it.
+    name: ${PROXY_NETWORK:-nginx-proxy-network}
     external: true
 
 volumes:
+  cowrie-etc:
+    name: ${COWRIE_ETC_VOLUME:-honeypot-cowrie-etc}
   cowrie-var:
-    external: true
-    name: honeypot_cowrie-var # compose project prefix from /home/user/honeypot/
+    name: ${COWRIE_VAR_VOLUME:-honeypot-cowrie-var}
   dashboard-data:
+    name: ${DASHBOARD_DATA_VOLUME:-honeypot-dashboard-data}

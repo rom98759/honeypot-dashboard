@@ -1,0 +1,10 @@
+[Unit]
+Description=Monthly refresh of the GeoLite2 databases
+
+[Timer]
+OnCalendar=monthly
+RandomizedDelaySec=6h
+Persistent=true
+
+[Install]
+WantedBy=timers.target

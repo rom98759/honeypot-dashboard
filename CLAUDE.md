@@ -4,7 +4,8 @@
 Dashboard self-hosted pour un honeypot Cowrie (SSH/Telnet) sur le VPS OVH. Ingère le JSON Cowrie, le log
 fail2ban et un log d'auth sshd dans SQLite ; sert vue d'ensemble, sessions (replay terminal), carte,
 corrélation honeypot / sshd réel / bans, page IP (enrichissement, ban/unban). Statut : actif, perso, déployé.
-Backlog : `TODO.md`. Décisions de design : `docs/superpowers/specs/`.
+Backlog : `TODO.md`. Doc publique bilingue : `README.md`/`README.fr.md`, `docs/install.md`/`docs/install.fr.md`
+(à garder synchronisées : `tests/test_docs.py` vérifie que chaque clé de config y figure).
 
 ## Stack & architecture
 - Backend FastAPI + SQLite brut (pas d'ORM) : `app/` (`main.py` create_app, `ingester.py`, `tailer.py`,
@@ -63,8 +64,13 @@ Backlog : `TODO.md`. Décisions de design : `docs/superpowers/specs/`.
   campagnes, sessions uniques, Corrélation) ; elles servent seulement à interdire le ban. Ne pas le reproposer.
 - Enrichissement IP (ASN, rDNS, AbuseIPDB) : table `ip_enrichment` = file d'attente + résultats, drainée par
   `EnrichmentWorker`. Sans config, tout dégrade en no-op.
-- Le dashboard est déployé en conteneur durci (`read_only`, `cap_drop: ALL`, `no-new-privileges`) sur le
-  réseau externe `nginx-proxy-network`, derrière Nginx Proxy Manager. `scripts/` = helpers côté VPS.
+- Un seul projet compose : Cowrie (port 22, réseau `honeypot-net` au sous-réseau figé `HONEYPOT_SUBNET`) +
+  dashboard durci (`read_only`, `cap_drop: ALL`, `no-new-privileges`) sur le réseau externe `PROXY_NETWORK`.
+  Réglages compose dans `.env` (`.env.example`) ; noms de volumes surchargeables pour reprendre une install.
+- Partie hôte : `scripts/install-host.sh` (idempotent, `--dry-run`, `--uninstall`, `--root` pour les tests)
+  installe scripts + unités depuis `scripts/`, config dans `/etc/honeypot-dashboard/host.env`
+  (`scripts/host.env.example`). Préflight : refuse (exit 2) si sshd écoute sur 22 ou si ufw actif sans règle
+  pour `SSHD_PORT`. Ne touche jamais sshd, ufw ni `INPUT` ; pare-feu uniquement dans `DOCKER-USER`.
 
 ## Commandes
 ```bash
@@ -91,4 +97,6 @@ Pas de lint/format configuré : imiter le style existant. Après déploiement : 
   `FBAN_QUEUE_PATH`, `FBAN_TIMEOUT_SECONDS`, `FBAN_ENABLED` (défaut 0 : ban masqué, worker hôte jamais
   interrogé), `SSHD_PORT` (libellé Corrélation, via `/api/config`), `ADMIN_IPS` (IP/CIDR séparés par des virgules, dans `.env`).
 - Les défauts de chemins sont ceux du conteneur (`/data/...`) ; importer `app.main` crée l'app au niveau module.
-- `docs/superpowers/` est dans `.gitignore` mais 26 fichiers déjà suivis restent versionnés.
+- `docs/superpowers/` est dans `.gitignore` (specs/plans locaux, jamais commités).
+- Dépôt destiné à être public : aucune IP, domaine, port SSH réel ni chemin `/home/...` dans un fichier suivi
+  (`tests/test_docs.py::test_no_owner_specific_values_tracked`).

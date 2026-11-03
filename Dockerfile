@@ -13,7 +13,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app/ app/
 COPY --from=frontend-build /frontend/dist/ static/
 
-RUN useradd --no-create-home --uid 1000 --shell /usr/sbin/nologin dashboard
+RUN useradd --no-create-home --uid 1000 --shell /usr/sbin/nologin dashboard \
+    && install -d -o dashboard -g dashboard /data
 
 ENV DASHBOARD_DB_PATH=/data/dashboard.sqlite3
 EXPOSE 8000

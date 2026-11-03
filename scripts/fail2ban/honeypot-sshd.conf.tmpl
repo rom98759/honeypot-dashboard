@@ -1,0 +1,7 @@
+# Installed by honeypot-dashboard/scripts/install-host.sh.
+# Protects the REAL sshd only. Cowrie on port 22 is a container and never shows up
+# in the sshd journal, so honeypot attackers are observed, not banned.
+[sshd]
+enabled = true
+port = @SSHD_PORT@
+backend = systemd

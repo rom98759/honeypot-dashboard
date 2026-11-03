@@ -61,6 +61,6 @@ describe("CorrelationPage", () => {
     renderWithProviders(<CorrelationPage />, { route: "/correlation" });
     await waitFor(() => expect(screen.getByText("1.2.3.4")).toBeInTheDocument());
     expect(screen.getByRole("button", { name: /Tentatives sshd réel/ })).toBeInTheDocument();
-    expect(screen.queryByText(/50022/)).toBeNull();
+    expect(screen.queryByText(/Tentatives port/)).toBeNull();
   });
 });

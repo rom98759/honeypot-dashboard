@@ -1,5 +1,5 @@
 [Unit]
-Description=Reapplique periodiquement la chain iptables DOCKER-USER (filet de securite)
+Description=Periodically re-apply the DOCKER-USER chain (safety net)
 
 [Timer]
 OnBootSec=2min
