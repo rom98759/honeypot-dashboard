@@ -84,16 +84,6 @@ def test_geoip_requires_creds(tmp_path):
     assert not marker.exists()
 
 
-def test_no_owner_specific_values_in_scripts():
-    out = subprocess.run(
-        ["git", "grep", "-nE", r"/home/user|50022|eth0|example", "--", "scripts/"],
-        cwd=REPO,
-        capture_output=True,
-        text=True,
-    )
-    assert out.stdout == ""
-
-
 def test_firewall_restore_payload_only_declares_docker_user(tmp_path):
     # Fed to `iptables-restore --noflush`: only the declared chain is flushed, so rules other
     # tools add to INPUT/f2b chains in the meantime are never lost.

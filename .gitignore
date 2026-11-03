@@ -9,3 +9,6 @@ data/
 frontend/dist/
 docs/superpowers/
 .env
+
+# Deployer-specific values checked by tests/test_docs.py, never committed
+.owner-patterns

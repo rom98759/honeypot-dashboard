@@ -1,6 +1,9 @@
 import re
 import subprocess
+
 from pathlib import Path
+
+import pytest
 
 REPO = Path(__file__).resolve().parent.parent
 GUIDES = [REPO / "docs" / "install.md", REPO / "docs" / "install.fr.md"]
@@ -33,11 +36,13 @@ def test_readmes_link_each_other_and_the_guides():
 
 
 def test_no_owner_specific_values_tracked():
+    # The deployer's own values (IPs, domain, ports, interface) live in an untracked
+    # .owner-patterns file, one extended regex per line: listing them here would publish them.
+    patterns = REPO / ".owner-patterns"
+    if not patterns.is_file():
+        pytest.skip("no .owner-patterns file")
     out = subprocess.run(
-        [
-            "git", "grep", "-nIE", r"50022|example|/home/user|54\.37\.|\bens3\b|00000000|vps-[0-9a-f]{8}",
-            "--", ".", ":!tests/test_docs.py", ":!tests/test_host_scripts.py",
-        ],
+        ["git", "grep", "-nIE", "-f", str(patterns), "--", ".", ":!.owner-patterns"],
         cwd=REPO,
         capture_output=True,
         text=True,
