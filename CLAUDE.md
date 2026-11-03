@@ -95,7 +95,8 @@ Pas de lint/format configuré : imiter le style existant. Après déploiement : 
 - Env vars : `COWRIE_JSON_PATH`, `COWRIE_VAR_PATH`, `DASHBOARD_DB_PATH`, `FAIL2BAN_LOG_PATH`,
   `SSHD_AUTH_LOG_PATH`, `GEOIP_DB_PATH`, `GEOIP_ASN_DB_PATH`, `ABUSEIPDB_API_KEY` (vide = désactivé),
   `FBAN_QUEUE_PATH`, `FBAN_TIMEOUT_SECONDS`, `FBAN_ENABLED` (défaut 0 : ban masqué, worker hôte jamais
-  interrogé), `SSHD_PORT` (libellé Corrélation, via `/api/config`), `ADMIN_IPS` (IP/CIDR séparés par des virgules, dans `.env`).
+  interrogé), `SSHD_PORT` (libellé Corrélation, via `/api/config`), `ADMIN_IPS` (IP/CIDR séparés par des virgules, dans `.env`),
+  `FAIL2BAN_BANTIMES` (`jail=secondes,…`, défauts = jails du VPS : un ban sans `Unban` expire après ce délai).
 - Les défauts de chemins sont ceux du conteneur (`/data/...`) ; importer `app.main` crée l'app au niveau module.
 - `docs/superpowers/` est dans `.gitignore` (specs/plans locaux, jamais commités).
 - Dépôt destiné à être public : aucune IP, domaine, port SSH réel ni chemin `/home/...` dans un fichier suivi

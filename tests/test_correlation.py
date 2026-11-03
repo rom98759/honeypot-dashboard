@@ -1,8 +1,12 @@
 import shutil
 from pathlib import Path
 
+from datetime import datetime, timezone
+
 from app.correlation import (
     FailbanIngester,
+    currently_banned_query,
+    parse_bantimes,
     SshdAuthIngester,
     get_correlation_rows,
     parse_fail2ban_line,
@@ -52,7 +56,10 @@ def test_parse_sshd_auth_failed_password():
     assert parsed["result"] == "failed_password"
 
 
-def test_ingesters_and_correlation_with_real_fixtures(tmp_path):
+def test_ingesters_and_correlation_with_real_fixtures(tmp_path, monkeypatch):
+    # The fixture bans are months old; keep them "current" to test the parsing.
+    monkeypatch.setattr("app.correlation.BANTIMES", {})
+    monkeypatch.setattr("app.correlation.FALLBACK_BANTIME", 10 * 365 * 86400)
     fail2ban_log = tmp_path / "fail2ban.log"
     sshd_auth_log = tmp_path / "sshd-auth.log"
     shutil.copy(FIXTURES / "sample_fail2ban.log", fail2ban_log)
@@ -131,3 +138,24 @@ def test_correlation_marks_ip_unbanned_after_later_unban(tmp_path):
     )
     rows = {r["ip"]: r for r in get_correlation_rows(db)}
     assert rows["9.9.9.9"]["fail2ban_banned"] is False
+
+
+def test_parse_bantimes_ignores_bad_entries():
+    assert parse_bantimes("sshd=60, recidive=600,bad,x=y,") == {"sshd": 60, "recidive": 600}
+    assert parse_bantimes(None) == {}
+
+
+def test_ban_expires_after_its_jail_bantime(tmp_path, monkeypatch):
+    monkeypatch.setattr("app.correlation.BANTIMES", {"sshd": 3600})
+    db = connect(tmp_path / "db.sqlite3")
+    db.executemany(
+        "INSERT INTO fail2ban_events (ip, action, jail, timestamp) VALUES (?, 'Ban', ?, ?)",
+        [
+            ("1.1.1.1", "sshd", "2026-11-03 11:30:00,000"),
+            ("2.2.2.2", "sshd", "2026-11-03 10:30:00,000"),
+            ("3.3.3.3", "other-jail", "2026-10-30 12:00:00,000"),
+        ],
+    )
+    db.commit()
+    sql, params = currently_banned_query(now=datetime(2026, 11, 3, 12, 0, tzinfo=timezone.utc))
+    assert {r["ip"] for r in db.execute(sql, params)} == {"1.1.1.1", "3.3.3.3"}

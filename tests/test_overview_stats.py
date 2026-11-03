@@ -54,8 +54,8 @@ def test_currently_banned_ignores_period(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
     now = datetime.now(timezone.utc)
     db.execute(
-        "INSERT INTO fail2ban_events (ip, action, jail, timestamp) VALUES ('9.9.9.9', 'Ban', 'sshd', ?)",
-        (_iso(now - timedelta(days=10)),),
+        "INSERT INTO fail2ban_events (ip, action, jail, timestamp) VALUES ('9.9.9.9', 'Ban', 'recidive', ?)",
+        ((now - timedelta(days=3)).strftime("%Y-%m-%d %H:%M:%S,000"),),
     )
     db.commit()
 

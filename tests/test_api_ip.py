@@ -1,7 +1,14 @@
+from datetime import datetime, timedelta, timezone
+
 from fastapi.testclient import TestClient
 
 from app.db import connect
 from app.main import create_app
+
+
+def _recent_ban_ts(hours: float = 1) -> str:
+    """fail2ban's own timestamp layout, `hours` ago."""
+    return (datetime.now(timezone.utc) - timedelta(hours=hours)).strftime("%Y-%m-%d %H:%M:%S,000")
 
 
 def test_ip_summary_404_for_unknown_ip(tmp_path):
@@ -46,8 +53,8 @@ def test_ip_summary_aggregates_sessions_and_geo(tmp_path):
 def test_ip_summary_currently_banned_true_after_ban_with_no_later_unban(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
     db.execute(
-        "INSERT INTO fail2ban_events (ip, action, jail, timestamp) "
-        "VALUES ('1.2.3.4', 'Ban', 'sshd', '2026-08-14T08:00:00Z')"
+        "INSERT INTO fail2ban_events (ip, action, jail, timestamp) VALUES ('1.2.3.4', 'Ban', 'sshd', ?)",
+        (_recent_ban_ts(),),
     )
     db.commit()
 
@@ -57,6 +64,20 @@ def test_ip_summary_currently_banned_true_after_ban_with_no_later_unban(tmp_path
     response = client.get("/api/ip/1.2.3.4/summary")
     assert response.status_code == 200
     assert response.json()["currently_banned"] is True
+
+
+def test_ip_summary_ban_older_than_bantime_has_expired(tmp_path):
+    """The Unban line can be lost (log gap, restart): a 1-day sshd ban from last week is over."""
+    db = connect(tmp_path / "db.sqlite3")
+    db.execute(
+        "INSERT INTO fail2ban_events (ip, action, jail, timestamp) VALUES ('1.2.3.4', 'Ban', 'sshd', ?)",
+        (_recent_ban_ts(hours=24 * 7),),
+    )
+    db.commit()
+
+    app = create_app(db=db, start_background_tasks=False)
+    response = TestClient(app).get("/api/ip/1.2.3.4/summary")
+    assert response.json()["currently_banned"] is False
 
 
 def test_ip_summary_currently_banned_false_after_later_unban(tmp_path):
@@ -105,8 +126,8 @@ def test_ip_summary_currently_banned_uses_live_status_over_log(tmp_path):
 def test_ip_summary_currently_banned_falls_back_to_log_when_worker_times_out(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
     db.execute(
-        "INSERT INTO fail2ban_events (ip, action, jail, timestamp) "
-        "VALUES ('1.2.3.4', 'Ban', 'sshd', '2026-08-14T08:00:00Z')"
+        "INSERT INTO fail2ban_events (ip, action, jail, timestamp) VALUES ('1.2.3.4', 'Ban', 'sshd', ?)",
+        (_recent_ban_ts(),),
     )
     db.commit()
 

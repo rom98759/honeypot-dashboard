@@ -1,5 +1,7 @@
 import ipaddress
+import os
 import re
+from datetime import datetime, timedelta, timezone
 import sqlite3
 from pathlib import Path
 
@@ -17,27 +19,67 @@ SOURCE_PORT_RE = re.compile(r"(\S+) port \d+")
 # the server's own address; anchored at the end so a username cannot fake it.
 LOCAL_SUFFIX_RE = re.compile(r' on \S+ port \d+(?: rdomain "[^"]*")?\s*$')
 
-# Banned now = a Ban/Restore Ban with no later Unban for that IP. Every
-# "banned" figure (overview KPI, correlation, IP page fallback) uses this so
-# the screens cannot disagree about the same IP.
-CURRENTLY_BANNED_IPS_SQL = (
-    "SELECT DISTINCT f1.ip FROM fail2ban_events f1 "
-    "WHERE f1.action IN ('Ban', 'Restore Ban') AND NOT EXISTS ("
-    "  SELECT 1 FROM fail2ban_events f2 "
-    "  WHERE f2.ip = f1.ip AND f2.action = 'Unban' AND f2.timestamp > f1.timestamp"
-    ")"
-)
+# A ban whose Unban line never reached us (log gap, fail2ban restart) would
+# otherwise stay "banned" forever, so a ban also ends once its jail's bantime
+# has passed. Defaults mirror the VPS jails; FAIL2BAN_BANTIMES overrides them.
+DEFAULT_BANTIMES = {"sshd": 86400, "recidive": 604800, "npm-badbots": 3600}
+# Unknown jails get fail2ban's longest common setting rather than being dropped.
+FALLBACK_BANTIME = 604800
+
+
+def parse_bantimes(raw: str | None) -> dict[str, int]:
+    """"sshd=86400,recidive=604800" -> {"sshd": 86400, ...}; bad entries are ignored."""
+    bantimes = {}
+    for item in (raw or "").split(","):
+        jail, _, seconds = item.partition("=")
+        if jail.strip() and seconds.strip().isdigit():
+            bantimes[jail.strip()] = int(seconds.strip())
+    return bantimes
+
+
+BANTIMES = {**DEFAULT_BANTIMES, **parse_bantimes(os.environ.get("FAIL2BAN_BANTIMES"))}
+
+
+def currently_banned_query(now: datetime | None = None) -> tuple[str, list]:
+    """Banned now = a Ban/Restore Ban younger than its jail's bantime with no
+    later Unban for that IP. Every "banned" figure (overview KPI, correlation,
+    IP page fallback) uses this so the screens cannot disagree about the same IP."""
+    now = now or datetime.now(timezone.utc)
+
+    # fail2ban timestamps are "YYYY-MM-DD HH:MM:SS,mmm" in host time (UTC on the
+    # VPS), so the same layout compares correctly as text.
+    def cutoff(seconds: int) -> str:
+        return (now - timedelta(seconds=seconds)).strftime("%Y-%m-%d %H:%M:%S")
+
+    params: list = []
+    for jail, seconds in BANTIMES.items():
+        params += [jail, cutoff(seconds)]
+    params.append(cutoff(FALLBACK_BANTIME))
+    # SQLite rejects a CASE without any WHEN.
+    cases = " ".join("WHEN ? THEN ?" for _ in BANTIMES)
+    jail_cutoff = f"CASE f1.jail {cases} ELSE ? END" if BANTIMES else "?"
+    sql = (
+        "SELECT DISTINCT f1.ip AS ip FROM fail2ban_events f1 "
+        "WHERE f1.action IN ('Ban', 'Restore Ban') "
+        f"AND f1.timestamp > {jail_cutoff} "
+        "AND NOT EXISTS ("
+        "  SELECT 1 FROM fail2ban_events f2 "
+        "  WHERE f2.ip = f1.ip AND f2.action = 'Unban' AND f2.timestamp > f1.timestamp"
+        ")"
+    )
+    return sql, params
 
 
 def currently_banned_ips(db: sqlite3.Connection) -> set[str]:
-    return {r["ip"] for r in db.execute(CURRENTLY_BANNED_IPS_SQL).fetchall()}
+    sql, params = currently_banned_query()
+    return {r["ip"] for r in db.execute(sql, params).fetchall()}
 
 
 def is_currently_banned(db: sqlite3.Connection, ip: str) -> bool:
+    sql, params = currently_banned_query()
     return (
         db.execute(
-            f"SELECT EXISTS (SELECT 1 FROM ({CURRENTLY_BANNED_IPS_SQL}) WHERE ip = ?) AS banned",
-            (ip,),
+            f"SELECT EXISTS (SELECT 1 FROM ({sql}) WHERE ip = ?) AS banned", [*params, ip]
         ).fetchone()["banned"]
         == 1
     )

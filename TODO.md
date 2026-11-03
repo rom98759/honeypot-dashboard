@@ -7,7 +7,7 @@
       la dernière paire `<ip> port <n>` (suffixe local VERBOSE retiré, IPv6
       acceptée). Les lignes déjà en base ne sont pas reparsées.
 - [x] « Banni » contradictoire : Corrélation = banni au moins une fois, page
-      IP = banni actuellement. Une seule requête (`CURRENTLY_BANNED_IPS_SQL`,
+      IP = banni actuellement. Une seule requête (`currently_banned_query`,
       `app/correlation.py`) pour Corrélation, KPI Overview et page IP.
 - [x] Ingestion fail2ban/sshd figée en silence (fail2ban bloqué au 2026-09-14) :
       les logs étaient bind-mountés comme fichiers, Docker fige l'inode, donc
@@ -28,11 +28,10 @@
       synchrone, grignotant le délai avant l'évènement suivant. Corrigé en
       découpant les évènements > `CHUNK_SIZE` en plusieurs évènements
       espacés de `CHUNK_STEP_SECONDS` (`app/ttyplayer.py`).
-
-- [ ] KPI « IP bannies » gonflé : 17 IP comptées bannies alors que leur ban date de juin–août
+- [x] KPI « IP bannies » gonflé : 17 IP comptées bannies alors que leur ban date de juin–août
       (bantime sshd 1 j, recidive 1 sem.). Leur `Unban` manque dans les logs (trou de septembre,
-      redémarrages de fail2ban), donc `CURRENTLY_BANNED_IPS_SQL` les croit toujours bannies. Piste :
-      considérer un ban expiré au-delà du bantime de sa jail (config), le worker hôte restant la vérité.
+      redémarrages de fail2ban). Corrigé : un ban expire aussi passé le bantime de sa jail
+      (`currently_banned_query`, défauts du VPS, `FAIL2BAN_BANTIMES` pour les changer). Prod : 17 → 0.
 
 ## Feuille de route (validée 2026-11-01)
 

@@ -3,7 +3,7 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 
 from app.commands_stats import commands_from
-from app.correlation import CURRENTLY_BANNED_IPS_SQL
+from app.correlation import currently_banned_query
 from app.periods import bucket_expr, period_cutoff, period_delta
 
 DURATION_BUCKETS = ["<10s", "10-60s", "1-5min", "5-30min", ">30min"]
@@ -83,8 +83,9 @@ def get_overview_stats(db: sqlite3.Connection, period: str, filters: dict | None
         [active_since] + filter_params,
     ).fetchone()["n"]
 
+    banned_sql, banned_params = currently_banned_query()
     currently_banned = db.execute(
-        f"SELECT COUNT(*) AS n FROM ({CURRENTLY_BANNED_IPS_SQL})"
+        f"SELECT COUNT(*) AS n FROM ({banned_sql})", banned_params
     ).fetchone()["n"]
     last_ban_at = _fail2ban_ts_to_iso(
         db.execute(
