@@ -29,6 +29,22 @@
       découpant les évènements > `CHUNK_SIZE` en plusieurs évènements
       espacés de `CHUNK_STEP_SECONDS` (`app/ttyplayer.py`).
 
+- [ ] KPI « IP bannies » gonflé : 17 IP comptées bannies alors que leur ban date de juin–août
+      (bantime sshd 1 j, recidive 1 sem.). Leur `Unban` manque dans les logs (trou de septembre,
+      redémarrages de fail2ban), donc `CURRENTLY_BANNED_IPS_SQL` les croit toujours bannies. Piste :
+      considérer un ban expiré au-delà du bantime de sa jail (config), le worker hôte restant la vérité.
+
+## Feuille de route (validée 2026-11-01)
+
+- [x] A. Corrections rapides (#18–#22).
+- [x] B1. Panneau session réorganisé + export JSON / .cast (#25) ; fiche campagne alignée, Campagnes mobile (#26).
+- [ ] B2. Fichiers : ingérer `cowrie.session.file_upload` / `file_download` (scp compris), onglet
+      « Fichiers » du panneau session (SHA-256, taille, source, lien VirusTotal), zip chiffré « infected ».
+- [ ] C. Recherche avancée : chips multi-valeurs ET barre de requête texte
+      (`ip:45.* country:CN cmd:wget -asn:… dur>60`) pilotant les mêmes filtres, sur toutes les pages.
+- [ ] D. Annotations : notes + tags sur IP, session, campagne, en base, filtrables.
+- [ ] Alertes Dependabot (le propriétaire gère les mises à jour).
+
 ## Frontend / refonte visuelle
 
 - [x] Libellé « Tentatives sshd » de la page Corrélation : port lu depuis `SSHD_PORT`
