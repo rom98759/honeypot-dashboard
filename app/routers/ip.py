@@ -1,10 +1,13 @@
 import asyncio
 from urllib.parse import urlparse
 
+from typing import Literal
+
 from fastapi import APIRouter, HTTPException, Query, Request
+from pydantic import BaseModel
 
 from app.admin_ips import is_admin_ip
-from app.correlation import is_currently_banned
+from app.correlation import active_bans, is_currently_banned
 from app.fban_control import FbanControlError
 
 router = APIRouter()
@@ -68,6 +71,7 @@ async def get_ip_summary(request: Request, ip: str):
         "total_sessions": session_stats["total"],
         "total_commands": total_commands,
         "currently_banned": currently_banned,
+        "active_bans": active_bans(db, ip),
         "protected": is_admin_ip(request.app, ip),
         "ban_enabled": request.app.state.ban_enabled,
         "asn": enrichment["asn"] if enrichment else None,
@@ -126,8 +130,12 @@ def require_ban_enabled(request: Request) -> None:
         raise HTTPException(status_code=404, detail="ban control disabled (FBAN_ENABLED)")
 
 
+class BanRequest(BaseModel):
+    scope: Literal["services", "all"] = "services"
+
+
 @router.post("/api/ip/{ip}/ban")
-async def ban_ip(request: Request, ip: str):
+async def ban_ip(request: Request, ip: str, body: BanRequest | None = None):
     require_ban_enabled(request)
     verify_dashboard_origin(request)
     if is_admin_ip(request.app, ip):
@@ -135,7 +143,7 @@ async def ban_ip(request: Request, ip: str):
         raise HTTPException(status_code=403, detail="protected admin IP")
     fban_control = request.app.state.fban_control
     try:
-        await asyncio.to_thread(fban_control.request_ban, ip)
+        await asyncio.to_thread(fban_control.request_ban, ip, (body or BanRequest()).scope)
     except FbanControlError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except ValueError as exc:

@@ -44,11 +44,43 @@ def test_request_ban_rejects_invalid_ip(tmp_path):
     assert list(tmp_path.glob("req-*")) == []
 
 
-def test_request_ban_rejects_non_whitelisted_jail(tmp_path):
+def test_request_ban_rejects_unknown_scope(tmp_path):
     control = FbanControl(tmp_path)
     with pytest.raises(ValueError):
-        control.request_ban("1.2.3.4", jail="nginx")
+        control.request_ban("1.2.3.4", "nginx")
     assert list(tmp_path.glob("req-*")) == []
+
+
+@pytest.mark.parametrize(
+    ("call", "line"),
+    [
+        (lambda c: c.request_ban("1.2.3.4"), "ban manual 1.2.3.4\n"),
+        (lambda c: c.request_ban("1.2.3.4", "all"), "ban manual-all 1.2.3.4\n"),
+        (lambda c: c.request_unban("1.2.3.4"), "unban all 1.2.3.4\n"),
+        (lambda c: c.request_status("1.2.3.4"), "status all 1.2.3.4\n"),
+    ],
+)
+def test_request_lines_match_the_worker_protocol(tmp_path, call, line):
+    control = FbanControl(tmp_path, timeout=0.05, poll_interval=0.01)
+    seen = []
+    original = control._await_response
+
+    def capture(request_id):
+        seen.append((tmp_path / f"req-{request_id}").read_text())
+        return original(request_id)
+
+    control._await_response = capture
+    try:
+        call(control)
+    except Exception:
+        pass
+    assert seen == [line]
+
+
+def test_request_status_true_when_worker_lists_jails(tmp_path):
+    control = FbanControl(tmp_path)
+    respond_after(tmp_path, "status", "banned sshd,cowrie")
+    assert control.request_status("1.2.3.4") is True
 
 
 def test_request_ban_raises_fban_control_error_on_worker_error(tmp_path):

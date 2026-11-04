@@ -68,9 +68,12 @@ troubleshooting) is in **[docs/install.md](docs/install.md)**.
 - Cowrie runs in a container with no capabilities, a read-only filesystem, resource limits and
   **no outbound network** (`DOCKER-USER` rule on its fixed subnet).
 - Docker-published ports bypass ufw: the firewall rules live in `DOCKER-USER`, never in ufw.
-- Ban/unban is off by default (`FBAN_ENABLED=0`). When on, requests go through a queue directory
-  to a host worker that only accepts `ban|unban|status sshd <ip>` and refuses the addresses in
-  `/etc/honeypot/never-ban` and `ADMIN_IPS`.
+- fail2ban: the honeypot observes, the real services are protected. Anyone who touches Cowrie is
+  banned from the real sshd and the sites for a day while Cowrie keeps recording it; failures on the
+  real sshd ban for 7 days, repeat offenders for 30 (see `docs/install.md`, "How bans work").
+- Ban/unban from the dashboard is off by default (`FBAN_ENABLED=0`). When on, requests go through a
+  queue directory to a host worker that only accepts `ban manual|manual-all <ip>`, `unban all <ip>`
+  and `status all <ip>`, and refuses the addresses in `/etc/honeypot/never-ban` and `ADMIN_IPS`.
 
 ## Development
 

@@ -119,5 +119,14 @@
 - [ ] Reste : `/ban` et `/unban` joignables sans auth depuis les autres
       conteneurs du réseau `nginx-proxy-network` (contourne NPM). Piste : réseau
       Docker dédié dashboard ↔ NPM, ou secret partagé sur les routes d'écriture.
-- [ ] Fail2Ban peut deban des ip donc affiche toujours ban mais peut etre pas. Afficher reelement les informations en cours et historique des ip ban/unban
-- [ ] Ajouter un mecanisme de ban en cliqaint sur un bouton dans le dashboard pour bannir une ip directement depuis l'interface.
+- [x] Fail2Ban peut deban des ip donc affiche toujours ban mais peut etre pas : la page IP liste les bans
+      en cours (jail, ce qu'ils bloquent, fin), expirés au bantime de leur jail.
+- [x] Bouton de ban dans le dashboard (jails `manual` / `manual-all`, portée au choix).
+- [x] Logique de ban revue (2026-11-04) : jail `sshd` aveugle sur Debian 12 (journal `ssh.service`, pas
+      `sshd.service` : 0 ligne vs 70 938 en 7 j), bans sur INPUT seulement (ne couvraient ni Docker ni
+      les sites), Cowrie déconnecté de fail2ban, jails avec tiret jamais lues (`npm-badbots`). Remplacé
+      par `honeypot.local` : « le honeypot observe, les vrais services sont protégés ».
+- [ ] Synchroniser la liste des IP protégées de la page Réglages avec `/etc/honeypot/never-ban` (et donc
+      l'`ignoreip` de fail2ban) : aujourd'hui il faut l'ajouter aux deux endroits.
+- [ ] Bans IPv6 sur Cowrie : docker-proxy présente les clients IPv6 comme la passerelle du réseau
+      honeypot, donc la jail `cowrie` ne peut pas les voir (ni les bannir).

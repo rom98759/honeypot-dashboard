@@ -26,6 +26,11 @@ const FAIL2BAN_ACTION_LABELS: Record<string, string> = {
   Unban: "Unban",
 };
 
+const BAN_SCOPE_LABELS: Record<"services" | "all", string> = {
+  services: "bloque le SSH réel, les sites et les autres ports, pas Cowrie",
+  all: "bloque tout, Cowrie compris",
+};
+
 const SSHD_RESULT_LABELS: Record<string, string> = {
   accepted: "Accepté",
   failed_password: "Mot de passe échoué",
@@ -126,19 +131,42 @@ export function IpDetailPage() {
       {confirmingBan && data.ban_enabled && !data.protected && !data.currently_banned ? (
         <div className="confirm-bar" role="alertdialog" aria-label="Confirmer le ban">
           <span>
-            Bannir <span className="mono">{ip}</span> du vrai sshd (jail <span className="mono">sshd</span>) ?
+            Bannir <span className="mono">{ip}</span> pendant 7 jours ?
           </span>
           <button
             className="btn btn-danger"
             disabled={banMutation.isPending}
-            onClick={() => banMutation.mutate(undefined, { onSettled: () => setConfirmingBan(false) })}
+            title={BAN_SCOPE_LABELS.services}
+            onClick={() => banMutation.mutate("services", { onSettled: () => setConfirmingBan(false) })}
           >
-            Confirmer le ban
+            Vrais services
+          </button>
+          <button
+            className="btn btn-danger"
+            disabled={banMutation.isPending}
+            title={BAN_SCOPE_LABELS.all}
+            onClick={() => banMutation.mutate("all", { onSettled: () => setConfirmingBan(false) })}
+          >
+            Tout bloquer
           </button>
           <button className="btn" onClick={() => setConfirmingBan(false)}>
             Annuler
           </button>
+          <span className="confirm-hint">
+            Vrais services : SSH réel et sites fermés, Cowrie continue de l'observer. Tout bloquer : Cowrie compris.
+          </span>
         </div>
+      ) : null}
+      {data.active_bans?.length ? (
+        <ul className="active-bans" aria-label="Bans en cours">
+          {data.active_bans.map((b) => (
+            <li key={b.jail}>
+              <Badge label={b.jail} tone="danger" />
+              <span>{BAN_SCOPE_LABELS[b.scope]}</span>
+              <span className="cell-muted">jusqu'au {formatTimestamp(b.expires_at)}</span>
+            </li>
+          ))}
+        </ul>
       ) : null}
       {banActionError ? (
         <ErrorState

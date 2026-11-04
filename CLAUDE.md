@@ -62,6 +62,15 @@ Backlog : `TODO.md`. Doc publique bilingue : `README.md`/`README.fr.md`, `docs/i
   `X-Frame-Options: DENY` + `frame-ancestors 'none'` (middleware dans `create_app`).
   Choix du propriétaire (2026-11-01) : les IP protégées ne sont PAS exclues des statistiques (Overview,
   campagnes, sessions uniques, Corrélation) ; elles servent seulement à interdire le ban. Ne pas le reproposer.
+- Logique de ban (validée 2026-11-04) : « le honeypot observe, les vrais services sont protégés ». Jails
+  dans `scripts/fail2ban/honeypot.local.tmpl` (posé par `install-host.sh`) : `cowrie` (toute connexion
+  Cowrie, 1 j), `sshd` (vrai port, 2 échecs, 7 j ; Debian 12 = `journalmatch` sur `ssh.service`),
+  `recidive` (30 j), `npm-badbots` (action seulement), `manual` / `manual-all` (bouton du dashboard, 7 j).
+  Action `honeypot-block` → `scripts/honeypot-ban.sh` : une chaîne `hp-<jail>` appelée depuis INPUT et
+  DOCKER-USER ; portée `services` = tout sauf Cowrie (RETURN tcp/`COWRIE_PORT`, DOCKER-USER `! -d
+  HONEYPOT_SUBNET`), `all` = tout. `docker-user-firewall.sh` réinjecte les sauts (il vide DOCKER-USER).
+  Le worker n'accepte que `ban manual|manual-all`, `unban all`, `status all`. Les bantimes du template
+  et `DEFAULT_BANTIMES` / `JAIL_SCOPES` (`app/correlation.py`) doivent rester alignés.
 - Enrichissement IP (ASN, rDNS, AbuseIPDB) : table `ip_enrichment` = file d'attente + résultats, drainée par
   `EnrichmentWorker`. Sans config, tout dégrade en no-op.
 - Un seul projet compose : Cowrie (port 22, réseau `honeypot-net` au sous-réseau figé `HONEYPOT_SUBNET`) +
@@ -96,7 +105,7 @@ Pas de lint/format configuré : imiter le style existant. Après déploiement : 
   `SSHD_AUTH_LOG_PATH`, `GEOIP_DB_PATH`, `GEOIP_ASN_DB_PATH`, `ABUSEIPDB_API_KEY` (vide = désactivé),
   `FBAN_QUEUE_PATH`, `FBAN_TIMEOUT_SECONDS`, `FBAN_ENABLED` (défaut 0 : ban masqué, worker hôte jamais
   interrogé), `SSHD_PORT` (libellé Corrélation, via `/api/config`), `ADMIN_IPS` (IP/CIDR séparés par des virgules, dans `.env`),
-  `FAIL2BAN_BANTIMES` (`jail=secondes,…`, défauts = jails du VPS : un ban sans `Unban` expire après ce délai).
+  `FAIL2BAN_BANTIMES` (`jail=secondes,…`, défauts = `honeypot.local.tmpl` : un ban sans `Unban` expire après ce délai).
 - Les défauts de chemins sont ceux du conteneur (`/data/...`) ; importer `app.main` crée l'app au niveau module.
 - `docs/superpowers/` est dans `.gitignore` (specs/plans locaux, jamais commités).
 - Dépôt destiné à être public : aucune IP, domaine, port SSH réel ni chemin `/home/...` dans un fichier suivi

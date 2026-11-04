@@ -69,9 +69,13 @@ désinstallation, dépannage) est dans **[docs/install.fr.md](docs/install.fr.md
 - Cowrie tourne dans un conteneur sans capability, en système de fichiers lecture seule, avec limites
   de ressources et **aucun accès réseau sortant** (règle `DOCKER-USER` sur son sous-réseau figé).
 - Les ports publiés par Docker contournent ufw : les règles pare-feu sont dans `DOCKER-USER`, jamais dans ufw.
-- Le ban/unban est désactivé par défaut (`FBAN_ENABLED=0`). Activé, les demandes passent par un
-  répertoire de file d'attente vers un worker hôte qui n'accepte que `ban|unban|status sshd <ip>` et
-  refuse les adresses de `/etc/honeypot/never-ban` et de `ADMIN_IPS`.
+- fail2ban : le honeypot observe, les vrais services sont protégés. Quiconque touche Cowrie est banni
+  du vrai sshd et des sites pendant un jour tandis que Cowrie continue de l'enregistrer ; les échecs sur
+  le vrai sshd bannissent 7 jours, les récidivistes 30 (voir `docs/install.fr.md`, « Fonctionnement des bans »).
+- Le ban/unban depuis le dashboard est désactivé par défaut (`FBAN_ENABLED=0`). Activé, les demandes
+  passent par un répertoire de file d'attente vers un worker hôte qui n'accepte que
+  `ban manual|manual-all <ip>`, `unban all <ip>` et `status all <ip>`, et refuse les adresses de
+  `/etc/honeypot/never-ban` et de `ADMIN_IPS`.
 
 ## Développement
 

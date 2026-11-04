@@ -1,0 +1,69 @@
+# Installed by honeypot-dashboard/scripts/install-host.sh, regenerated on every run:
+# change host.env or /etc/honeypot/never-ban and rerun the installer instead of editing.
+# jail.d/*.local is read after jail.local, so these settings win over yours.
+#
+# Rule of thumb: the honeypot observes, the real services are protected.
+#   scope=services  bans the real sshd, the sites and every other port, but NOT Cowrie
+#   scope=all       bans everything, Cowrie included
+# Bantimes must match FAIL2BAN_BANTIMES defaults in app/correlation.py.
+
+[DEFAULT]
+# Your own addresses (never-ban) and the honeypot network: Cowrie sees IPv6
+# clients and some health checks as its Docker gateway, which must never be banned.
+ignoreip = 127.0.0.1/8 ::1 @HONEYPOT_SUBNET@ @NEVER_BAN@
+
+[sshd]
+# Only you use the real sshd, so any failure there is hostile: 7 days at once.
+enabled = true
+port = @SSHD_PORT@
+backend = systemd
+# Debian 12 logs sshd as ssh.service; the stock match (sshd.service) sees nothing.
+journalmatch = _SYSTEMD_UNIT=ssh.service + _COMM=sshd
+mode = aggressive
+maxretry = 2
+findtime = 1d
+bantime = 7d
+action = honeypot-block[name=sshd, scope=services]
+
+[cowrie]
+# Anyone who touches the honeypot is shut out of the real services for a day,
+# and keeps being recorded by Cowrie.
+enabled = @COWRIE_ENABLED@
+filter = honeypot-cowrie
+logpath = @COWRIE_JSON@
+backend = polling
+maxretry = 1
+findtime = 1d
+bantime = 1d
+action = honeypot-block[name=cowrie, scope=services]
+
+[npm-badbots]
+# Only applies if you defined this jail yourself (filter + logpath); the stock
+# iptables action works on INPUT, which Docker-published ports never cross.
+action = honeypot-block[name=npm-badbots, scope=services]
+
+[recidive]
+# Banned 3 times in a week by any jail: a month.
+enabled = true
+maxretry = 3
+findtime = 7d
+bantime = 30d
+action = honeypot-block[name=recidive, scope=services]
+
+[manual]
+# Dashboard "Ban" button, default choice.
+enabled = true
+filter = honeypot-manual
+backend = systemd
+journalmatch = _SYSTEMD_UNIT=honeypot-manual-ban.service
+bantime = 7d
+action = honeypot-block[name=manual, scope=services]
+
+[manual-all]
+# Dashboard "Ban" button, "block everything" choice.
+enabled = true
+filter = honeypot-manual
+backend = systemd
+journalmatch = _SYSTEMD_UNIT=honeypot-manual-ban.service
+bantime = 7d
+action = honeypot-block[name=manual-all, scope=all]

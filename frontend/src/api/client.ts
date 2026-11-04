@@ -15,8 +15,13 @@ export async function fetchJSON<T>(url: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export async function postJSON<T>(url: string): Promise<T> {
-  const response = await fetch(url, { method: "POST" });
+export async function postJSON<T>(url: string, body?: unknown): Promise<T> {
+  const response = await fetch(
+    url,
+    body === undefined
+      ? { method: "POST" }
+      : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
+  );
   if (!response.ok) {
     throw new ApiError(url, response.status);
   }

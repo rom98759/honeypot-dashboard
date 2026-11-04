@@ -4,7 +4,10 @@ import uuid
 from pathlib import Path
 
 IP_RE = re.compile(r"^(\d{1,3}\.){3}\d{1,3}$|^[0-9a-fA-F:]+$")
-JAIL_WHITELIST = {"sshd"}
+# The dashboard only bans into its own jails (scripts/fail2ban/honeypot.local.tmpl);
+# "all" addresses every jail at once, for unban and status.
+BAN_SCOPES = {"services": "manual", "all": "manual-all"}
+JAIL_WHITELIST = {*BAN_SCOPES.values(), "all"}
 
 
 class FbanControlError(Exception):
@@ -69,20 +72,24 @@ class FbanControl:
         if result != "ok":
             raise FbanControlError(result)
 
-    def request_ban(self, ip: str, jail: str = "sshd") -> None:
-        self._request_action("ban", ip, jail)
+    def request_ban(self, ip: str, scope: str = "services") -> None:
+        """scope "services" keeps the honeypot reachable, "all" blocks everything."""
+        if scope not in BAN_SCOPES:
+            raise ValueError(f"invalid scope: {scope!r}")
+        self._request_action("ban", ip, BAN_SCOPES[scope])
 
-    def request_unban(self, ip: str, jail: str = "sshd") -> None:
-        self._request_action("unban", ip, jail)
+    def request_unban(self, ip: str) -> None:
+        """Lifts the IP from every jail: a manual unban that left an automatic ban would surprise."""
+        self._request_action("unban", ip, "all")
 
-    def request_status(self, ip: str, jail: str = "sshd") -> bool | None:
-        _validate(ip, jail)
+    def request_status(self, ip: str) -> bool | None:
+        _validate(ip, "all")
         try:
-            request_id = self._write_request("status", ip, jail)
+            request_id = self._write_request("status", ip, "all")
             result = self._await_response(request_id)
         except OSError:
             return None  # queue mechanism unavailable: caller falls back
-        if result == "banned":
+        if result is not None and (result == "banned" or result.startswith("banned ")):
             return True
         if result == "not_banned":
             return False

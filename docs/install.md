@@ -127,6 +127,8 @@ install -m 600 .env.example .env
 | `SSHD_PORT` | yes | — | Port of your real sshd (step 0). Never 22. |
 | `REPO_DIR` | no | the clone the installer runs from | Where you cloned the repo. GeoIP files go to `$REPO_DIR/geoip`. The installer adds it to host.env if missing. |
 | `HONEYPOT_SUBNET` | no | `172.21.0.0/16` | Cowrie's network. Must equal `HONEYPOT_SUBNET` in `.env`. Change it only if it collides with an existing Docker network (`docker network inspect` to check). |
+| `COWRIE_PORT` | no | `22` | Host port Cowrie is published on. Bans with the "services" scope leave it open. |
+| `COWRIE_JSON` | no | derived | Cowrie's JSON log seen from the host, read by the `cowrie` jail. Empty = `/var/lib/docker/volumes/<COWRIE_VAR_VOLUME>/_data/log/cowrie/cowrie.json`. |
 | `WAN_IFACE` | no | default route interface | Internet-facing interface, used by the optional WAN filters. |
 | `CLOUDFLARE_ONLY` | no | `0` | `1` = published ports 80/443 accept only Cloudflare IP ranges. Only if your DNS is proxied by Cloudflare. |
 | `BLOCK_PORTS` | no | empty | Space-separated published container ports to drop from the Internet, e.g. `81` for a proxy admin UI you reach through an SSH tunnel. |
@@ -180,12 +182,40 @@ What it installs (all idempotent, re-run it any time):
   `fban-queue-worker.path` (if enabled).
 - `/etc/logrotate.d/honeypot-export`, `/var/log/honeypot-export/` (root:adm 750),
   `/etc/honeypot/never-ban` (created empty, never overwritten).
-- `/etc/fail2ban/jail.d/honeypot-sshd.conf`: the `sshd` jail on `SSHD_PORT`. If you already have an
-  `[sshd]` section in `jail.local` or `jail.d/`, it is kept and the installer only reminds you to check
-  its port.
+- `/etc/fail2ban/jail.d/honeypot.local` (+ `action.d/honeypot-block.conf`, `filter.d/honeypot-*.conf`,
+  `/usr/local/sbin/honeypot-ban.sh`): the jails described in [How bans work](#how-bans-work). It is
+  regenerated on every run (edit `host.env` / `never-ban`, not the file) and, being a `jail.d/*.local`,
+  wins over your own `jail.local`. The installer checks it with `fail2ban-client -t` before reloading
+  and puts the previous file back if fail2ban rejects it.
 
-It **never** touches sshd, ufw or the `INPUT` chain: firewall rules only go to `DOCKER-USER`, which
-filters container traffic.
+The installer itself **never** touches sshd or ufw. Ban rules live in one `hp-<jail>` chain per jail,
+reached from `INPUT` and `DOCKER-USER`; the other firewall rules only go to `DOCKER-USER`.
+
+### How bans work
+
+The honeypot observes, the real services are protected:
+
+| Jail | Triggered by | Bans for | Blocks |
+|---|---|---|---|
+| `cowrie` | any connection or login on Cowrie | 1 day | real services (sshd, sites, other ports), **not** Cowrie |
+| `sshd` | 2 failures on the real sshd (`mode = aggressive`) | 7 days | real services |
+| `recidive` | 3 bans in a week, any jail | 30 days | real services |
+| `npm-badbots` | your own jail, if you defined it | its bantime | real services |
+| `manual` | dashboard Ban, "Vrais services" | 7 days | real services |
+| `manual-all` | dashboard Ban, "Tout bloquer" | 7 days | everything, Cowrie included |
+
+"Real services" = everything on the host except tcp/`COWRIE_PORT`, and every container except the
+honeypot network: a banned bot keeps talking to Cowrie, so you keep recording it, but cannot reach
+your sshd or your sites. Never banned: `127.0.0.1`, `::1`, `HONEYPOT_SUBNET` (Cowrie sees IPv6
+clients as its Docker gateway) and every entry of `/etc/honeypot/never-ban`.
+
+Debian 12 logs sshd as `ssh.service`; the stock jail matches `sshd.service` and therefore never sees a
+failure. `honeypot.local` sets the right `journalmatch`. The `sshd` jail bans after 2 failures for 7
+days: **put your own addresses in `never-ban` before installing**, or a typo locks you out for a week
+(recovery: your provider's console, `fail2ban-client unban <ip>`).
+
+The dashboard counts a ban as running until its `Unban` line or its jail's bantime; if you change a
+bantime, set `FAIL2BAN_BANTIMES` (`jail=seconds,…`) in `.env` to match.
 
 ## Step 5 — Start the containers
 
@@ -243,9 +273,11 @@ scripts/install-host.sh && docker compose up -d
 ```
 
 The dashboard writes requests into `/opt/honeypot/fban-queue/`; a systemd path unit runs the worker,
-which accepts only `ban|unban|status sshd <ip>`, refuses `never-ban` addresses, and calls
-`fail2ban-client`. This bans from the **real sshd** jail: banning your own IP locks you out, hence
-the two allow-lists and the confirmation step in the UI.
+which accepts only `ban manual|manual-all <ip>`, `unban all <ip>` and `status all <ip>`, refuses
+`never-ban` addresses, and calls `fail2ban-client`. The Ban button asks for a scope: "Vrais services"
+(jail `manual`, Cowrie keeps observing the IP) or "Tout bloquer" (jail `manual-all`), 7 days each;
+Unban lifts the IP from every jail. The IP page lists the running bans, with what they block and until
+when. Banning your own IP locks you out, hence the two allow-lists and the confirmation step.
 
 **AbuseIPDB.** Put your key in `ABUSEIPDB_API_KEY` and `docker compose up -d`.
 
@@ -263,7 +295,7 @@ docker compose pull cowrie && docker compose up -d cowrie   # newer Cowrie image
 
 ```bash
 docker compose down                     # add -v to also delete the volumes (all data!)
-scripts/install-host.sh --uninstall     # removes scripts, units, jail file; keeps logs, never-ban, host.env
+scripts/install-host.sh --uninstall     # removes scripts, units, jail files; keeps logs, never-ban, host.env
 systemctl restart docker                # clears the DOCKER-USER rules
 ```
 

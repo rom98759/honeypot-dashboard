@@ -20,6 +20,9 @@ const SUMMARY = {
   total_sessions: 3,
   total_commands: 7,
   currently_banned: true,
+  active_bans: [
+    { jail: "cowrie", banned_at: "2026-08-14T08:00:00Z", expires_at: "2026-08-15T08:00:00Z", scope: "services" },
+  ],
   asn: 15169,
   asn_org: "GOOGLE",
   reverse_dns: "dns.google",
@@ -122,17 +125,29 @@ describe("IpDetailPage", () => {
     renderPage();
     await userEvent.click(await screen.findByRole("button", { name: "Bannir" }));
 
-    expect(screen.getByRole("alertdialog")).toHaveTextContent("Bannir 1.2.3.4 du vrai sshd");
+    expect(screen.getByRole("alertdialog")).toHaveTextContent("Bannir 1.2.3.4 pendant 7 jours");
     expect(fetchMock).not.toHaveBeenCalledWith(expect.stringContaining("/ban"), expect.anything());
 
     await userEvent.click(screen.getByRole("button", { name: "Annuler" }));
     expect(screen.queryByRole("alertdialog")).toBeNull();
 
     await userEvent.click(screen.getByRole("button", { name: "Bannir" }));
-    await userEvent.click(screen.getByRole("button", { name: "Confirmer le ban" }));
+    await userEvent.click(screen.getByRole("button", { name: "Vrais services" }));
     await waitFor(() =>
-      expect(fetchMock).toHaveBeenCalledWith("/api/ip/1.2.3.4/ban", expect.objectContaining({ method: "POST" }))
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/ip/1.2.3.4/ban",
+        expect.objectContaining({ method: "POST", body: JSON.stringify({ scope: "services" }) })
+      )
     );
+  });
+
+  it("lists running bans with what they block and until when", async () => {
+    stubFetch({});
+    renderPage();
+    const bans = await screen.findByRole("list", { name: "Bans en cours" });
+    expect(bans).toHaveTextContent("cowrie");
+    expect(bans).toHaveTextContent("pas Cowrie");
+    expect(bans).toHaveTextContent("jusqu'au");
   });
 
   it("shows protected IPs without any ban button", async () => {
@@ -268,10 +283,13 @@ describe("IpDetailPage", () => {
 
     await waitFor(() => expect(screen.getByText("Non banni")).toBeInTheDocument());
     await userEvent.click(screen.getByRole("button", { name: "Bannir" }));
-    await userEvent.click(screen.getByRole("button", { name: "Confirmer le ban" }));
+    await userEvent.click(screen.getByRole("button", { name: "Tout bloquer" }));
 
     await waitFor(() =>
-      expect(fetchMock).toHaveBeenCalledWith("/api/ip/1.2.3.4/ban", expect.objectContaining({ method: "POST" }))
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/ip/1.2.3.4/ban",
+        expect.objectContaining({ method: "POST", body: JSON.stringify({ scope: "all" }) })
+      )
     );
   });
 
@@ -291,7 +309,7 @@ describe("IpDetailPage", () => {
 
     await waitFor(() => expect(screen.getByText("Non banni")).toBeInTheDocument());
     await userEvent.click(screen.getByRole("button", { name: "Bannir" }));
-    await userEvent.click(screen.getByRole("button", { name: "Confirmer le ban" }));
+    await userEvent.click(screen.getByRole("button", { name: "Vrais services" }));
 
     await waitFor(() => expect(screen.getByText("Échec de l'action, réessaie.")).toBeInTheDocument());
   });

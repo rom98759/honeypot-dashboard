@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Installs the host side of honeypot-dashboard: log exporters, DOCKER-USER firewall,
-# GeoIP refresh, logrotate, fail2ban sshd jail and (optionally) the ban worker.
+# GeoIP refresh, logrotate, fail2ban jails (real sshd, Cowrie, recidive, manual bans)
+# and (optionally) the ban worker.
 # Idempotent: run it again after `git pull` to update the installed copies.
 #
 # It NEVER edits sshd, ufw or the INPUT chain. Cowrie takes port 22, so the real
@@ -77,14 +78,18 @@ fi
 
 SBIN="$ROOT/usr/local/sbin"
 UNITS="$ROOT/etc/systemd/system"
-JAIL_FILE="$ROOT/etc/fail2ban/jail.d/honeypot-sshd.conf"
+JAIL_FILE="$ROOT/etc/fail2ban/jail.d/honeypot.local"
+# Written by older versions, which only knew the real sshd jail.
+LEGACY_JAIL_FILE="$ROOT/etc/fail2ban/jail.d/honeypot-sshd.conf"
+F2B_ACTION="$ROOT/etc/fail2ban/action.d/honeypot-block.conf"
+F2B_FILTERS=(honeypot-cowrie.conf honeypot-manual.conf)
 NEVER_BAN="$ROOT/etc/honeypot/never-ban"
 EXPORT_DIR="$ROOT/var/log/honeypot-export"
 QUEUE_DIR="$ROOT/opt/honeypot/fban-queue"
 # Must match the dashboard image user (Dockerfile: useradd --uid 1000).
 DASHBOARD_UID=1000
 
-CORE_SCRIPTS=(fail2ban-export.sh sshd-auth-export.sh docker-user-firewall.sh geoip-update.sh)
+CORE_SCRIPTS=(fail2ban-export.sh sshd-auth-export.sh docker-user-firewall.sh geoip-update.sh honeypot-ban.sh)
 CORE_UNITS=(
   fail2ban-export.service fail2ban-export.timer
   sshd-auth-export.service sshd-auth-export.timer
@@ -211,36 +216,75 @@ remove_file() {
   return 0
 }
 
-existing_sshd_jail() {
-  local f
-  for f in "$ROOT/etc/fail2ban/jail.local" "$ROOT"/etc/fail2ban/jail.d/*; do
-    [[ -f "$f" ]] || continue
-    # Debian ships jail.d/defaults-debian.conf with a bare [sshd] enable: not a real config.
-    [[ "$f" == "$JAIL_FILE" || "$(basename "$f")" == defaults-debian.conf ]] && continue
-    if grep -q '^\[sshd\]' "$f"; then
-      echo "$f"
-      return 0
-    fi
-  done
-  return 1
+# Space-separated never-ban entries for fail2ban's ignoreip (comments and blanks dropped).
+never_ban_entries() {
+  [[ -f "$NEVER_BAN" ]] || return 0
+  sed 's/#.*//' "$NEVER_BAN" | tr -s ' \t' '\n' | grep -E '^[0-9a-fA-F:.]+(/[0-9]{1,3})?$' | tr '\n' ' ' | sed 's/ $//'
+}
+
+# Cowrie writes its JSON log into a named Docker volume; fail2ban reads it from the host.
+cowrie_json_path() {
+  if [[ -n "${COWRIE_JSON:-}" ]]; then
+    echo "$COWRIE_JSON"
+    return
+  fi
+  local volume=""
+  if [[ -f "$REPO_DIR/.env" ]]; then
+    volume="$(sed -n 's/^COWRIE_VAR_VOLUME=//p' "$REPO_DIR/.env" | tail -n1)"
+  fi
+  echo "/var/lib/docker/volumes/${volume:-honeypot-cowrie-var}/_data/log/cowrie/cowrie.json"
 }
 
 install_jail() {
-  local existing
-  if existing="$(existing_sshd_jail)"; then
-    log "kept existing sshd jail in $existing (check that its port is $SSHD_PORT)"
-    return 1
+  local cowrie_json cowrie_enabled=true changed=0
+  cowrie_json="$(cowrie_json_path)"
+  if [[ ! -f "$ROOT$cowrie_json" ]]; then
+    # fail2ban refuses to start at all when a jail's log file is missing.
+    warn "Cowrie log $cowrie_json not found: cowrie jail disabled. Start Cowrie, then rerun this installer."
+    cowrie_enabled=false
   fi
-  local tmp
+
+  local src dest pair
+  for pair in "action.d/honeypot-block.conf" "${F2B_FILTERS[@]/#/filter.d/}"; do
+    src="$REPO_SCRIPTS/fail2ban/$pair"
+    dest="$ROOT/etc/fail2ban/$pair"
+    cmp -s "$src" "$dest" 2>/dev/null || changed=1
+    install_file 0644 "$src" "$dest"
+  done
+
+  local tmp backup="" jail_differs=1
   tmp="$(mktemp)"
-  sed "s/@SSHD_PORT@/$SSHD_PORT/" "$REPO_SCRIPTS/fail2ban/honeypot-sshd.conf.tmpl" >"$tmp"
-  if [[ -f "$JAIL_FILE" ]] && cmp -s "$tmp" "$JAIL_FILE"; then
-    rm -f "$tmp"
-    return 1
+  sed -e "s|@SSHD_PORT@|$SSHD_PORT|" \
+      -e "s|@HONEYPOT_SUBNET@|${HONEYPOT_SUBNET:-172.21.0.0/16}|" \
+      -e "s|@NEVER_BAN@|$(never_ban_entries)|" \
+      -e "s|@COWRIE_JSON@|$cowrie_json|" \
+      -e "s|@COWRIE_ENABLED@|$cowrie_enabled|" \
+      "$REPO_SCRIPTS/fail2ban/honeypot.local.tmpl" >"$tmp"
+  [[ -f "$JAIL_FILE" ]] && cmp -s "$tmp" "$JAIL_FILE" && jail_differs=0
+  if [[ "$jail_differs" == 1 ]]; then
+    changed=1
+    if [[ -f "$JAIL_FILE" && "$DRY_RUN" == 0 ]]; then
+      backup="$(mktemp)"
+      cp "$JAIL_FILE" "$backup"
+    fi
+    install_file 0644 "$tmp" "$JAIL_FILE"
   fi
-  install_file 0644 "$tmp" "$JAIL_FILE"
   rm -f "$tmp"
-  return 0
+  if [[ -e "$LEGACY_JAIL_FILE" ]]; then
+    remove_file "$LEGACY_JAIL_FILE"
+    changed=1
+  fi
+
+  # A broken jail file stops fail2ban entirely: check it before any reload.
+  if [[ "$changed" == 1 && -z "$ROOT" && "$DRY_RUN" == 0 ]] && command -v fail2ban-client >/dev/null; then
+    if ! fail2ban-client -t >/dev/null 2>&1; then
+      if [[ -n "$backup" ]]; then cp "$backup" "$JAIL_FILE"; else rm -f "$JAIL_FILE"; fi
+      rm -f "$backup"
+      fail "fail2ban rejected $JAIL_FILE (restored the previous one): run fail2ban-client -t"
+    fi
+  fi
+  rm -f "$backup"
+  [[ "$changed" == 1 ]]
 }
 
 do_install() {
@@ -322,10 +366,13 @@ do_uninstall() {
   for f in "${CORE_UNITS[@]}" "${FBAN_UNITS[@]}"; do remove_file "$UNITS/$f"; done
   for f in "${CORE_SCRIPTS[@]}" "${FBAN_SCRIPTS[@]}"; do remove_file "$SBIN/$f"; done
   remove_file "$ROOT/etc/logrotate.d/honeypot-export"
-  if [[ -e "$JAIL_FILE" ]]; then
+  if [[ -e "$JAIL_FILE" || -e "$LEGACY_JAIL_FILE" ]]; then
     remove_file "$JAIL_FILE"
+    remove_file "$LEGACY_JAIL_FILE"
     systemctl_do reload-or-restart fail2ban
   fi
+  remove_file "$F2B_ACTION"
+  for f in "${F2B_FILTERS[@]}"; do remove_file "$ROOT/etc/fail2ban/filter.d/$f"; done
   systemctl_do daemon-reload
   log "removed. Kept: $EXPORT_DIR, $NEVER_BAN, $HOST_ENV, Docker volumes."
   log "DOCKER-USER rules stay until the next Docker restart (systemctl restart docker clears them)."

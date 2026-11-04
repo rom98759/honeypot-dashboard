@@ -118,15 +118,20 @@ describe("useBanIp", () => {
     queryClient.setQueryData(["ip-summary", "1.2.3.4"], { ip: "1.2.3.4", currently_banned: false });
 
     const { result } = renderHook(() => useBanIp("1.2.3.4"), { wrapper: wrapperFor(queryClient) });
-    result.current.mutate();
+    result.current.mutate("services");
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    expect(fetchMock).toHaveBeenCalledWith("/api/ip/1.2.3.4/ban", { method: "POST" });
+    expect(fetchMock).toHaveBeenCalledWith("/api/ip/1.2.3.4/ban", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scope: "services" }),
+    });
     // No second request to /summary — the cache is updated directly from the mutation's response.
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(queryClient.getQueryData(["ip-summary", "1.2.3.4"])).toEqual({
+    expect(queryClient.getQueryData(["ip-summary", "1.2.3.4"])).toMatchObject({
       ip: "1.2.3.4",
       currently_banned: true,
+      active_bans: [{ jail: "manual", scope: "services" }],
     });
   });
 });
@@ -158,6 +163,7 @@ describe("useUnbanIp", () => {
     expect(queryClient.getQueryData(["ip-summary", "1.2.3.4"])).toEqual({
       ip: "1.2.3.4",
       currently_banned: false,
+      active_bans: [],
     });
   });
 });

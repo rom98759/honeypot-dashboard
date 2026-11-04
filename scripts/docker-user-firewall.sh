@@ -11,7 +11,8 @@
 #     compromised Cowrie cannot be used to attack anyone else;
 #   - CLOUDFLARE_ONLY=1: published 80/443 only reachable from Cloudflare ranges;
 #   - BLOCK_PORTS: published container ports dropped when coming from the WAN
-#     (e.g. a reverse proxy admin UI).
+#     (e.g. a reverse proxy admin UI);
+#   - fail2ban bans: a jump to each hp-<jail> chain kept by honeypot-ban.sh.
 # Docker-published ports bypass ufw entirely, which is why this lives here.
 #
 # WAN-scoped rules use "-i $WAN_IFACE": they must filter inbound traffic from
@@ -151,8 +152,18 @@ wan_rules() {
   done
 }
 
+# Jumps to the fail2ban ban chains (hp-<jail>, see honeypot-ban.sh): this script
+# empties DOCKER-USER, so without them every ban would stop covering containers.
+ban_rules() {
+  local helper
+  helper="$(dirname "$0")/honeypot-ban.sh"
+  [[ -x "$helper" ]] || return 0
+  "$helper" docker-user-rules "$1" "$WAN_IFACE"
+}
+
 build_rules_v4() {
   echo "-A DOCKER-USER -i lo -j RETURN"
+  ban_rules v4
   echo "-A DOCKER-USER -s ${HONEYPOT_SUBNET} -m conntrack --ctstate NEW -m comment --comment \"honeypot: no egress\" -j DROP"
   wan_rules "$CF_V4"
   echo "-A DOCKER-USER -j RETURN"
@@ -160,6 +171,7 @@ build_rules_v4() {
 
 build_rules_v6() {
   echo "-A DOCKER-USER -i lo -j RETURN"
+  ban_rules v6
   wan_rules "$CF_V6"
   echo "-A DOCKER-USER -j RETURN"
 }

@@ -67,11 +67,11 @@ def test_ip_summary_currently_banned_true_after_ban_with_no_later_unban(tmp_path
 
 
 def test_ip_summary_ban_older_than_bantime_has_expired(tmp_path):
-    """The Unban line can be lost (log gap, restart): a 1-day sshd ban from last week is over."""
+    """The Unban line can be lost (log gap, restart): a 7-day sshd ban from 8 days ago is over."""
     db = connect(tmp_path / "db.sqlite3")
     db.execute(
         "INSERT INTO fail2ban_events (ip, action, jail, timestamp) VALUES ('1.2.3.4', 'Ban', 'sshd', ?)",
-        (_recent_ban_ts(hours=24 * 7),),
+        (_recent_ban_ts(hours=24 * 8),),
     )
     db.commit()
 

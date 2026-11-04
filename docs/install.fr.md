@@ -128,6 +128,8 @@ install -m 600 .env.example .env
 | `SSHD_PORT` | oui | — | Port de ton vrai sshd (étape 0). Jamais 22. |
 | `REPO_DIR` | non | le clone d'où l'installeur est lancé | Où tu as cloné le dépôt. Les fichiers GeoIP vont dans `$REPO_DIR/geoip`. L'installeur l'ajoute à host.env s'il manque. |
 | `HONEYPOT_SUBNET` | non | `172.21.0.0/16` | Réseau de Cowrie. Doit être identique à `HONEYPOT_SUBNET` dans `.env`. À changer seulement s'il entre en conflit avec un réseau Docker existant (`docker network inspect` pour vérifier). |
+| `COWRIE_PORT` | non | `22` | Port de l'hôte où Cowrie est publié. Les bans de portée « services » le laissent ouvert. |
+| `COWRIE_JSON` | non | déduit | Log JSON de Cowrie vu depuis l'hôte, lu par la jail `cowrie`. Vide = `/var/lib/docker/volumes/<COWRIE_VAR_VOLUME>/_data/log/cowrie/cowrie.json`. |
 | `WAN_IFACE` | non | interface de la route par défaut | Interface côté Internet, utilisée par les filtres WAN optionnels. |
 | `CLOUDFLARE_ONLY` | non | `0` | `1` = les ports publiés 80/443 n'acceptent que les plages IP Cloudflare. Seulement si ton DNS passe par le proxy Cloudflare. |
 | `BLOCK_PORTS` | non | vide | Ports de conteneurs publiés à bloquer depuis Internet, séparés par des espaces, par ex. `81` pour une interface d'admin de proxy que tu joins par tunnel SSH. |
@@ -181,12 +183,41 @@ Ce qu'il installe (tout est idempotent, relançable à tout moment) :
   renseignée), `fban-queue-worker.path` (si activé).
 - `/etc/logrotate.d/honeypot-export`, `/var/log/honeypot-export/` (root:adm 750),
   `/etc/honeypot/never-ban` (créé vide, jamais écrasé).
-- `/etc/fail2ban/jail.d/honeypot-sshd.conf` : la jail `sshd` sur `SSHD_PORT`. Si tu as déjà une section
-  `[sshd]` dans `jail.local` ou `jail.d/`, elle est conservée et l'installeur te rappelle seulement d'en
-  vérifier le port.
+- `/etc/fail2ban/jail.d/honeypot.local` (+ `action.d/honeypot-block.conf`, `filter.d/honeypot-*.conf`,
+  `/usr/local/sbin/honeypot-ban.sh`) : les jails décrites dans [Fonctionnement des bans](#fonctionnement-des-bans).
+  Il est régénéré à chaque passage (modifie `host.env` / `never-ban`, pas le fichier) et, en tant que
+  `jail.d/*.local`, il l'emporte sur ton propre `jail.local`. L'installeur le vérifie avec
+  `fail2ban-client -t` avant de recharger et remet l'ancien fichier si fail2ban le refuse.
 
-Il ne touche **jamais** à sshd, à ufw ni à la chaîne `INPUT` : les règles pare-feu vont uniquement dans
-`DOCKER-USER`, qui filtre le trafic des conteneurs.
+L'installeur lui-même ne touche **jamais** à sshd ni à ufw. Les règles de ban vivent dans une chaîne
+`hp-<jail>` par jail, appelée depuis `INPUT` et `DOCKER-USER` ; les autres règles pare-feu vont uniquement
+dans `DOCKER-USER`.
+
+### Fonctionnement des bans
+
+Le honeypot observe, les vrais services sont protégés :
+
+| Jail | Déclenchée par | Durée | Bloque |
+|---|---|---|---|
+| `cowrie` | toute connexion ou tentative de login sur Cowrie | 1 jour | les vrais services (sshd, sites, autres ports), **pas** Cowrie |
+| `sshd` | 2 échecs sur le vrai sshd (`mode = aggressive`) | 7 jours | les vrais services |
+| `recidive` | 3 bans en une semaine, toutes jails | 30 jours | les vrais services |
+| `npm-badbots` | ta propre jail, si tu l'as définie | son bantime | les vrais services |
+| `manual` | bouton Bannir du dashboard, « Vrais services » | 7 jours | les vrais services |
+| `manual-all` | bouton Bannir du dashboard, « Tout bloquer » | 7 jours | tout, Cowrie compris |
+
+« Vrais services » = tout l'hôte sauf tcp/`COWRIE_PORT`, et tous les conteneurs sauf le réseau du
+honeypot : un robot banni continue de parler à Cowrie, donc tu continues de l'enregistrer, mais ne peut
+plus joindre ton sshd ni tes sites. Jamais bannis : `127.0.0.1`, `::1`, `HONEYPOT_SUBNET` (Cowrie voit
+les clients IPv6 comme sa passerelle Docker) et chaque entrée de `/etc/honeypot/never-ban`.
+
+Debian 12 journalise sshd sous `ssh.service` ; la jail d'origine cherche `sshd.service` et ne voit donc
+aucun échec. `honeypot.local` pose le bon `journalmatch`. La jail `sshd` bannit 7 jours après 2 échecs :
+**mets tes propres adresses dans `never-ban` avant d'installer**, sinon une faute de frappe te bloque une
+semaine (secours : la console de ton hébergeur, `fail2ban-client unban <ip>`).
+
+Le dashboard compte un ban comme actif jusqu'à sa ligne `Unban` ou la fin du bantime de sa jail ; si tu
+changes un bantime, mets `FAIL2BAN_BANTIMES` (`jail=secondes,…`) dans `.env` pour qu'il suive.
 
 ## Étape 5 — Démarrer les conteneurs
 
@@ -244,9 +275,11 @@ scripts/install-host.sh && docker compose up -d
 ```
 
 Le dashboard écrit les demandes dans `/opt/honeypot/fban-queue/` ; une unité systemd path lance le worker,
-qui n'accepte que `ban|unban|status sshd <ip>`, refuse les adresses de `never-ban` et appelle
-`fail2ban-client`. Le ban s'applique à la jail du **vrai sshd** : bannir ta propre IP te bloque dehors,
-d'où les deux listes d'exclusion et la confirmation dans l'interface.
+qui n'accepte que `ban manual|manual-all <ip>`, `unban all <ip>` et `status all <ip>`, refuse les adresses
+de `never-ban` et appelle `fail2ban-client`. Le bouton Bannir demande une portée : « Vrais services »
+(jail `manual`, Cowrie continue d'observer l'IP) ou « Tout bloquer » (jail `manual-all`), 7 jours chacune ;
+Débannir retire l'IP de toutes les jails. La page IP liste les bans en cours, ce qu'ils bloquent et jusqu'à
+quand. Bannir ta propre IP te bloque dehors, d'où les deux listes d'exclusion et la confirmation.
 
 **AbuseIPDB.** Mets ta clé dans `ABUSEIPDB_API_KEY` puis `docker compose up -d`.
 
@@ -264,7 +297,7 @@ docker compose pull cowrie && docker compose up -d cowrie   # nouvelle image Cow
 
 ```bash
 docker compose down                     # ajouter -v pour supprimer aussi les volumes (toutes les données !)
-scripts/install-host.sh --uninstall     # retire scripts, unités, fichier de jail ; garde logs, never-ban, host.env
+scripts/install-host.sh --uninstall     # retire scripts, unités, fichiers de jails ; garde logs, never-ban, host.env
 systemctl restart docker                # vide les règles DOCKER-USER
 ```
 

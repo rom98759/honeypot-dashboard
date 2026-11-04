@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 
 from app.correlation import (
     FailbanIngester,
+    active_bans,
     currently_banned_query,
     parse_bantimes,
     SshdAuthIngester,
@@ -159,3 +160,30 @@ def test_ban_expires_after_its_jail_bantime(tmp_path, monkeypatch):
     db.commit()
     sql, params = currently_banned_query(now=datetime(2026, 11, 3, 12, 0, tzinfo=timezone.utc))
     assert {r["ip"] for r in db.execute(sql, params)} == {"1.1.1.1", "3.3.3.3"}
+
+
+def test_parse_fail2ban_line_keeps_jail_names_with_dashes():
+    line = "2026-11-03 21:19:13,177 fail2ban.actions        [811]: NOTICE  [manual-all] Ban 192.0.2.9"
+    assert parse_fail2ban_line(line)["jail"] == "manual-all"
+
+
+def test_active_bans_are_per_jail_with_scope_and_expiry(tmp_path, monkeypatch):
+    monkeypatch.setattr("app.correlation.BANTIMES", {"cowrie": 86400, "manual-all": 7 * 86400})
+    db = connect(tmp_path / "db.sqlite3")
+    db.executemany(
+        "INSERT INTO fail2ban_events (ip, action, jail, timestamp) VALUES ('192.0.2.9', ?, ?, ?)",
+        [
+            ("Ban", "cowrie", "2026-11-03 08:00:00,000"),
+            ("Ban", "manual-all", "2026-11-03 09:00:00,500"),
+            # The cowrie ban ending must not end the manual one.
+            ("Unban", "cowrie", "2026-11-03 10:00:00,000"),
+        ],
+    )
+    db.commit()
+    bans = active_bans(db, "192.0.2.9", now=datetime(2026, 11, 3, 12, 0, tzinfo=timezone.utc))
+    assert bans == [{
+        "jail": "manual-all",
+        "banned_at": "2026-11-03T09:00:00.500Z",
+        "expires_at": "2026-11-10T09:00:00Z",
+        "scope": "all",
+    }]

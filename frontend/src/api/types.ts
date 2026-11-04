@@ -139,6 +139,7 @@ export interface IpSummary {
   total_sessions: number;
   total_commands: number;
   currently_banned: boolean;
+  active_bans: ActiveBan[];
   protected: boolean;
   ban_enabled: boolean;
   asn: number | null;
@@ -149,6 +150,14 @@ export interface IpSummary {
   abuseipdb_last_reported_at: string | null;
   abuseipdb_configured: boolean;
   enrichment_status: "pending" | "done";
+}
+
+export interface ActiveBan {
+  jail: string;
+  banned_at: string;
+  expires_at: string;
+  /** services = real SSH, sites and other ports but not the honeypot; all = everything. */
+  scope: "services" | "all";
 }
 
 export interface Fail2banEvent {

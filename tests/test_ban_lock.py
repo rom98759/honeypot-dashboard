@@ -10,13 +10,14 @@ class _RecordingFban:
     def __init__(self):
         self.calls = []
 
-    def request_ban(self, ip, jail="sshd"):
+    def request_ban(self, ip, scope="services"):
         self.calls.append(("ban", ip))
+        self.scopes = getattr(self, "scopes", []) + [scope]
 
-    def request_unban(self, ip, jail="sshd"):
+    def request_unban(self, ip):
         self.calls.append(("unban", ip))
 
-    def request_status(self, ip, jail="sshd"):
+    def request_status(self, ip):
         return False
 
 
@@ -66,3 +67,11 @@ def test_responses_forbid_framing(tmp_path, monkeypatch):
     assert "frame-ancestors 'none'" in headers["content-security-policy"]
     assert headers["x-content-type-options"] == "nosniff"
     assert headers["referrer-policy"] == "same-origin"
+
+
+def test_ban_scope_defaults_to_real_services_and_accepts_all(tmp_path, monkeypatch):
+    client, fban = _client(tmp_path, monkeypatch)
+    assert client.post("/api/ip/192.0.2.1/ban", headers=SAME_ORIGIN).status_code == 200
+    assert client.post("/api/ip/192.0.2.1/ban", headers=SAME_ORIGIN, json={"scope": "all"}).status_code == 200
+    assert fban.scopes == ["services", "all"]
+    assert client.post("/api/ip/192.0.2.1/ban", headers=SAME_ORIGIN, json={"scope": "x"}).status_code == 422

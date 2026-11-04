@@ -96,6 +96,9 @@ def test_install_is_idempotent(tmp_path):
     assert out.returncode == 0, out.stdout + out.stderr
     never_ban = root / "etc/honeypot/never-ban"
     never_ban.write_text("203.0.113.7\n")
+    # The jail's ignoreip follows never-ban, so it changes once, then stays put.
+    out, _ = _run(tmp_path)
+    assert "203.0.113.7" in (root / "etc/fail2ban/jail.d/honeypot.local").read_text()
     first = _tree(root)
     out, _ = _run(tmp_path)
     assert out.returncode == 0, out.stdout + out.stderr
@@ -106,10 +109,13 @@ def test_install_is_idempotent(tmp_path):
         "usr/local/sbin/sshd-auth-export.sh",
         "etc/systemd/system/geoip-update.timer",
         "etc/logrotate.d/honeypot-export",
-        "etc/fail2ban/jail.d/honeypot-sshd.conf",
+        "etc/fail2ban/jail.d/honeypot.local",
+        "etc/fail2ban/action.d/honeypot-block.conf",
+        "etc/fail2ban/filter.d/honeypot-cowrie.conf",
+        "usr/local/sbin/honeypot-ban.sh",
     ]:
         assert rel in first, rel
-    assert "port = 50022" in (root / "etc/fail2ban/jail.d/honeypot-sshd.conf").read_text()
+    assert "port = 50022" in (root / "etc/fail2ban/jail.d/honeypot.local").read_text()
     assert "usr/local/sbin/fban-queue-worker.sh" not in first
     # Compose always bind-mounts the queue dir: if Docker creates it, it is root-owned and
     # the non-root dashboard can never drop a request in it.
@@ -124,23 +130,43 @@ def test_ban_worker_only_when_enabled(tmp_path):
     assert (root / "etc/systemd/system/fban-queue-worker.path").exists()
 
 
-def test_keeps_existing_sshd_jail(tmp_path):
-    root = tmp_path / "root"
-    (root / "etc/fail2ban").mkdir(parents=True)
-    (root / "etc/fail2ban/jail.local").write_text("[sshd]\nenabled = true\nport = 50022\n")
-    out, root = _run(tmp_path)
-    assert out.returncode == 0, out.stdout + out.stderr
-    assert not (root / "etc/fail2ban/jail.d/honeypot-sshd.conf").exists()
-    assert "existing sshd jail" in out.stdout
-
-
-def test_debian_default_jail_does_not_count_as_existing(tmp_path):
+def test_jail_overrides_jail_local_and_drops_the_legacy_file(tmp_path):
     root = tmp_path / "root"
     (root / "etc/fail2ban/jail.d").mkdir(parents=True)
-    (root / "etc/fail2ban/jail.d/defaults-debian.conf").write_text("[sshd]\nenabled = true\n")
+    (root / "etc/fail2ban/jail.local").write_text("[sshd]\nenabled = true\nport = 50022\n")
+    (root / "etc/fail2ban/jail.d/honeypot-sshd.conf").write_text("[sshd]\nenabled = true\n")
     out, root = _run(tmp_path)
     assert out.returncode == 0, out.stdout + out.stderr
-    assert (root / "etc/fail2ban/jail.d/honeypot-sshd.conf").exists()
+    # jail.d/*.local is read after jail.local: the owner's file stays as is and ours wins.
+    assert (root / "etc/fail2ban/jail.local").read_text() == "[sshd]\nenabled = true\nport = 50022\n"
+    assert (root / "etc/fail2ban/jail.d/honeypot.local").exists()
+    assert not (root / "etc/fail2ban/jail.d/honeypot-sshd.conf").exists()
+
+
+def test_jail_ignores_never_ban_and_the_honeypot_network(tmp_path):
+    root = tmp_path / "root"
+    (root / "etc/honeypot").mkdir(parents=True)
+    (root / "etc/honeypot/never-ban").write_text("# me\n203.0.113.7  # box\n\n198.51.100.0/24\nnot an ip\n")
+    out, root = _run(tmp_path, host_env="SSHD_PORT=50022\nHONEYPOT_SUBNET=172.30.0.0/16\n")
+    assert out.returncode == 0, out.stdout + out.stderr
+    jail = (root / "etc/fail2ban/jail.d/honeypot.local").read_text()
+    assert "ignoreip = 127.0.0.1/8 ::1 172.30.0.0/16 203.0.113.7 198.51.100.0/24\n" in jail
+
+
+def test_cowrie_jail_follows_the_log_file(tmp_path):
+    host_env = "SSHD_PORT=50022\nCOWRIE_JSON=/srv/cowrie/cowrie.json\n"
+    out, root = _run(tmp_path, host_env=host_env)
+    assert out.returncode == 0, out.stdout + out.stderr
+    cowrie = (root / "etc/fail2ban/jail.d/honeypot.local").read_text().split("[cowrie]")[1].split("[")[0]
+    assert "enabled = false" in cowrie
+    assert "cowrie jail disabled" in out.stdout
+
+    (root / "srv/cowrie").mkdir(parents=True)
+    (root / "srv/cowrie/cowrie.json").write_text("")
+    out, root = _run(tmp_path, host_env=host_env)
+    cowrie = (root / "etc/fail2ban/jail.d/honeypot.local").read_text().split("[cowrie]")[1].split("[")[0]
+    assert "enabled = true" in cowrie
+    assert "logpath = /srv/cowrie/cowrie.json" in cowrie
 
 
 def test_uninstall_removes_units_not_data(tmp_path):
@@ -151,7 +177,8 @@ def test_uninstall_removes_units_not_data(tmp_path):
     assert out.returncode == 0, out.stdout + out.stderr
     assert not (root / "usr/local/sbin/docker-user-firewall.sh").exists()
     assert not (root / "etc/systemd/system/fban-queue-worker.path").exists()
-    assert not (root / "etc/fail2ban/jail.d/honeypot-sshd.conf").exists()
+    assert not (root / "etc/fail2ban/jail.d/honeypot.local").exists()
+    assert not (root / "etc/fail2ban/action.d/honeypot-block.conf").exists()
     assert (root / "etc/honeypot/never-ban").read_text() == "203.0.113.7\n"
     assert (root / "var/log/honeypot-export").is_dir()
 
