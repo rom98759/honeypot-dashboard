@@ -207,7 +207,11 @@ The honeypot observes, the real services are protected:
 "Real services" = everything on the host except tcp/`COWRIE_PORT`, and every container except the
 honeypot network: a banned bot keeps talking to Cowrie, so you keep recording it, but cannot reach
 your sshd or your sites. Never banned: `127.0.0.1`, `::1`, `HONEYPOT_SUBNET` (Cowrie sees IPv6
-clients as its Docker gateway) and every entry of `/etc/honeypot/never-ban`.
+clients as its Docker gateway), every entry of `/etc/honeypot/never-ban`, and the dashboard's protected
+IPs (`ADMIN_IPS` + Settings page). The dashboard writes the latter to `/opt/honeypot/fban-queue/admin-networks`;
+fail2ban asks `/usr/local/sbin/honeypot-never-ban.sh` before every ban (`ignorecommand`), so an
+address added in Settings is protected at once, without a reload. Entries of that file wider than /16
+(IPv4) or /48 (IPv6) are ignored, since the container can write it.
 
 Debian 12 logs sshd as `ssh.service`; the stock jail matches `sshd.service` and therefore never sees a
 failure. `honeypot.local` sets the right `journalmatch`. The `sshd` jail bans after 2 failures for 7

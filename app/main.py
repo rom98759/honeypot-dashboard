@@ -8,6 +8,7 @@ import geoip2.database
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+from app.admin_ips import export_admin_networks
 from app.correlation import FailbanIngester, SshdAuthIngester
 from app.db import connect
 from app.enrichment_worker import EnrichmentWorker
@@ -253,6 +254,8 @@ def create_app(
     app.state.fban_control = (
         fban_control if fban_control is not None else FbanControl(fban_queue_path, timeout=fban_timeout_seconds)
     )
+    app.state.fban_queue_path = fban_queue_path
+    export_admin_networks(app)
     app.state.cowrie_var_path = cowrie_var_path
     app.state.geo_lookup = GeoLookup(app.state.db, _open_geoip_reader(geoip_db_path))
     _backfill_geo_cache(app.state.db, app.state.geo_lookup)

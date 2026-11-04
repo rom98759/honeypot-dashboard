@@ -49,8 +49,10 @@ export function SettingsPage() {
       <section className="panel">
         <h2>IP protégées</h2>
         <p className="cell-muted">
-          Tes propres adresses : elles ne peuvent jamais être bannies depuis le dashboard. Une IP seule ou une plage
-          CIDR (par exemple <span className="mono">198.51.100.0/24</span>).
+          Tes propres adresses : ni le bouton Bannir ni les bans automatiques de fail2ban (Cowrie, vrai SSH,
+          récidive) ne les touchent. Une IP seule ou une plage CIDR jusqu'à /16 (par exemple{" "}
+          <span className="mono">198.51.100.0/24</span>). La liste <span className="mono">/etc/honeypot/never-ban</span>{" "}
+          du serveur s'y ajoute.
         </p>
         <form className="settings-form" onSubmit={handleSubmit}>
           <label>

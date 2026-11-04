@@ -20,26 +20,14 @@ DASHBOARD_UID=1000
 DASHBOARD_GID=1000
 IP_RE='(([0-9]{1,3}\.){3}[0-9]{1,3}|[0-9a-fA-F:]+)'
 LINE_RE="^(ban (manual|manual-all)|(unban|status) all) $IP_RE\$"
-# One IP or CIDR per line (# comments allowed): addresses that must never be banned,
-# checked here as well as in the dashboard so a request that bypasses the app is refused too.
-NEVER_BAN_FILE="/etc/honeypot/never-ban"
+# Same check as fail2ban's ignorecommand: /etc/honeypot/never-ban plus the dashboard's
+# settings list, so a request that bypasses the app is refused too.
+NEVER_BAN_CMD="/usr/local/sbin/honeypot-never-ban.sh"
 
 is_protected() {
-  [[ -f "$NEVER_BAN_FILE" ]] || return 1
-  python3 -I -c '
-import ipaddress, sys
-ip = ipaddress.ip_address(sys.argv[1])
-for line in open(sys.argv[2]):
-    entry = line.split("#", 1)[0].strip()
-    if not entry:
-        continue
-    try:
-        if ip in ipaddress.ip_network(entry, strict=False):
-            sys.exit(0)
-    except ValueError:
-        continue
-sys.exit(1)
-' "$1" "$NEVER_BAN_FILE"
+  # Without the check, refuse every ban rather than risk banning the owner.
+  [[ -x "$NEVER_BAN_CMD" ]] || return 0
+  "$NEVER_BAN_CMD" "$1"
 }
 
 # Self-provision the queue directory (mirrors sshd-auth-export.sh provisioning its own
@@ -71,7 +59,7 @@ for req in "$QUEUE_DIR"/req-*; do
     ban)
       if is_protected "$ip"; then
         logger -t fban-queue-worker "refused to ban protected IP $ip" || true
-        echo "error: $ip is listed in $NEVER_BAN_FILE" > "$res.tmp" && mv "$res.tmp" "$res"
+        echo "error: $ip is protected (never-ban or dashboard settings)" > "$res.tmp" && mv "$res.tmp" "$res"
       elif fail2ban-client set "$jail" banip "$ip" >/dev/null 2>&1; then
         echo "ok" > "$res.tmp" && mv "$res.tmp" "$res"
       else

@@ -69,7 +69,10 @@ Backlog : `TODO.md`. Doc publique bilingue : `README.md`/`README.fr.md`, `docs/i
   Action `honeypot-block` → `scripts/honeypot-ban.sh` : une chaîne `hp-<jail>` appelée depuis INPUT et
   DOCKER-USER ; portée `services` = tout sauf Cowrie (RETURN tcp/`COWRIE_PORT`, DOCKER-USER `! -d
   HONEYPOT_SUBNET`), `all` = tout. `docker-user-firewall.sh` réinjecte les sauts (il vide DOCKER-USER).
-  Le worker n'accepte que `ban manual|manual-all`, `unban all`, `status all`. Les bantimes du template
+  Le worker n'accepte que `ban manual|manual-all`, `unban all`, `status all`. IP protégées : le dashboard
+  écrit `ADMIN_IPS` + table `admin_networks` dans `<queue>/admin-networks` (démarrage et chaque modif) ;
+  `scripts/honeypot-never-ban.sh` (ignorecommand fail2ban + worker) lit ce fichier et `/etc/honeypot/never-ban`,
+  et ignore dans le premier les plages > /16 ou /48 (le conteneur peut l'écrire). Les bantimes du template
   et `DEFAULT_BANTIMES` / `JAIL_SCOPES` (`app/correlation.py`) doivent rester alignés.
 - Enrichissement IP (ASN, rDNS, AbuseIPDB) : table `ip_enrichment` = file d'attente + résultats, drainée par
   `EnrichmentWorker`. Sans config, tout dégrade en no-op.

@@ -11,6 +11,8 @@
 # Your own addresses (never-ban) and the honeypot network: Cowrie sees IPv6
 # clients and some health checks as its Docker gateway, which must never be banned.
 ignoreip = 127.0.0.1/8 ::1 @HONEYPOT_SUBNET@ @NEVER_BAN@
+# Read on every ban, so never-ban and the dashboard settings page apply without a reload.
+ignorecommand = /usr/local/sbin/honeypot-never-ban.sh <ip>
 
 [sshd]
 # Only you use the real sshd, so any failure there is hostile: 7 days at once.

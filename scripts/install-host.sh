@@ -89,7 +89,7 @@ QUEUE_DIR="$ROOT/opt/honeypot/fban-queue"
 # Must match the dashboard image user (Dockerfile: useradd --uid 1000).
 DASHBOARD_UID=1000
 
-CORE_SCRIPTS=(fail2ban-export.sh sshd-auth-export.sh docker-user-firewall.sh geoip-update.sh honeypot-ban.sh)
+CORE_SCRIPTS=(fail2ban-export.sh sshd-auth-export.sh docker-user-firewall.sh geoip-update.sh honeypot-ban.sh honeypot-never-ban.sh)
 CORE_UNITS=(
   fail2ban-export.service fail2ban-export.timer
   sshd-auth-export.service sshd-auth-export.timer

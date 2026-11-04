@@ -113,3 +113,45 @@ def test_cowrie_filter_matches_a_real_connect_line():
     )
     assert pattern.search(line)["host"] == "192.0.2.50"
     assert not pattern.search(line.replace("session.connect", "command.input"))
+
+
+NEVER_BAN = REPO / "scripts" / "honeypot-never-ban.sh"
+
+
+def _protected(tmp_path, ip, never_ban="", dashboard=None):
+    (tmp_path / "never-ban").write_text(never_ban)
+    dash = tmp_path / "admin-networks"
+    if dashboard is not None:
+        dash.write_text(dashboard)
+    env = {
+        "PATH": os.environ["PATH"],
+        "HONEYPOT_NEVER_BAN": str(tmp_path / "never-ban"),
+        "HONEYPOT_DASHBOARD_NETWORKS": str(dash),
+    }
+    return subprocess.run(["bash", str(NEVER_BAN), ip], env=env).returncode == 0
+
+
+def test_never_ban_reads_both_lists(tmp_path):
+    assert _protected(tmp_path, "203.0.113.7", never_ban="# box\n203.0.113.7  # me\n")
+    assert _protected(tmp_path, "198.51.100.9", dashboard="# header\n198.51.100.0/24\n")
+    assert not _protected(tmp_path, "192.0.2.1", never_ban="203.0.113.7\n", dashboard="198.51.100.0/24\n")
+    assert not _protected(tmp_path, "not-an-ip", never_ban="0.0.0.0/0\n")
+
+
+def test_dashboard_list_cannot_whitelist_wide_ranges(tmp_path):
+    # The container writes this file: a /8 there must not protect anyone.
+    assert not _protected(tmp_path, "10.1.2.3", dashboard="10.0.0.0/8\n")
+    assert not _protected(tmp_path, "2001:db8::1", dashboard="2001:db8::/32\n")
+    # The owner's own file is trusted as is.
+    assert _protected(tmp_path, "10.1.2.3", never_ban="10.0.0.0/8\n")
+
+
+def test_dashboard_list_symlink_is_ignored(tmp_path):
+    target = tmp_path / "elsewhere"
+    target.write_text("192.0.2.0/24\n")
+    (tmp_path / "admin-networks").symlink_to(target)
+    assert not _protected(tmp_path, "192.0.2.1")
+
+
+def test_jail_template_asks_the_never_ban_script():
+    assert "ignorecommand = /usr/local/sbin/honeypot-never-ban.sh <ip>" in JAIL_TEMPLATE.read_text()

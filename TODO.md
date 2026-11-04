@@ -126,7 +126,7 @@
       `sshd.service` : 0 ligne vs 70 938 en 7 j), bans sur INPUT seulement (ne couvraient ni Docker ni
       les sites), Cowrie déconnecté de fail2ban, jails avec tiret jamais lues (`npm-badbots`). Remplacé
       par `honeypot.local` : « le honeypot observe, les vrais services sont protégés ».
-- [ ] Synchroniser la liste des IP protégées de la page Réglages avec `/etc/honeypot/never-ban` (et donc
-      l'`ignoreip` de fail2ban) : aujourd'hui il faut l'ajouter aux deux endroits.
+- [x] IP protégées de la page Réglages appliquées aussi aux bans automatiques : fichier `admin-networks`
+      dans la queue, lu par `honeypot-never-ban.sh` (ignorecommand fail2ban + worker), sans rechargement.
 - [ ] Bans IPv6 sur Cowrie : docker-proxy présente les clients IPv6 comme la passerelle du réseau
       honeypot, donc la jail `cowrie` ne peut pas les voir (ni les bannir).

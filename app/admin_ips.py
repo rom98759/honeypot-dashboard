@@ -5,8 +5,17 @@ from the settings page.
 """
 
 import ipaddress
+import logging
+import os
 import sqlite3
 from datetime import datetime, timezone
+from pathlib import Path
+
+log = logging.getLogger(__name__)
+
+# Read by the host's honeypot-never-ban.sh (fail2ban ignorecommand and ban worker),
+# so the settings page also protects these addresses from automatic bans.
+HOST_FILE_NAME = "admin-networks"
 
 # A wider range would make most of the internet unbannable; refuse it outright.
 MIN_PREFIX = {4: 16, 6: 48}
@@ -47,6 +56,25 @@ def admin_networks(app) -> list:
         except ValueError:
             continue
     return [*getattr(app.state, "admin_networks", []), *stored]
+
+
+def export_admin_networks(app) -> None:
+    """Write every protected network into the ban queue directory shared with the host.
+    Best effort: without the host side, the list still guards the Ban button."""
+    queue = getattr(app.state, "fban_queue_path", None)
+    if queue is None:
+        return
+    lines = [
+        "# Written by honeypot-dashboard (ADMIN_IPS + settings page). Do not edit: changes are overwritten.",
+        *sorted({str(n) for n in admin_networks(app)}),
+    ]
+    target = Path(queue) / HOST_FILE_NAME
+    tmp = target.with_name(f".{HOST_FILE_NAME}.tmp")
+    try:
+        tmp.write_text("\n".join(lines) + "\n")
+        os.replace(tmp, target)  # atomic: the host never reads half a list
+    except OSError as exc:
+        log.warning("could not write %s: %s", target, exc)
 
 
 def is_admin_ip(app, ip: str) -> bool:

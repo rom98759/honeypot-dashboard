@@ -68,3 +68,19 @@ def test_settings_writes_reject_bad_input_duplicates_and_cross_origin(tmp_path, 
     assert client.post(url, json={"value": "203.0.113.7/32"}, headers=SAME_ORIGIN).status_code == 409
     assert client.post(url, json={"value": "1.2.3.4"}, headers={"Origin": "http://evil.example"}).status_code == 403
     assert client.delete(f"{url}?cidr=203.0.113.7/32", headers={"Origin": "http://evil.example"}).status_code == 403
+
+
+def test_protected_networks_are_exported_for_the_host(tmp_path, monkeypatch):
+    queue = tmp_path / "queue"
+    queue.mkdir()
+    monkeypatch.setenv("FBAN_QUEUE_PATH", str(queue))
+    client, _ = _client(tmp_path, monkeypatch, env="198.51.100.0/24")
+    exported = queue / "admin-networks"
+    assert exported.read_text().splitlines()[1:] == ["198.51.100.0/24"]
+
+    client.post("/api/settings/admin-ips", headers=SAME_ORIGIN, json={"value": "203.0.113.7"})
+    assert exported.read_text().splitlines()[1:] == ["198.51.100.0/24", "203.0.113.7/32"]
+
+    client.delete("/api/settings/admin-ips", headers=SAME_ORIGIN, params={"cidr": "203.0.113.7/32"})
+    assert exported.read_text().splitlines()[1:] == ["198.51.100.0/24"]
+    assert not (queue / ".admin-networks.tmp").exists()
