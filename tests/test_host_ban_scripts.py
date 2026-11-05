@@ -1,5 +1,6 @@
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -155,3 +156,34 @@ def test_dashboard_list_symlink_is_ignored(tmp_path):
 
 def test_jail_template_asks_the_never_ban_script():
     assert "ignorecommand = /usr/local/sbin/honeypot-never-ban.sh <ip>" in JAIL_TEMPLATE.read_text()
+
+
+PERMS = REPO / "scripts" / "cowrie-downloads-perms.py"
+
+
+def test_downloads_perms_makes_samples_readable_and_nothing_else(tmp_path):
+    downloads = tmp_path / "downloads"
+    downloads.mkdir()
+    sample = downloads / ("a" * 64)
+    sample.write_bytes(b"x")
+    sample.chmod(0o4600)
+    tmp = downloads / "tmpXYZ"  # Cowrie's in-flight temp file
+    tmp.write_bytes(b"x")
+    tmp.chmod(0o600)
+    outside = tmp_path / "outside"
+    outside.write_bytes(b"secret")
+    outside.chmod(0o600)
+    (downloads / ("b" * 64)).symlink_to(outside)
+    os.link(outside, downloads / ("c" * 64))
+
+    out = subprocess.run([sys.executable, str(PERMS), str(downloads)], capture_output=True, text=True)
+    assert out.returncode == 0, out.stderr
+    assert oct(sample.stat().st_mode & 0o7777) == "0o604"  # o+r, setuid dropped
+    assert oct(tmp.stat().st_mode & 0o777) == "0o600"
+    assert oct(outside.stat().st_mode & 0o777) == "0o600"  # neither via symlink nor hard link
+    assert "1 file(s)" in out.stdout
+
+    again = subprocess.run([sys.executable, str(PERMS), str(downloads)], capture_output=True, text=True)
+    assert again.returncode == 0 and again.stdout == ""
+    missing = subprocess.run([sys.executable, str(PERMS), str(tmp_path / "none")])
+    assert missing.returncode == 0

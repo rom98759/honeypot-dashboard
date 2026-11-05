@@ -222,3 +222,23 @@ def test_probe_overrides_ignored_outside_root(tmp_path):
     out = subprocess.run(["bash", str(INSTALLER), "--dry-run"], env=env, capture_output=True, text=True, timeout=30)
     assert "would:" not in out.stdout
     assert out.returncode == 2
+
+
+def test_downloads_perms_units_follow_cowrie_volume(tmp_path):
+    out, root = _run(tmp_path)
+    assert out.returncode == 0, out.stdout + out.stderr
+    downloads = "/var/lib/docker/volumes/honeypot-cowrie-var/_data/lib/cowrie/downloads"
+    path_unit = (root / "etc/systemd/system/cowrie-downloads-perms.path").read_text()
+    service = (root / "etc/systemd/system/cowrie-downloads-perms.service").read_text()
+    assert f"PathChanged={downloads}\n" in path_unit
+    assert f"ExecStart=/usr/local/sbin/cowrie-downloads-perms.py {downloads}\n" in service
+    assert "@" not in path_unit + service
+    assert os.access(root / "usr/local/sbin/cowrie-downloads-perms.py", os.X_OK)
+
+    out, root = _run(tmp_path, host_env="SSHD_PORT=50022\nCOWRIE_JSON=/srv/c.json\n")
+    assert "cannot locate Cowrie's downloads" in out.stdout
+    assert not (root / "etc/systemd/system/cowrie-downloads-perms.path").exists()
+
+    out, root = _run(tmp_path, "--uninstall")
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert not (root / "usr/local/sbin/cowrie-downloads-perms.py").exists()

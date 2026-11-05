@@ -4,6 +4,7 @@ from pathlib import Path
 
 from app.cowrie_parser import (
     CommandInput,
+    FileTransfer,
     LoginAttempt,
     SessionClosed,
     SessionConnect,
@@ -11,6 +12,7 @@ from app.cowrie_parser import (
     parse_event,
 )
 from app.fingerprint_stats import record_ttylog
+from app.session_files import record_file_transfer
 from app.tailer import LogTailer
 
 
@@ -45,6 +47,8 @@ def apply_cowrie_record(db: sqlite3.Connection, record, geo_lookup=None) -> None
             "VALUES (?, ?, ?, ?, ?)",
             (record.session_id, record.ttylog_path, record.timestamp, record.size, record.duration_ms),
         )
+    elif isinstance(record, FileTransfer):
+        record_file_transfer(db, record)
     elif isinstance(record, SessionClosed):
         db.execute(
             "UPDATE sessions SET close_time = ?, duration_ms = ? WHERE session_id = ?",

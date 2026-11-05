@@ -101,6 +101,26 @@ CREATE TABLE IF NOT EXISTS admin_networks (
     created_at TEXT NOT NULL
 );
 
+-- Files fetched, written or uploaded by attackers (app/session_files.py). Empty strings
+-- instead of NULL so the UNIQUE constraint also dedupes rows without a URL or a hash.
+CREATE TABLE IF NOT EXISTS session_files (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL,
+    timestamp TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    shasum TEXT NOT NULL DEFAULT '',
+    url TEXT NOT NULL DEFAULT '',
+    filename TEXT NOT NULL DEFAULT '',
+    UNIQUE (session_id, timestamp, kind, shasum, url, filename)
+);
+
+-- One-off startup jobs already done (name -> when).
+CREATE TABLE IF NOT EXISTS backfills (
+    name TEXT PRIMARY KEY,
+    done_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_session_files_shasum ON session_files(shasum);
 CREATE INDEX IF NOT EXISTS idx_sessions_src_ip ON sessions(src_ip);
 CREATE INDEX IF NOT EXISTS idx_sessions_connect_time ON sessions(connect_time);
 CREATE INDEX IF NOT EXISTS idx_fail2ban_events_ip_timestamp ON fail2ban_events(ip, timestamp);

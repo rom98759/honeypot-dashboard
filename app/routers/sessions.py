@@ -10,6 +10,7 @@ from app.campaigns_stats import campaign_of_paths
 from app.correlation import is_currently_banned
 from app.periods import VALID_PERIODS, period_cutoff
 from app.routers.campaigns import cached_aggregate
+from app.session_files import downloads_dir, session_files
 from app.ttyplayer import TTYLogError, ttylogs_to_asciicast
 
 router = APIRouter()
@@ -111,6 +112,7 @@ def _session_detail(request: Request, session_id: str) -> dict:
         "session": dict(session),
         "commands": [dict(c) for c in commands],
         "ttylogs": ttylog_paths,
+        "files": session_files(db, downloads_dir(request.app), session_id),
         "ip": {
             "ip": ip,
             "country": geo["country"] if geo else None,

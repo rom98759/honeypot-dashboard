@@ -33,10 +33,64 @@ export interface SessionCampaign {
   sample_command: string | null;
 }
 
+export type FileKind = "download" | "redirect" | "upload" | "failed";
+
+export interface SessionFile {
+  timestamp: string;
+  kind: FileKind;
+  shasum: string;
+  url: string;
+  filename: string;
+  size: number | null;
+}
+
+export type FileSort = "sessions" | "ips" | "first_seen" | "last_seen";
+
+export interface CapturedFile {
+  shasum: string;
+  name: string;
+  kinds: FileKind[];
+  events: number;
+  sessions: number;
+  ips: number;
+  first_seen: string;
+  last_seen: string;
+  size: number | null;
+}
+
+export interface FileList {
+  items: CapturedFile[];
+  total: number;
+  totals: { files: number; events: number; new_7d: number; failed: number };
+}
+
+export interface FileDetail {
+  shasum: string;
+  size: number | null;
+  events: number;
+  sessions: number;
+  ips: number;
+  first_seen: string;
+  last_seen: string;
+  kinds: FileKind[];
+  sources: { kind: FileKind; url: string; filename: string; events: number }[];
+  recent_events: {
+    session_id: string;
+    src_ip: string | null;
+    timestamp: string;
+    kind: FileKind;
+    url: string;
+    filename: string;
+  }[];
+  top_ips: { ip: string; sessions: number }[];
+}
+
 export interface SessionDetail {
   session: Session;
   commands: Command[];
   ttylogs: string[];
+  /** Absent from older API responses. */
+  files?: SessionFile[];
   ip: SessionIpContext;
   campaign: SessionCampaign | null;
 }

@@ -6,6 +6,7 @@ import {
   List,
   Terminal,
   Fingerprint,
+  FileDown,
   Link2,
   Globe,
   Sun,
@@ -23,6 +24,7 @@ const NAV_SECTIONS = [
       { to: "/sessions", label: "Sessions", Icon: List },
       { to: "/commands", label: "Commandes", Icon: Terminal },
       { to: "/campaigns", label: "Campagnes", Icon: Fingerprint },
+      { to: "/files", label: "Fichiers", Icon: FileDown },
     ],
   },
   {

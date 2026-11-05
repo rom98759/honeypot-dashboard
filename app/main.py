@@ -13,11 +13,12 @@ from app.correlation import FailbanIngester, SshdAuthIngester
 from app.db import connect
 from app.enrichment_worker import EnrichmentWorker
 from app.fingerprint_stats import ensure_fingerprint_stats
+from app.session_files import backfill_session_files
 from app.fban_control import FbanControl
 from app.geoip import GeoLookup
 from app.ingester import CowrieIngester
 from app.ip_enrichment import AbuseIpDbClient, AsnLookup, IpEnrichment
-from app.routers import campaigns, commands, config, correlation, health, ip, overview, sessions, settings
+from app.routers import campaigns, commands, config, correlation, files, health, ip, overview, sessions, settings
 from app.ttl_cache import TtlCache
 
 POLL_INTERVAL_SECONDS = 5
@@ -267,6 +268,7 @@ def create_app(
     )
     _backfill_missing_asn(app.state.db, app.state.ip_enrichment.asn_lookup)
     ensure_fingerprint_stats(app.state.db)
+    backfill_session_files(app.state.db, cowrie_json_path)
     app.state.enrichment_worker = EnrichmentWorker(app.state.db, app.state.ip_enrichment)
     app.state.cowrie_ingester = CowrieIngester(app.state.db, cowrie_json_path, app.state.geo_lookup)
     app.state.fail2ban_ingester = FailbanIngester(app.state.db, fail2ban_log_path)
@@ -279,6 +281,7 @@ def create_app(
     app.include_router(commands.router)
     app.include_router(health.router)
     app.include_router(campaigns.router)
+    app.include_router(files.router)
     app.include_router(settings.router)
     app.include_router(config.router)
     if STATIC_DIR.exists():

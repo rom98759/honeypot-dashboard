@@ -1,0 +1,14 @@
+[Unit]
+Description=Let honeypot-dashboard read the files Cowrie captured
+# An attack burst triggers the path unit many times: never give up on the start limit.
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/cowrie-downloads-perms.py @DOWNLOADS_DIR@
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+ReadWritePaths=@DOWNLOADS_DIR@

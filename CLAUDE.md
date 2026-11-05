@@ -29,6 +29,12 @@ Backlog : `TODO.md`. Doc publique bilingue : `README.md`/`README.fr.md`, `docs/i
   Compteurs par empreinte tenus à l'ingestion (`fingerprint_stats.py` : tables `fingerprint_stats/_ips/_days`,
   rattrapage au démarrage si vides) ; les familles restent calculées à la lecture depuis ces compteurs.
   Agrégat, pages et fiches en cache 5 min (`stats_cache`), tri/pagination en Python.
+- Fichiers (`session_files.py`, `/api/files`, page `FilesPage/`, onglet Fichiers de la fiche session) : table
+  `session_files` remplie par `cowrie.session.file_download(.failed)` / `file_upload` (kind `download` = URL,
+  `redirect` = `echo > fichier`, `upload` = SFTP/scp, `failed`) ; rattrapage unique au démarrage de tous les
+  `cowrie.json*` (table `backfills`). Contenu lu dans `<COWRIE_VAR_PATH>/lib/cowrie/downloads/<sha256>`
+  (O_NOFOLLOW) ; zip « infected » en ZipCrypto pur Python (`zipcrypto.py`, ~4 Mo/s, hors boucle, 1 à la fois,
+  max 64 Mo). Cowrie écrit ces fichiers en 600 : l'unité hôte `cowrie-downloads-perms.path` ajoute o+r.
 - Réimport ponctuel des logs sshd avec le parseur courant : `python -m app.reimport_sshd_auth [--dry-run] FICHIERS`
   (remplace les lignes de la plage couverte par les fichiers).
 - Cowrie : `parse_event` (dataclasses typées) puis `apply_cowrie_record` (tables `sessions`, `commands`,

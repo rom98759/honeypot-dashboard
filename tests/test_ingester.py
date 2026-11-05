@@ -14,12 +14,11 @@ def test_ingests_real_session_fixture(tmp_path):
     ingester = CowrieIngester(db, cowrie_json)
 
     applied = ingester.tick()
-    # 55 lines total, but only 6 event types are handled by parse_event:
+    # 55 lines total, but only these event types are handled by parse_event:
     # session.connect(1) + login.success(1) + command.input(16) + log.closed(16)
-    # + session.closed(1) = 35. The rest (client.version, client.kex,
-    # session.params, command.failed, session.file_download) are parsed as
-    # None and skipped — verified against the real fixture with a one-off count.
-    assert applied == 35
+    # + session.file_download(1) + session.closed(1) = 36. The rest (client.version,
+    # client.kex, session.params, command.failed) are parsed as None and skipped.
+    assert applied == 36
 
     session = db.execute(
         "SELECT * FROM sessions WHERE session_id = 'f3a41d6cf03f'"
@@ -75,7 +74,7 @@ def test_ingestion_works_without_a_geo_lookup(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
     ingester = CowrieIngester(db, cowrie_json)
 
-    assert ingester.tick() == 35
+    assert ingester.tick() == 36
 
 
 def test_picks_up_appended_lines(tmp_path):

@@ -91,6 +91,38 @@ describe("SessionDetailPanel", () => {
     );
   });
 
+  it("lists the session's files with VirusTotal and zip links", async () => {
+    const sha = "a8".repeat(32);
+    render({
+      ...DETAIL,
+      files: [
+        { timestamp: "2026-10-30T10:04:00Z", kind: "download", shasum: sha, url: "http://198.51.100.7/x86", filename: "", size: 2048 },
+        { timestamp: "2026-10-30T10:05:00Z", kind: "failed", shasum: "", url: "http://192.0.2.9/arm7", filename: "", size: null },
+      ],
+    });
+    await screen.findByRole("heading", { name: "a279a5a0ccab" });
+    await userEvent.click(screen.getByRole("tab", { name: /Fichiers/ }));
+    expect(screen.getByText("http://198.51.100.7/x86")).toBeInTheDocument();
+    expect(screen.getByText("Téléchargé")).toBeInTheDocument();
+    expect(screen.getByText("Échec")).toBeInTheDocument();
+    expect(screen.getByText("2,0 Ko")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /VirusTotal/ })).toHaveAttribute(
+      "href",
+      `https://www.virustotal.com/gui/file/${sha}`
+    );
+    expect(screen.getByRole("link", { name: /Zip/ })).toHaveAttribute("href", `/api/files/${sha}/download`);
+    expect(screen.getByRole("link", { name: new RegExp(sha.slice(0, 16)) })).toHaveAttribute(
+      "href",
+      `/files?file=${sha}`
+    );
+  });
+
+  it("hides the files tab when the session moved no file", async () => {
+    render();
+    await screen.findByRole("heading", { name: "a279a5a0ccab" });
+    expect(screen.queryByRole("tab", { name: /Fichiers/ })).toBeNull();
+  });
+
   it("opens on commands and hides the cast export when there is no recording", async () => {
     render({ ...DETAIL, ttylogs: [], campaign: null });
     await screen.findByRole("heading", { name: "a279a5a0ccab" });

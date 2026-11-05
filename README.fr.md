@@ -19,6 +19,9 @@ vrai sshd et fail2ban.
 - **Sessions** : chaque session Cowrie avec **replay** du terminal (lecteur asciinema).
 - **Campagnes** : sessions regroupées par script exécuté, normalisées pour que jetons aléatoires, IP et
   mots de passe ne coupent pas une famille de bots.
+- **Fichiers** : ce que les attaquants ont téléchargé (wget/curl), écrit (`echo … > fichier`) ou déposé
+  (SFTP/scp), par session et par SHA-256 : sources, sessions, IP, lien VirusTotal, téléchargement en zip
+  chiffré avec le mot de passe `infected`.
 - **Carte** : attaques par pays (GeoLite2).
 - **Corrélation** : la même IP vue sur le honeypot, sur le vrai sshd et bannie par fail2ban.
 - **Page IP** : historique, ASN, DNS inverse, score AbuseIPDB, **ban/unban** fail2ban optionnel.
@@ -45,7 +48,8 @@ vrai sshd et fail2ban.
   aucune capability, non-root).
 - `scripts/install-host.sh` installe la partie hôte : timers systemd qui exportent le log fail2ban et
   le journal sshd, règle pare-feu `DOCKER-USER` qui bloque toute connexion sortante de Cowrie,
-  rafraîchissement GeoIP mensuel, logrotate, jail fail2ban sshd et worker de ban optionnel.
+  rafraîchissement GeoIP mensuel, logrotate, jails fail2ban, accès en lecture aux fichiers capturés
+  par Cowrie, et worker de ban optionnel.
 - Le dashboard n'a **pas de login** : il doit être derrière un reverse proxy qui ajoute l'authentification.
 
 ## Démarrage rapide

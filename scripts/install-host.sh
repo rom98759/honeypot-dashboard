@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Installs the host side of honeypot-dashboard: log exporters, DOCKER-USER firewall,
-# GeoIP refresh, logrotate, fail2ban jails (real sshd, Cowrie, recidive, manual bans)
-# and (optionally) the ban worker.
+# GeoIP refresh, logrotate, fail2ban jails (real sshd, Cowrie, recidive, manual bans),
+# read access to Cowrie's captured files, and (optionally) the ban worker.
 # Idempotent: run it again after `git pull` to update the installed copies.
 #
 # It NEVER edits sshd, ufw or the INPUT chain. Cowrie takes port 22, so the real
@@ -89,7 +89,7 @@ QUEUE_DIR="$ROOT/opt/honeypot/fban-queue"
 # Must match the dashboard image user (Dockerfile: useradd --uid 1000).
 DASHBOARD_UID=1000
 
-CORE_SCRIPTS=(fail2ban-export.sh sshd-auth-export.sh docker-user-firewall.sh geoip-update.sh honeypot-ban.sh honeypot-never-ban.sh)
+CORE_SCRIPTS=(fail2ban-export.sh sshd-auth-export.sh docker-user-firewall.sh geoip-update.sh honeypot-ban.sh honeypot-never-ban.sh cowrie-downloads-perms.py)
 CORE_UNITS=(
   fail2ban-export.service fail2ban-export.timer
   sshd-auth-export.service sshd-auth-export.timer
@@ -97,6 +97,9 @@ CORE_UNITS=(
   geoip-update.service geoip-update.timer
 )
 CORE_ENABLE=(fail2ban-export.timer sshd-auth-export.timer docker-user-firewall.service docker-user-firewall.timer geoip-update.timer)
+# Generated from scripts/*.tmpl: they name the Docker volume's real path.
+PERMS_UNITS=(cowrie-downloads-perms.service cowrie-downloads-perms.path)
+PERMS_ENABLE=(cowrie-downloads-perms.path)
 FBAN_SCRIPTS=(fban-queue-worker.sh)
 FBAN_UNITS=(fban-queue-worker.service fban-queue-worker.path)
 FBAN_ENABLE=(fban-queue-worker.path)
@@ -235,6 +238,38 @@ cowrie_json_path() {
   echo "/var/lib/docker/volumes/${volume:-honeypot-cowrie-var}/_data/log/cowrie/cowrie.json"
 }
 
+# Cowrie keeps captured files next to its logs: <var>/lib/cowrie/downloads.
+cowrie_downloads_dir() {
+  local json
+  json="$(cowrie_json_path)"
+  case "$json" in
+    */log/cowrie/cowrie.json) echo "${json%/log/cowrie/cowrie.json}/lib/cowrie/downloads" ;;
+    *) echo "" ;;
+  esac
+}
+
+# Returns 0 when the units are in place (to enable), 1 when skipped.
+install_downloads_perms() {
+  local dir tmp f
+  dir="$(cowrie_downloads_dir)"
+  if [[ -z "$dir" ]]; then
+    warn "COWRIE_JSON does not end in /log/cowrie/cowrie.json: cannot locate Cowrie's downloads," \
+      "so the dashboard cannot zip captured files."
+    for f in "${PERMS_ENABLE[@]}"; do
+      [[ -e "$UNITS/$f" ]] && systemctl_do disable --now "$f"
+    done
+    for f in "${PERMS_UNITS[@]}"; do remove_file "$UNITS/$f"; done
+    return 1
+  fi
+  tmp="$(mktemp)"
+  for f in "${PERMS_UNITS[@]}"; do
+    sed "s|@DOWNLOADS_DIR@|$dir|g" "$REPO_SCRIPTS/$f.tmpl" >"$tmp"
+    install_file 0644 "$tmp" "$UNITS/$f"
+  done
+  rm -f "$tmp"
+  return 0
+}
+
 install_jail() {
   local cowrie_json cowrie_enabled=true changed=0
   cowrie_json="$(cowrie_json_path)"
@@ -326,8 +361,9 @@ do_install() {
     rm -f "$tmp"
   fi
 
-  local jail_changed=0
+  local jail_changed=0 perms=0
   if install_jail; then jail_changed=1; fi
+  if install_downloads_perms; then perms=1; fi
 
   if [[ "$FBAN_ENABLED" == 1 ]]; then
     for f in "${FBAN_SCRIPTS[@]}"; do install_file 0755 "$REPO_SCRIPTS/$f" "$SBIN/$f"; done
@@ -343,6 +379,11 @@ do_install() {
   systemctl_do daemon-reload
   systemctl_do enable --now "${CORE_ENABLE[@]}"
   [[ "$FBAN_ENABLED" == 1 ]] && systemctl_do enable --now "${FBAN_ENABLE[@]}"
+  if [[ "$perms" == 1 ]]; then
+    systemctl_do enable --now "${PERMS_ENABLE[@]}"
+    # The path unit only reacts to new files: fix the ones already captured.
+    [[ -d "$ROOT$(cowrie_downloads_dir)" ]] && systemctl_do start cowrie-downloads-perms.service
+  fi
   [[ "$jail_changed" == 1 ]] && systemctl_do reload-or-restart fail2ban
 
   if [[ -n "${MAXMIND_ACCOUNT_ID:-}" && -n "${MAXMIND_LICENSE_KEY:-}" ]]; then
@@ -359,11 +400,11 @@ do_install() {
 
 do_uninstall() {
   local f
-  local all_enable=("${CORE_ENABLE[@]}" "${FBAN_ENABLE[@]}")
+  local all_enable=("${CORE_ENABLE[@]}" "${PERMS_ENABLE[@]}" "${FBAN_ENABLE[@]}")
   for f in "${all_enable[@]}"; do
     [[ -e "$UNITS/$f" ]] && systemctl_do disable --now "$f"
   done
-  for f in "${CORE_UNITS[@]}" "${FBAN_UNITS[@]}"; do remove_file "$UNITS/$f"; done
+  for f in "${CORE_UNITS[@]}" "${PERMS_UNITS[@]}" "${FBAN_UNITS[@]}"; do remove_file "$UNITS/$f"; done
   for f in "${CORE_SCRIPTS[@]}" "${FBAN_SCRIPTS[@]}"; do remove_file "$SBIN/$f"; done
   remove_file "$ROOT/etc/logrotate.d/honeypot-export"
   if [[ -e "$JAIL_FILE" || -e "$LEGACY_JAIL_FILE" ]]; then

@@ -18,6 +18,9 @@ who attacks your server, what they type, and how the honeypot, the real sshd and
 - **Sessions**: every Cowrie session with a terminal **replay** (asciinema player).
 - **Campaigns**: sessions grouped by the script they ran, normalised so random tokens, IPs and
   passwords do not split a bot family.
+- **Files**: what attackers fetched (wget/curl), wrote (`echo … > file`) or uploaded (SFTP/scp), per
+  session and per SHA-256: sources, sessions, IPs, VirusTotal link, download as a zip encrypted
+  with the password `infected`.
 - **Map**: attacks per country (GeoLite2).
 - **Correlation**: the same IP seen on the honeypot, on the real sshd, and banned by fail2ban.
 - **IP page**: history, ASN, reverse DNS, AbuseIPDB score, optional **ban/unban** through fail2ban.
@@ -44,7 +47,8 @@ who attacks your server, what they type, and how the honeypot, the real sshd and
   no capabilities, non-root).
 - `scripts/install-host.sh` installs the host side: systemd timers exporting the fail2ban log and
   the sshd journal, a `DOCKER-USER` firewall rule that blocks any outbound connection from
-  Cowrie, monthly GeoIP refresh, logrotate, the fail2ban sshd jail and the optional ban worker.
+  Cowrie, monthly GeoIP refresh, logrotate, the fail2ban jails, read access to Cowrie's captured
+  files, and the optional ban worker.
 - The dashboard has **no login**: it must sit behind a reverse proxy that adds authentication.
 
 ## Quick start

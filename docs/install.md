@@ -175,11 +175,11 @@ What the preflight checks, and what to do if it stops (exit code 2, nothing chan
 What it installs (all idempotent, re-run it any time):
 
 - `/usr/local/sbin/`: `fail2ban-export.sh`, `sshd-auth-export.sh`, `docker-user-firewall.sh`,
-  `geoip-update.sh` (+ `fban-queue-worker.sh` if `FBAN_ENABLED=1`).
+  `geoip-update.sh`, `cowrie-downloads-perms.py` (+ `fban-queue-worker.sh` if `FBAN_ENABLED=1`).
 - systemd units, enabled: `fail2ban-export.timer` (every minute), `sshd-auth-export.timer`
   (every 5 min), `docker-user-firewall.service` + `.timer` (at boot, at every Docker restart, every
   10 min), `geoip-update.timer` (monthly; first download right away if the key is set),
-  `fban-queue-worker.path` (if enabled).
+  `fban-queue-worker.path` (if enabled), `cowrie-downloads-perms.path` (see below).
 - `/etc/logrotate.d/honeypot-export`, `/var/log/honeypot-export/` (root:adm 750),
   `/etc/honeypot/never-ban` (created empty, never overwritten).
 - `/etc/fail2ban/jail.d/honeypot.local` (+ `action.d/honeypot-block.conf`, `filter.d/honeypot-*.conf`,
@@ -187,6 +187,13 @@ What it installs (all idempotent, re-run it any time):
   regenerated on every run (edit `host.env` / `never-ban`, not the file) and, being a `jail.d/*.local`,
   wins over your own `jail.local`. The installer checks it with `fail2ban-client -t` before reloading
   and puts the previous file back if fail2ban rejects it.
+
+Cowrie stores the files attackers fetch or upload as `lib/cowrie/downloads/<sha256>` in its volume,
+mode 600, so the dashboard (another user) could list them but not zip them.
+`cowrie-downloads-perms.path` watches that directory (derived from `COWRIE_JSON`, or from
+`COWRIE_VAR_VOLUME` in `.env`) and adds the read bit for others to each new sample. `/var/lib/docker`
+is reachable by root only, so no host user gains access. The script never follows a link and only
+touches regular files named like a SHA-256.
 
 The installer itself **never** touches sshd or ufw. Ban rules live in one `hp-<jail>` chain per jail,
 reached from `INPUT` and `DOCKER-USER`; the other firewall rules only go to `DOCKER-USER`.
@@ -310,6 +317,9 @@ Then move your real SSH back to 22 if you want, with the same care as step 0.
 - **Health banner "stalled" on a source**: `systemctl status fail2ban-export.timer sshd-auth-export.timer`,
   `ls -l /var/log/honeypot-export/`. The container mounts the *directory*: never bind-mount a single
   log file (the inode is pinned and ingestion stops at the next rotation).
+- **Files page: the Zip button answers 503 "not readable yet"**: rerun the installer, then
+  `systemctl status cowrie-downloads-perms.path` and `systemctl start cowrie-downloads-perms.service`.
+  A file without a Zip button is one Cowrie kept no copy of (e.g. a failed download).
 - **`docker compose up` fails with "port is already allocated" on 22**: sshd still listens on 22.
   Back to step 0.
 - **"network … declared as external, but could not be found"**: wrong `PROXY_NETWORK`, check `docker network ls`.

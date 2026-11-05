@@ -176,11 +176,11 @@ Ce que vérifie l'installeur, et quoi faire s'il s'arrête (code de sortie 2, ri
 Ce qu'il installe (tout est idempotent, relançable à tout moment) :
 
 - `/usr/local/sbin/` : `fail2ban-export.sh`, `sshd-auth-export.sh`, `docker-user-firewall.sh`,
-  `geoip-update.sh` (+ `fban-queue-worker.sh` si `FBAN_ENABLED=1`).
+  `geoip-update.sh`, `cowrie-downloads-perms.py` (+ `fban-queue-worker.sh` si `FBAN_ENABLED=1`).
 - Unités systemd activées : `fail2ban-export.timer` (chaque minute), `sshd-auth-export.timer`
   (toutes les 5 min), `docker-user-firewall.service` + `.timer` (au boot, à chaque redémarrage de Docker,
   toutes les 10 min), `geoip-update.timer` (mensuel ; premier téléchargement immédiat si la clé est
-  renseignée), `fban-queue-worker.path` (si activé).
+  renseignée), `fban-queue-worker.path` (si activé), `cowrie-downloads-perms.path` (voir plus bas).
 - `/etc/logrotate.d/honeypot-export`, `/var/log/honeypot-export/` (root:adm 750),
   `/etc/honeypot/never-ban` (créé vide, jamais écrasé).
 - `/etc/fail2ban/jail.d/honeypot.local` (+ `action.d/honeypot-block.conf`, `filter.d/honeypot-*.conf`,
@@ -188,6 +188,13 @@ Ce qu'il installe (tout est idempotent, relançable à tout moment) :
   Il est régénéré à chaque passage (modifie `host.env` / `never-ban`, pas le fichier) et, en tant que
   `jail.d/*.local`, il l'emporte sur ton propre `jail.local`. L'installeur le vérifie avec
   `fail2ban-client -t` avant de recharger et remet l'ancien fichier si fail2ban le refuse.
+
+Cowrie range les fichiers téléchargés ou déposés par les attaquants dans `lib/cowrie/downloads/<sha256>`
+de son volume, en mode 600 : le dashboard (un autre utilisateur) peut les lister mais pas les zipper.
+`cowrie-downloads-perms.path` surveille ce répertoire (déduit de `COWRIE_JSON`, ou de `COWRIE_VAR_VOLUME`
+dans `.env`) et ajoute la lecture pour les autres à chaque nouvel échantillon. `/var/lib/docker` n'est
+accessible qu'à root : aucun utilisateur de l'hôte n'y gagne d'accès. Le script ne suit jamais de lien et
+ne touche que des fichiers réguliers nommés comme un SHA-256.
 
 L'installeur lui-même ne touche **jamais** à sshd ni à ufw. Les règles de ban vivent dans une chaîne
 `hp-<jail>` par jail, appelée depuis `INPUT` et `DOCKER-USER` ; les autres règles pare-feu vont uniquement
@@ -310,6 +317,9 @@ Remets ensuite ton vrai SSH sur 22 si tu le souhaites, avec les mêmes précauti
 
 ## Dépannage
 
+- **Page Fichiers : le bouton Zip répond 503 « not readable yet »** : relancer l'installeur, puis
+  `systemctl status cowrie-downloads-perms.path` et `systemctl start cowrie-downloads-perms.service`.
+  Un fichier sans bouton Zip est un fichier dont Cowrie n'a pas gardé de copie (téléchargement raté…).
 - **Bandeau santé « stalled » sur une source** : `systemctl status fail2ban-export.timer sshd-auth-export.timer`,
   `ls -l /var/log/honeypot-export/`. Le conteneur monte le *répertoire* : ne jamais bind-monter un fichier de
   log seul (l'inode est figé et l'ingestion s'arrête à la rotation suivante).

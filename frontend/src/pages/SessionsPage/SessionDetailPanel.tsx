@@ -7,7 +7,8 @@ import { SkeletonBlock } from "../../components/SkeletonBlock";
 import { ErrorState } from "../../components/ErrorState";
 import { AcceptedLoginBadge, Badge } from "../../components/Badge";
 import { ReplayPlayer } from "../../components/ReplayPlayer";
-import type { Command, Session, SessionDetail } from "../../api/types";
+import type { Command, Session, SessionDetail, SessionFile } from "../../api/types";
+import { FileActions, KindBadge, formatBytes } from "../FilesPage/fileLabels";
 import { formatTimestamp } from "../../utils/formatDate";
 import { useCopy } from "../../utils/useCopy";
 import { countryLabel, flagEmoji, formatDuration, formatNumber } from "../../utils/format";
@@ -109,14 +110,57 @@ function CommandsTab({ start, commands }: { start: string; commands: Command[] }
   );
 }
 
+function FilesTab({ start, files }: { start: string; files: SessionFile[] }) {
+  const [copied, copy] = useCopy();
+  return (
+    <ul className="files-list">
+      {files.map((f, i) => (
+        <li key={i}>
+          <div className="files-list-head">
+            <KindBadge kind={f.kind} />
+            <span className="mono cell-muted" title={formatTimestamp(f.timestamp)}>
+              {relativeTime(start, f.timestamp)}
+            </span>
+            <code title={f.url || f.filename}>{f.url || f.filename || "(sans nom)"}</code>
+          </div>
+          {f.shasum && (
+            <div className="files-list-meta">
+              <Link className="mono" to={`/files?file=${f.shasum}`} title={f.shasum}>
+                {f.shasum.slice(0, 16)}…
+              </Link>
+              <button
+                className="btn-icon btn-copy"
+                aria-label={`Copier le SHA-256 du fichier ${i + 1}`}
+                onClick={() => copy(`sha-${i}`, f.shasum)}
+              >
+                {copied === `sha-${i}` ? <Check /> : <Copy />}
+              </button>
+              <span className="cell-muted">{f.size == null ? "pas de copie" : formatBytes(f.size)}</span>
+              <FileActions shasum={f.shasum} stored={f.size != null} />
+            </div>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+type SessionTab = "replay" | "commands" | "files";
+
 function PanelBody({ detail, closeRef, onClose }: {
   detail: SessionDetail;
   closeRef: RefObject<HTMLButtonElement>;
   onClose: () => void;
 }) {
   const { session, commands } = detail;
+  const files = detail.files ?? [];
   const hasReplay = detail.ttylogs.length > 0;
-  const [tab, setTab] = useState<"replay" | "commands">(hasReplay ? "replay" : "commands");
+  const [tab, setTab] = useState<SessionTab>(hasReplay ? "replay" : "commands");
+  const tabs: { id: SessionTab; label: string; count?: number }[] = [
+    { id: "replay", label: "Replay" },
+    { id: "commands", label: "Commandes", count: commands.length },
+  ];
+  if (files.length) tabs.push({ id: "files", label: "Fichiers", count: files.length });
   const [copied, copy] = useCopy();
 
   return (
@@ -168,34 +212,29 @@ function PanelBody({ detail, closeRef, onClose }: {
         <dd className="mono">{session.login_password ?? "-"}</dd>
       </dl>
 
-      <div className="tabs" role="tablist">
-        <button
-          role="tab"
-          aria-selected={tab === "replay"}
-          className={`tab${tab === "replay" ? " active" : ""}`}
-          onClick={() => setTab("replay")}
-        >
-          Replay
-        </button>
-        <button
-          role="tab"
-          aria-selected={tab === "commands"}
-          className={`tab${tab === "commands" ? " active" : ""}`}
-          onClick={() => setTab("commands")}
-        >
-          Commandes <span className="tab-count">{commands.length}</span>
-        </button>
+      <div className="tabs panel-tabs" role="tablist">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            role="tab"
+            aria-selected={tab === t.id}
+            className={`tab${tab === t.id ? " active" : ""}`}
+            onClick={() => setTab(t.id)}
+          >
+            {t.label}
+            {t.count != null && <span className="tab-count">{formatNumber(t.count)}</span>}
+          </button>
+        ))}
       </div>
       <div role="tabpanel">
-        {tab === "replay" ? (
-          hasReplay ? (
+        {tab === "replay" &&
+          (hasReplay ? (
             <ReplayPlayer sessionId={session.session_id} />
           ) : (
             <p className="cell-muted">Pas d'enregistrement terminal : l'attaquant s'est arrêté au login.</p>
-          )
-        ) : (
-          <CommandsTab start={session.connect_time} commands={commands} />
-        )}
+          ))}
+        {tab === "commands" && <CommandsTab start={session.connect_time} commands={commands} />}
+        {tab === "files" && <FilesTab start={session.connect_time} files={files} />}
       </div>
     </>
   );

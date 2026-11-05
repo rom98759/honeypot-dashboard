@@ -42,6 +42,41 @@ class SessionClosed:
     timestamp: str
 
 
+@dataclass
+class FileTransfer:
+    """A file the attacker fetched (wget/curl), wrote with a shell redirection, or
+    uploaded (SFTP/scp). Cowrie stores the content under downloads/<shasum>."""
+
+    session_id: str
+    kind: str  # download | redirect | upload | failed
+    shasum: str
+    url: str
+    filename: str
+    timestamp: str
+
+
+FILE_EVENTS = ("cowrie.session.file_download", "cowrie.session.file_download.failed", "cowrie.session.file_upload")
+
+
+def _file_transfer(event: dict) -> FileTransfer:
+    eventid = event["eventid"]
+    url = event.get("url") or ""
+    if eventid == "cowrie.session.file_upload":
+        kind, filename = "upload", event.get("filename") or ""
+    elif eventid == "cowrie.session.file_download.failed":
+        kind, filename = "failed", ""
+    else:
+        kind, filename = ("download" if url else "redirect"), event.get("destfile") or ""
+    return FileTransfer(
+        session_id=event.get("session"),
+        kind=kind,
+        shasum=(event.get("shasum") or "").lower(),
+        url=url,
+        filename=filename,
+        timestamp=event.get("timestamp"),
+    )
+
+
 def parse_event(event: dict):
     """Translate one raw Cowrie JSON event into a typed record, or None if irrelevant."""
     eventid = event.get("eventid")
@@ -84,4 +119,6 @@ def parse_event(event: dict):
             duration_ms=event.get("duration_ms", 0),
             timestamp=timestamp,
         )
+    if eventid in FILE_EVENTS:
+        return _file_transfer(event)
     return None
