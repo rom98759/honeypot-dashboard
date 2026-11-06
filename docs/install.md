@@ -248,6 +248,11 @@ In your reverse proxy, create a site for a (sub)domain of yours that forwards to
 authentication layer** (basic auth, SSO, IP allow-list...). For Nginx Proxy Manager: *Proxy Host*
 (forward hostname `honeypot-dashboard`, port `8000`), *SSL* tab, and an *Access List* with a user.
 
+> **Known limitation:** that authentication lives in the proxy only. Any other container on
+> `PROXY_NETWORK` can reach `honeypot-dashboard:8000` directly, read everything and use ban/unban
+> (the Origin check only stops browsers). If you do not trust every container on that network,
+> give the dashboard a network of its own shared with the proxy only, and set `PROXY_NETWORK` to it.
+
 Without a reverse proxy, reach it through an SSH tunnel: temporarily add
 `ports: ["127.0.0.1:8000:8000"]` to the `dashboard` service, then
 `ssh -p 50022 -L 8000:127.0.0.1:8000 <user>@<server>` and open <http://localhost:8000>.

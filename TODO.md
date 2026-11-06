@@ -115,9 +115,8 @@
 - [x] Exclure l'IP admin des statistiques : décidé de NE PAS le faire (2026-11-01).
       Les sessions de test du propriétaire restent visibles ; la liste des IP
       protégées (page Réglages) ne sert qu'à interdire le ban.
-- [ ] Reste : `/ban` et `/unban` joignables sans auth depuis les autres
-      conteneurs du réseau `nginx-proxy-network` (contourne NPM). Piste : réseau
-      Docker dédié dashboard ↔ NPM, ou secret partagé sur les routes d'écriture.
+- [x] `/ban` et `/unban` joignables depuis les autres conteneurs du réseau proxy : limite
+      documentée (install.md), à régler côté config VPS (réseau dédié dashboard ↔ NPM), hors projet.
 - [x] Fail2Ban peut deban des ip donc affiche toujours ban mais peut etre pas : la page IP liste les bans
       en cours (jail, ce qu'ils bloquent, fin), expirés au bantime de leur jail.
 - [x] Bouton de ban dans le dashboard (jails `manual` / `manual-all`, portée au choix).
