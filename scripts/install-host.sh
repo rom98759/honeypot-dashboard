@@ -155,10 +155,66 @@ preflight_abort() {
 # Configured ports (sshd -T) plus ports an sshd process actually listens on (ss):
 # a Port change written but not yet applied shows up as a mismatch, not a pass.
 detect_sshd_ports() {
+  local conf listen
+  conf="$(sshd -T 2>/dev/null || true)"
+  # ListenAddress entries carry their own port and override Port.
+  listen="$(awk '/^listenaddress /{n = split($2, a, ":"); print a[n]}' <<<"$conf")"
   {
-    sshd -T 2>/dev/null | awk '/^port /{print $2}'
+    if [[ -n "$listen" ]]; then echo "$listen"; else awk '/^port /{print $2}' <<<"$conf"; fi
     ss -ltnpH 2>/dev/null | awk '/"sshd"/{n = split($4, a, ":"); print a[n]}'
-  } | sort -un
+    # Socket activation (ssh.socket): systemd holds the listener, so ss never names sshd.
+    if systemctl is-active --quiet ssh.socket 2>/dev/null; then
+      systemctl show ssh.socket -p Listen --value 2>/dev/null | awk '{n = split($1, a, ":"); print a[n]}'
+    fi
+  } | grep -E '^[0-9]+$' | sort -un || true
+}
+
+# Reads `ufw status` output. Returns 0 when an ALLOW/LIMIT rule opens $2/tcp, 3 when no
+# rule does but some rules use application profiles (ports unknown here), 1 otherwise.
+ufw_allows_port() {
+  local port="$1" line action i spec proto ports item apps=0
+  local -a words to
+  while IFS= read -r line; do
+    read -ra words <<<"$line"
+    action=""
+    to=()
+    for ((i = 0; i < ${#words[@]}; i++)); do
+      case "${words[i]}" in
+        ALLOW|LIMIT|DENY|REJECT) action="${words[i]}"; break ;;
+        *) to+=("${words[i]}") ;;
+      esac
+    done
+    [[ "$action" == ALLOW || "$action" == LIMIT ]] || continue
+    # Drop the "(v6)" marker and an "on <iface>" suffix: "50022/tcp (v6) on eth0".
+    for ((i = ${#to[@]} - 1; i >= 0; i--)); do
+      if [[ "${to[i]}" == "(v6)" ]]; then unset 'to[i]'; fi
+    done
+    to=("${to[@]}")
+    if (( ${#to[@]} >= 2 )) && [[ "${to[${#to[@]} - 2]}" == on ]]; then
+      to=("${to[@]:0:${#to[@]} - 2}")
+    fi
+    (( ${#to[@]} > 0 )) || continue
+    spec="${to[${#to[@]} - 1]}"
+    [[ "$spec" == Anywhere ]] && return 0
+    proto=""
+    [[ "$spec" == */* ]] && proto="${spec#*/}"
+    ports="${spec%%/*}"
+    if ! [[ "$ports" =~ ^[0-9][0-9,:]*$ ]]; then
+      apps=1
+      continue
+    fi
+    [[ -z "$proto" || "$proto" == tcp ]] || continue
+    IFS=, read -ra words <<<"$ports"
+    for item in "${words[@]}"; do
+      if [[ "$item" == *:* ]]; then
+        (( port >= ${item%%:*} && port <= ${item##*:} )) && return 0
+      elif [[ "$item" == "$port" ]]; then
+        return 0
+      fi
+    done
+  done <<<"$2"
+  (( apps )) && return 3
+  return 1
 }
 
 preflight() {
@@ -195,14 +251,37 @@ preflight() {
   [[ -n "$ROOT" && -n "${UFW_STATUS_CMD:-}" ]] && ufw_cmd="$UFW_STATUS_CMD"
   ufw_status="$(bash -c "$ufw_cmd")"
   if grep -q '^Status: active' <<<"$ufw_status"; then
-    if ! grep -Eq "^${SSHD_PORT}(/tcp)?[[:space:]]+(ALLOW|LIMIT)" <<<"$ufw_status"; then
-      echo "[install-host] ufw is active but has no rule for port $SSHD_PORT."
-      echo "[install-host] Run: ufw allow ${SSHD_PORT}/tcp   then rerun this installer."
-      exit 2
-    fi
-    log "ufw allows $SSHD_PORT/tcp"
+    local ufw_rc=0
+    ufw_allows_port "$SSHD_PORT" "$ufw_status" || ufw_rc=$?
+    case "$ufw_rc" in
+      0) log "ufw allows $SSHD_PORT/tcp" ;;
+      3) warn "ufw rules use application profiles (e.g. OpenSSH) whose ports are not checked here:" \
+           "make sure one of them opens $SSHD_PORT/tcp (ufw app info <name>)." ;;
+      *)
+        echo "[install-host] ufw is active but no ALLOW/LIMIT rule opens port $SSHD_PORT/tcp."
+        echo "[install-host] Run: ufw allow ${SSHD_PORT}/tcp   then rerun this installer."
+        exit 2
+        ;;
+    esac
   else
     warn "ufw is not active. Make sure your provider firewall allows $SSHD_PORT/tcp and 22/tcp."
+  fi
+
+  # The firewall unit hooks into docker.service: without Docker, enabling it fails halfway.
+  local docker_cmd="docker compose version && systemctl cat docker.service"
+  [[ -n "$ROOT" ]] && docker_cmd="${DOCKER_CHECK_CMD:-true}"
+  if ! bash -c "$docker_cmd" >/dev/null 2>&1; then
+    fail "Docker Engine with the compose plugin is required (docker compose version, docker.service): install it first (docs/install.md, step 1)."
+  fi
+  # The egress block matches HONEYPOT_SUBNET from host.env; compose creates the network
+  # from the one in .env. If they differ, the honeypot can reach the Internet unnoticed.
+  local host_subnet="${HONEYPOT_SUBNET:-172.21.0.0/16}" env_subnet=""
+  if [[ -f "$REPO_DIR/.env" ]]; then
+    env_subnet="$(sed -n 's/^HONEYPOT_SUBNET=//p' "$REPO_DIR/.env" | tail -n1 | tr -d "\"'")"
+  fi
+  env_subnet="${env_subnet:-172.21.0.0/16}"
+  if [[ "$env_subnet" != "$host_subnet" ]]; then
+    fail "HONEYPOT_SUBNET is $host_subnet in $HOST_ENV but $env_subnet in $REPO_DIR/.env: set the same value in both (the egress block would miss the honeypot)."
   fi
 }
 
@@ -404,6 +483,13 @@ do_uninstall() {
   for f in "${all_enable[@]}"; do
     [[ -e "$UNITS/$f" ]] && systemctl_do disable --now "$f"
   done
+  # Timers are stopped above, so nothing re-adds the rules once cleared.
+  if [[ -n "$ROOT" ]]; then
+    log "skip (no iptables under --root): docker-user-firewall.sh --clear"
+  else
+    run bash "$REPO_SCRIPTS/docker-user-firewall.sh" --clear \
+      || warn "could not clear DOCKER-USER: run $REPO_SCRIPTS/docker-user-firewall.sh --clear"
+  fi
   for f in "${CORE_UNITS[@]}" "${PERMS_UNITS[@]}" "${FBAN_UNITS[@]}"; do remove_file "$UNITS/$f"; done
   for f in "${CORE_SCRIPTS[@]}" "${FBAN_SCRIPTS[@]}"; do remove_file "$SBIN/$f"; done
   remove_file "$ROOT/etc/logrotate.d/honeypot-export"
@@ -416,7 +502,6 @@ do_uninstall() {
   for f in "${F2B_FILTERS[@]}"; do remove_file "$ROOT/etc/fail2ban/filter.d/$f"; done
   systemctl_do daemon-reload
   log "removed. Kept: $EXPORT_DIR, $NEVER_BAN, $HOST_ENV, Docker volumes."
-  log "DOCKER-USER rules stay until the next Docker restart (systemctl restart docker clears them)."
 }
 
 if [[ "$MODE" == uninstall ]]; then

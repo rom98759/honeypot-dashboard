@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from app.fban_control import FbanControl, FbanControlError, FbanTimeout
+from app.fban_control import FbanControl, FbanControlError, FbanProtected, FbanTimeout
 
 
 def respond_after(queue_dir: Path, verb: str, response_text: str, delay: float = 0.02):
@@ -126,3 +126,11 @@ def test_request_status_rejects_invalid_ip(tmp_path):
     control = FbanControl(tmp_path)
     with pytest.raises(ValueError):
         control.request_status("not-an-ip")
+
+
+def test_request_ban_raises_protected_when_worker_refuses(tmp_path):
+    control = FbanControl(tmp_path)
+    t = respond_after(tmp_path, "ban", "protected")
+    with pytest.raises(FbanProtected):
+        control.request_ban("1.2.3.4")
+    t.join(timeout=1)

@@ -119,3 +119,19 @@ def test_scripts_refuse_writable_host_env(tmp_path):
         )
         assert out.returncode != 0, script
         assert "writable" in out.stderr, script
+
+
+def test_firewall_clear_payload_keeps_only_return(tmp_path):
+    out = _run(
+        "docker-user-firewall.sh",
+        "--print-clear",
+        host_env="WAN_IFACE=eth0\nCLOUDFLARE_ONLY=1\nBLOCK_PORTS=81\n",
+        tmp_path=tmp_path,
+    )
+    assert out.returncode == 0, out.stderr
+    assert out.stdout.splitlines() == ["*filter", ":DOCKER-USER - [0:0]", "-A DOCKER-USER -j RETURN", "COMMIT"]
+
+
+def test_ban_worker_answers_protected_distinctly():
+    worker = (SCRIPTS / "fban-queue-worker.sh").read_text()
+    assert 'echo "protected"' in worker

@@ -18,6 +18,10 @@ class FbanTimeout(FbanControlError):
     """No response file appeared within the configured timeout."""
 
 
+class FbanProtected(FbanControlError):
+    """The host worker refused to ban an IP of its never-ban list."""
+
+
 def _validate(ip: str, jail: str) -> None:
     if jail not in JAIL_WHITELIST:
         raise ValueError(f"jail not whitelisted: {jail!r}")
@@ -30,7 +34,7 @@ class FbanControl:
     Talks to the host-side fail2ban worker (scripts/fban-queue-worker.sh) via a
     bind-mounted directory: writes a `req-<id>` file, polls for the matching
     `res-<id>` file. The container never gets a socket or capability toward
-    fail2ban itself — see docs/superpowers/specs/2026-09-14-fban-control-design.md.
+    fail2ban itself.
     """
 
     def __init__(self, queue_dir: Path, timeout: float = 2.0, poll_interval: float = 0.05):
@@ -69,6 +73,8 @@ class FbanControl:
             raise FbanControlError(str(exc)) from exc
         if result is None:
             raise FbanTimeout(f"no response for {verb} {ip}")
+        if result == "protected":
+            raise FbanProtected(f"{ip} is protected on the host (/etc/honeypot/never-ban)")
         if result != "ok":
             raise FbanControlError(result)
 
