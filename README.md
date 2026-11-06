@@ -12,6 +12,16 @@ who attacks your server, what they type, and how the honeypot, the real sshd and
 > The installer refuses to run while sshd still listens on 22. Follow
 > [step 0 of the install guide](docs/install.md#step-0--move-your-real-ssh-server-off-port-22) carefully.
 
+![Overview: connections, unique IPs, login attempts and bans over the last 24 hours](docs/screenshots/overview.jpg)
+
+| Session panel with replay and export | Campaign sheet |
+|---|---|
+| ![Sessions list with a session panel open](docs/screenshots/sessions.jpg) | ![Campaigns list with a campaign sheet open](docs/screenshots/campaigns.jpg) |
+
+![Map of the countries the attacks come from](docs/screenshots/map.jpg)
+
+_Screenshots from a live deployment. The French interface is the one currently shipped._
+
 ## Features
 
 - **Overview**: attempts, sessions, top credentials/countries/commands, period comparison, heatmap.

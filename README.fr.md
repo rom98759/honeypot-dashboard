@@ -13,6 +13,16 @@ vrai sshd et fail2ban.
 > L'installeur refuse de tourner tant que sshd écoute encore sur 22. Suis
 > [l'étape 0 du guide d'installation](docs/install.fr.md#étape-0--déplacer-le-vrai-ssh-hors-du-port-22) avec attention.
 
+![Vue d'ensemble : connexions, IP uniques, logins tentés et bans sur 24 heures](docs/screenshots/overview.jpg)
+
+| Panneau session avec replay et export | Fiche campagne |
+|---|---|
+| ![Liste des sessions avec le panneau d'une session ouvert](docs/screenshots/sessions.jpg) | ![Liste des campagnes avec la fiche d'une campagne ouverte](docs/screenshots/campaigns.jpg) |
+
+![Carte des pays d'origine des attaques](docs/screenshots/map.jpg)
+
+_Captures d'un déploiement réel._
+
 ## Fonctionnalités
 
 - **Vue d'ensemble** : tentatives, sessions, top identifiants/pays/commandes, comparaison de période, heatmap.
