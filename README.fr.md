@@ -1,5 +1,7 @@
 # honeypot-dashboard
 
+[![CI](https://github.com/rom98759/honeypot-dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/rom98759/honeypot-dashboard/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 [English](README.md)
 
 Dashboard auto-hébergé pour un honeypot SSH/Telnet [Cowrie](https://github.com/cowrie/cowrie).
@@ -97,7 +99,7 @@ désinstallation, dépannage) est dans **[docs/install.fr.md](docs/install.fr.md
 ## Développement
 
 ```bash
-python -m venv .venv && .venv/bin/pip install -r requirements.txt pytest httpx
+python -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 .venv/bin/uvicorn app.main:app --reload     # backend sur :8000
 cd frontend && npm ci && npm run dev        # frontend, proxy /api vers :8000
 .venv/bin/pytest                            # tests backend + scripts
