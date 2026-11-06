@@ -6,6 +6,7 @@ import sqlite3
 from pathlib import Path
 
 from app.tailer import LogTailer
+from app.proxied_ip import PROXIED_SOURCE_IP
 
 FAIL2BAN_RE = re.compile(
     r"^(?P<ts>\S+ \S+)\s+fail2ban\.actions\s+\[\d+\]:\s+NOTICE\s+\[(?P<jail>[\w-]+)\]\s+"
@@ -202,8 +203,9 @@ class SshdAuthIngester:
 
 def get_correlation_rows(db: sqlite3.Connection) -> list[dict]:
     ip_rows = db.execute(
-        "SELECT src_ip, COUNT(*) AS session_count FROM sessions GROUP BY src_ip "
-        "ORDER BY session_count DESC"
+        "SELECT src_ip, COUNT(*) AS session_count FROM sessions WHERE src_ip != ? GROUP BY src_ip "
+        "ORDER BY session_count DESC",
+        (PROXIED_SOURCE_IP or "",),
     ).fetchall()
 
     banned_ips = currently_banned_ips(db)

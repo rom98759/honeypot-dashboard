@@ -12,6 +12,7 @@ import { FileActions, KindBadge, formatBytes } from "../FilesPage/fileLabels";
 import { formatTimestamp } from "../../utils/formatDate";
 import { useCopy } from "../../utils/useCopy";
 import { countryLabel, flagEmoji, formatDuration, formatNumber } from "../../utils/format";
+import { PROXIED_LABEL, useIsProxiedIp } from "../../components/IpAddress";
 
 function authBadge(session: Session) {
   if (session.login_username == null) return <Badge label="Aucune tentative" tone="neutral" />;
@@ -57,7 +58,8 @@ function ExportMenu({ detail }: { detail: SessionDetail }) {
 
 function IpCard({ detail }: { detail: SessionDetail }) {
   const { session, ip, campaign } = detail;
-  const address = session.src_port ? `${ip.ip}:${session.src_port}` : ip.ip;
+  const isProxied = useIsProxiedIp();
+  const address = isProxied(ip.ip) ? PROXIED_LABEL : session.src_port ? `${ip.ip}:${session.src_port}` : ip.ip;
   const where = ip.country || ip.country_code ? `${flagEmoji(ip.country_code)} ${countryLabel(ip.country_code, ip.country)}` : "Pays inconnu";
   return (
     <div className="ip-card">

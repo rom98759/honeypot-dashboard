@@ -10,6 +10,7 @@ import { formatNumber, formatShare } from "../../utils/format";
 import { formatTimestamp } from "../../utils/formatDate";
 import { useCopy } from "../../utils/useCopy";
 import { FileActions, KindBadge, formatBytes } from "./fileLabels";
+import { IpAddress } from "../../components/IpAddress";
 
 type FileTab = "sessions" | "sources" | "ips";
 
@@ -107,7 +108,7 @@ function PanelBody({ data, closeRef, onClose }: {
                   </Link>
                   {e.src_ip && (
                     <Link className="mono" to={`/ip/${encodeURIComponent(e.src_ip)}`}>
-                      {e.src_ip}
+                      <IpAddress ip={e.src_ip} />
                     </Link>
                   )}
                   <span className="mono cell-muted">{formatTimestamp(e.timestamp)}</span>

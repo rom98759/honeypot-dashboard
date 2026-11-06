@@ -67,6 +67,7 @@ services:
       - FAIL2BAN_BANTIMES=${FAIL2BAN_BANTIMES:-}
       - SSHD_PORT=${SSHD_PORT:-}
       - FBAN_ENABLED=${FBAN_ENABLED:-0}
+      - HONEYPOT_SUBNET=${HONEYPOT_SUBNET:-172.21.0.0/16}
 
 networks:
   honeypot-net:

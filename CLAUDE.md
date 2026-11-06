@@ -65,6 +65,9 @@ Backlog : `TODO.md`. Doc publique bilingue : `README.md`/`README.fr.md`, `docs/i
 - `/api/overview` et la heatmap passent par `app.state.stats_cache` (`ttl_cache.py`, TTL par période dans
   `routers/overview.py`, 10 s pour 24h à 60 s pour all) ; le front poll au même rythme. Un test qui insère
   puis relit l'overview doit vider ce cache.
+- Clients IPv6 : docker-proxy les relaie depuis la passerelle du réseau honeypot (`app/proxied_ip.py`, 1re IP de
+  `HONEYPOT_SUBNET`, passé au conteneur) ; sessions gardées, exclues des tops IP / Corrélation, affichées
+  « IPv6 (IP inconnue) » via `components/IpAddress.tsx` (`proxied_source_ip` de `/api/config`).
 - Ban/unban : `fban_control.py` parle à un worker systemd hôte (`scripts/fban-queue-worker.sh`) via un
   répertoire de queue bind-mounté (`FBAN_QUEUE_PATH`) ; repli sur l'heuristique logs après
   `FBAN_TIMEOUT_SECONDS` (2.0). `/ban` et `/unban` rejettent les requêtes cross-origin (Origin/Referer).

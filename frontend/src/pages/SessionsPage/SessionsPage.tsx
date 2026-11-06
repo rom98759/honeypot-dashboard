@@ -15,6 +15,7 @@ import { filterErrorOf } from "../../api/client";
 import { AcceptedLoginBadge } from "../../components/Badge";
 import { formatTimestamp } from "../../utils/formatDate";
 import { formatDuration, formatNumber } from "../../utils/format";
+import { IpAddress } from "../../components/IpAddress";
 
 const COLUMNS: Column[] = [
   { key: "src_ip", label: "IP" },
@@ -149,7 +150,7 @@ export function SessionsPage() {
                       className="ip-link"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      {s.src_ip}
+                      <IpAddress ip={s.src_ip} />
                     </Link>
                   </td>
                   <td className="mono cell-muted">{formatTimestamp(s.connect_time)}</td>

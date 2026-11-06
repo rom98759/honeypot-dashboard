@@ -16,6 +16,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from app.cowrie_parser import FileTransfer, parse_event
+from app.proxied_ip import PROXIED_SOURCE_IP
 
 log = logging.getLogger(__name__)
 
@@ -197,8 +198,8 @@ def file_detail(db: sqlite3.Connection, directory: Path, shasum: str) -> dict | 
         for r in db.execute(
             "SELECT s.src_ip AS ip, COUNT(DISTINCT f.session_id) AS sessions "
             "FROM session_files f JOIN sessions s ON s.session_id = f.session_id "
-            "WHERE f.shasum = ? GROUP BY s.src_ip ORDER BY sessions DESC LIMIT 10",
-            (shasum,),
+            "WHERE f.shasum = ? AND s.src_ip != ? GROUP BY s.src_ip ORDER BY sessions DESC LIMIT 10",
+            (shasum, PROXIED_SOURCE_IP or ""),
         )
     ]
     return {

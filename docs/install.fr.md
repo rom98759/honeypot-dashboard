@@ -144,7 +144,7 @@ install -m 600 .env.example .env
 | `SSHD_PORT` | conseillé | vide | Même valeur que dans host.env ; affiché sur la page Corrélation. |
 | `COWRIE_PORT` | non | `22` | Port hôte publié pour Cowrie. |
 | `COWRIE_IMAGE` | non | `cowrie/cowrie:latest` | Image Cowrie ; fige un tag pour une installation parfaitement reproductible. |
-| `HONEYPOT_SUBNET` | non | `172.21.0.0/16` | Doit être identique à host.env : le blocage de sortie vise ce sous-réseau. |
+| `HONEYPOT_SUBNET` | non | `172.21.0.0/16` | Doit être identique à host.env : le blocage de sortie vise ce sous-réseau. Le dashboard affiche les sessions venant de sa passerelle (clients IPv6 relayés par Docker) comme « IPv6 (IP inconnue) » et les écarte des classements d'IP. |
 | `PROXY_NETWORK` | oui | `nginx-proxy-network` | Réseau Docker de ton reverse proxy. Il doit déjà exister. |
 | `COWRIE_ETC_VOLUME` | non | `honeypot-cowrie-etc` | Noms des volumes. À changer seulement pour réutiliser les volumes d'une ancienne installation. |
 | `COWRIE_VAR_VOLUME` | non | `honeypot-cowrie-var` | Logs et sessions enregistrées de Cowrie. |

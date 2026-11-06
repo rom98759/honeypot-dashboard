@@ -84,5 +84,7 @@
       par `honeypot.local` : « le honeypot observe, les vrais services sont protégés ».
 - [x] IP protégées de la page Réglages appliquées aussi aux bans automatiques : fichier `admin-networks`
       dans la queue, lu par `honeypot-never-ban.sh` (ignorecommand fail2ban + worker), sans rechargement.
-- [ ] Bans IPv6 sur Cowrie : docker-proxy présente les clients IPv6 comme la passerelle du réseau
-      honeypot, donc la jail `cowrie` ne peut pas les voir (ni les bannir).
+- [x] Clients IPv6 vus comme la passerelle du réseau honeypot (docker-proxy) : affichés « IPv6 (IP inconnue) »,
+      exclus des tops IP et de Corrélation (`app/proxied_ip.py`). ~1 session/jour en prod.
+- [ ] Vraies IP IPv6 dans Cowrie (et bans IPv6) : activer l'IPv6 sur le réseau honeypot ET étendre le
+      blocage de sortie à ip6tables (sinon le honeypot gagne un accès sortant IPv6). Non bloquant.

@@ -5,6 +5,12 @@ import { Link, Routes, Route } from "react-router-dom";
 import { renderWithProviders } from "../../test-utils";
 import { SessionsPage } from "./SessionsPage";
 
+/** Last `/api/sessions` request; other queries (e.g. `/api/config`) may land in between. */
+function lastSessionsUrl(fetchMock: { mock: { calls: unknown[][] } }): string {
+  const urls = fetchMock.mock.calls.map((c) => String(c[0])).filter((u) => u.startsWith("/api/sessions"));
+  return urls[urls.length - 1] ?? "";
+}
+
 function jsonResponse(body: unknown): Promise<Response> {
   return Promise.resolve({ ok: true, json: () => Promise.resolve(body) } as Response);
 }
@@ -77,7 +83,7 @@ describe("SessionsPage", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /IP/ }));
     await waitFor(() =>
-      expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("sort=src_ip&order=asc"))
+      expect(lastSessionsUrl(fetchMock)).toContain("sort=src_ip&order=asc")
     );
   });
 
@@ -97,7 +103,7 @@ describe("SessionsPage", () => {
     const input = screen.getByRole("textbox", { name: "Requête de recherche" });
     await userEvent.type(input, "9.9.9.9 dur>60{Enter}");
     await waitFor(() =>
-      expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("filter=ip%3A9.9.9.9+dur%3E60"))
+      expect(lastSessionsUrl(fetchMock)).toContain("filter=ip%3A9.9.9.9+dur%3E60")
     );
     expect(document.activeElement).toBe(input);
     expect(screen.getByText("IP", { selector: ".filter-chip b" })).toBeInTheDocument();
@@ -108,11 +114,11 @@ describe("SessionsPage", () => {
     vi.stubGlobal("fetch", fetchMock);
     renderWithProviders(<SessionsPage />, { route: "/sessions?page=3" });
     await waitFor(() => expect(screen.getByText("1.2.3.4")).toBeInTheDocument());
-    expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("offset=50"));
+    expect(lastSessionsUrl(fetchMock)).toContain("offset=50");
 
     await userEvent.type(screen.getByRole("textbox", { name: "Requête de recherche" }), "user:root{Enter}");
-    await waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("filter=user%3Aroot")));
-    expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("offset=0"));
+    await waitFor(() => expect(lastSessionsUrl(fetchMock)).toContain("filter=user%3Aroot"));
+    expect(lastSessionsUrl(fetchMock)).toContain("offset=0");
   });
 
   it("keeps the search when sorting", async () => {
@@ -123,9 +129,9 @@ describe("SessionsPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /^IP/ }));
     await waitFor(() =>
-      expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("sort=src_ip&order=asc"))
+      expect(lastSessionsUrl(fetchMock)).toContain("sort=src_ip&order=asc")
     );
-    expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("filter=country%3ACN"));
+    expect(lastSessionsUrl(fetchMock)).toContain("filter=country%3ACN");
   });
 
   it("shows the server's message when it rejects the search", async () => {
@@ -294,13 +300,13 @@ describe("SessionsPage", () => {
     vi.stubGlobal("fetch", fetchMock);
     renderWithProviders(<SessionsPage />, { route: "/sessions?command=whoami" });
     await waitFor(() => expect(screen.getByText("1.2.3.4")).toBeInTheDocument());
-    expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("command=whoami"));
+    expect(lastSessionsUrl(fetchMock)).toContain("command=whoami");
 
     await userEvent.click(screen.getByRole("button", { name: "Suivant" }));
     await waitFor(() =>
-      expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("offset=25"))
+      expect(lastSessionsUrl(fetchMock)).toContain("offset=25")
     );
-    expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("command=whoami"));
+    expect(lastSessionsUrl(fetchMock)).toContain("command=whoami");
   });
 
   it("reads older protocol/country links as search terms, with period and date range", async () => {
@@ -310,7 +316,7 @@ describe("SessionsPage", () => {
       route: "/sessions?protocol=ssh&country=France&period=7d&date_from=2026-08-12T10&date_to=2026-08-12T13",
     });
     await waitFor(() => expect(screen.getByText("1.2.3.4")).toBeInTheDocument());
-    const url = fetchMock.mock.calls[fetchMock.mock.calls.length - 1][0] as string;
+    const url = lastSessionsUrl(fetchMock);
     expect(url).toContain("filter=country%3AFrance+proto%3Assh");
     expect(url).toContain("period=7d");
     expect(url).toContain("date_from=2026-08-12T10");
@@ -338,8 +344,8 @@ describe("SessionsPage", () => {
     await waitFor(() => expect(screen.getByText("1.2.3.4")).toBeInTheDocument());
 
     await userEvent.click(screen.getByRole("button", { name: "Suivant" }));
-    await waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("offset=25")));
-    const url = fetchMock.mock.calls[fetchMock.mock.calls.length - 1][0] as string;
+    await waitFor(() => expect(lastSessionsUrl(fetchMock)).toContain("offset=25"));
+    const url = lastSessionsUrl(fetchMock);
     expect(url).toContain("command=whoami");
     expect(url).toContain("filter=country%3AFrance+proto%3Assh");
   });

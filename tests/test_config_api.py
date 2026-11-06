@@ -38,14 +38,14 @@ def test_config_defaults(tmp_path, monkeypatch):
     monkeypatch.delenv("SSHD_PORT", raising=False)
     monkeypatch.delenv("FBAN_ENABLED", raising=False)
     client, _ = _client(tmp_path)
-    assert client.get("/api/config").json() == {"sshd_port": None, "ban_enabled": False}
+    assert client.get("/api/config").json() == {"sshd_port": None, "ban_enabled": False, "proxied_source_ip": "172.21.0.1"}
 
 
 def test_config_from_env(tmp_path, monkeypatch):
     monkeypatch.setenv("SSHD_PORT", "50022")
     monkeypatch.setenv("FBAN_ENABLED", "true")
     client, _ = _client(tmp_path)
-    assert client.get("/api/config").json() == {"sshd_port": 50022, "ban_enabled": True}
+    assert client.get("/api/config").json() == {"sshd_port": 50022, "ban_enabled": True, "proxied_source_ip": "172.21.0.1"}
 
 
 def test_config_ignores_invalid_port(tmp_path, monkeypatch):
@@ -56,7 +56,7 @@ def test_config_ignores_invalid_port(tmp_path, monkeypatch):
 
 def test_config_from_args(tmp_path):
     client, _ = _client(tmp_path, sshd_port=50022, ban_enabled=True)
-    assert client.get("/api/config").json() == {"sshd_port": 50022, "ban_enabled": True}
+    assert client.get("/api/config").json() == {"sshd_port": 50022, "ban_enabled": True, "proxied_source_ip": "172.21.0.1"}
 
 
 def test_ban_disabled_returns_404(tmp_path):

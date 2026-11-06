@@ -4,6 +4,7 @@ import { fetchJSON } from "./client";
 export interface AppConfig {
   sshd_port: number | null;
   ban_enabled: boolean;
+  proxied_source_ip: string | null;
 }
 
 export function useAppConfig() {

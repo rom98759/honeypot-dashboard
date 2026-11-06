@@ -13,6 +13,7 @@ import { formatDuration, formatNumber, formatShare } from "../../utils/format";
 import { formatTimestamp } from "../../utils/formatDate";
 import { SessionDetailPanel } from "../SessionsPage/SessionDetailPanel";
 import { CampaignDetailPanel } from "./CampaignDetailPanel";
+import { IpAddress } from "../../components/IpAddress";
 
 const UNIQUE_VIEW = "unique";
 
@@ -78,7 +79,9 @@ function UniqueSessionRow({ session, href }: { session: UniqueSession; href: str
         </Link>
       </td>
       <td className="mono">
-        <Link to={`/ip/${encodeURIComponent(session.src_ip)}`}>{session.src_ip}</Link>
+        <Link to={`/ip/${encodeURIComponent(session.src_ip)}`}>
+          <IpAddress ip={session.src_ip} />
+        </Link>
       </td>
       <td className="mono cell-muted hide-narrow">{formatTimestamp(session.connect_time)}</td>
       <td className="cell-num cell-muted hide-narrow">{formatDuration(session.duration_ms)}</td>

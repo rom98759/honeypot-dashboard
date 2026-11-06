@@ -6,6 +6,7 @@ from app.commands_stats import commands_from
 from app.correlation import currently_banned_query
 from app.search_filter import compile_filter
 from app.periods import bucket_expr, period_cutoff, period_delta
+from app.proxied_ip import PROXIED_SOURCE_IP
 
 DURATION_BUCKETS = ["<10s", "10-60s", "1-5min", "5-30min", ">30min"]
 FILTER_KEYS = ("country", "protocol", "ip", "username")
@@ -87,9 +88,9 @@ def get_overview_stats(db: sqlite3.Connection, period: str, filters: dict | None
     top_offenders = db.execute(
         "SELECT s.src_ip, COUNT(*) AS n, MAX(s.connect_time) AS last_seen, g.country, g.country_code "
         "FROM sessions s LEFT JOIN geo_cache g ON g.ip = s.src_ip "
-        "WHERE 1=1" + where + " "
+        "WHERE s.src_ip != ?" + where + " "
         "GROUP BY s.src_ip ORDER BY n DESC LIMIT 10",
-        params,
+        [PROXIED_SOURCE_IP or "", *params],
     ).fetchall()
 
     countries = [

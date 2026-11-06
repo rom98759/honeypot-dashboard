@@ -16,6 +16,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 
 from app.command_normalize import normalize_sequence, sequence_key
+from app.proxied_ip import PROXIED_SOURCE_IP
 
 CAMPAIGN_ID_RE = re.compile(r"^[0-9a-f]{64}$")
 # Most families hold a single session: a one-off exchange (often a human),
@@ -287,7 +288,10 @@ def campaign_detail(db: sqlite3.Connection, aggregate: dict, campaign_id: str) -
         "SELECT timestamp, input_text FROM commands WHERE session_id = ? ORDER BY id",
         (family["sample_session_id"],),
     ).fetchall()
-    top_ips = sorted(sessions_by_ip.items(), key=lambda item: (-item[1], item[0]))[:10]
+    top_ips = sorted(
+        ((ip, n) for ip, n in sessions_by_ip.items() if ip != PROXIED_SOURCE_IP),
+        key=lambda item: (-item[1], item[0]),
+    )[:10]
     variants = sorted(family["variant_sessions"].items(), key=lambda item: -item[1])
     return {
         **_public(family),

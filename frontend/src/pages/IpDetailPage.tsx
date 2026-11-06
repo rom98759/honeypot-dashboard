@@ -13,6 +13,7 @@ import { Pagination } from "../components/Pagination";
 import { SessionDetailPanel } from "./SessionsPage/SessionDetailPanel";
 import { formatTimestamp } from "../utils/formatDate";
 import { countryLabel, flagEmoji, formatDuration, formatNumber } from "../utils/format";
+import { IpAddress } from "../components/IpAddress";
 
 const SESSION_COLUMNS: Column[] = [
   { key: "connect_time", label: "Début" },
@@ -105,7 +106,9 @@ export function IpDetailPage() {
             <span className="flag" aria-hidden="true">
               {flagEmoji(data.country_code)}
             </span>
-            <span className="mono">{ip}</span>
+            <span className="mono">
+              <IpAddress ip={ip} />
+            </span>
           </>
         }
       >
