@@ -48,17 +48,17 @@
       passe, graphiques cliquables qui filtrent, période partagée entre les pages, recherche globale (barre
       latérale), page IP enrichie (ASN, rDNS, AbuseIPDB), export JSON / .cast d'une session, mise en page mobile.
 
-## Idées restantes (non planifiées)
+## Idées restantes : suivies en issues GitHub
 
-- [ ] Pages Campagnes et Fichiers filtrables par la barre de recherche (agrégats en cache : recalcul par filtre).
-- [ ] Premier affichage de la Vue d'ensemble sur « all » (~3,5 s en prod, puis cache) : agrégats dans un
-      thread sur une connexion SQLite en lecture seule.
-- [ ] Thème sombre (tokens CSS déjà centralisés dans `:root`).
-- [ ] Répartition des bans par jail fail2ban.
-- [ ] Export CSV des sessions ou de l'historique d'une IP.
-- [ ] `TimelineChart` : sélection d'une plage de dates à la souris.
-- [ ] Flux d'activité en direct (sessions, bans, tentatives sshd) façon SIEM light.
-- [ ] Alertes sur seuil (ex. plus de N attaques par heure).
+- #3 Pages Campagnes et Fichiers filtrables par la barre de recherche
+- #4 Premier affichage de la Vue d'ensemble sur « all » plus rapide
+- #5 Thème sombre
+- #6 Répartition des bans par jail fail2ban
+- #7 Export CSV des sessions et de l'historique d'une IP
+- #8 Sélection d'une plage de dates sur la timeline
+- #9 Flux d'activité en direct
+- #10 Alertes sur seuil
+- #11 Vraies IP IPv6 dans Cowrie (et bans IPv6)
 
 ## Sécurité / ops
 
@@ -86,5 +86,4 @@
       dans la queue, lu par `honeypot-never-ban.sh` (ignorecommand fail2ban + worker), sans rechargement.
 - [x] Clients IPv6 vus comme la passerelle du réseau honeypot (docker-proxy) : affichés « IPv6 (IP inconnue) »,
       exclus des tops IP et de Corrélation (`app/proxied_ip.py`). ~1 session/jour en prod.
-- [ ] Vraies IP IPv6 dans Cowrie (et bans IPv6) : activer l'IPv6 sur le réseau honeypot ET étendre le
-      blocage de sortie à ip6tables (sinon le honeypot gagne un accès sortant IPv6). Non bloquant.
+- [ ] Vraies IP IPv6 dans Cowrie (et bans IPv6) : voir #11.
