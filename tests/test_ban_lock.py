@@ -75,3 +75,17 @@ def test_ban_scope_defaults_to_real_services_and_accepts_all(tmp_path, monkeypat
     assert client.post("/api/ip/192.0.2.1/ban", headers=SAME_ORIGIN, json={"scope": "all"}).status_code == 200
     assert fban.scopes == ["services", "all"]
     assert client.post("/api/ip/192.0.2.1/ban", headers=SAME_ORIGIN, json={"scope": "x"}).status_code == 422
+
+
+def test_ban_refused_by_host_never_ban_is_403(tmp_path, monkeypatch):
+    from app.fban_control import FbanProtected
+
+    client, fban = _client(tmp_path, monkeypatch)
+
+    def refuse(ip, scope="services"):
+        raise FbanProtected(f"{ip} is protected")
+
+    fban.request_ban = refuse
+    response = client.post("/api/ip/192.0.2.1/ban", headers=SAME_ORIGIN)
+    assert response.status_code == 403
+    assert "never-ban" in response.json()["detail"]

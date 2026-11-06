@@ -11,19 +11,21 @@ UFW_ACTIVE_NO_RULE = "Status: active\\n\\nTo Action From\\n-- ------ ----\\n80/t
 UFW_INACTIVE = "Status: inactive\\n"
 
 
-def _run(tmp_path, *args, sshd_ports="50022", ufw=UFW_ACTIVE_WITH_RULE, host_env=None):
+def _run(tmp_path, *args, sshd_ports="50022", ufw=UFW_ACTIVE_WITH_RULE, host_env=None, extra_env=None, fake_bin=None):
     root = tmp_path / "root"
     root.mkdir(exist_ok=True)
     env_file = tmp_path / "host.env"
     env_file.write_text(host_env if host_env is not None else "SSHD_PORT=50022\n")
     env_file.chmod(0o600)
     env = {
-        "PATH": os.environ["PATH"],
+        "PATH": f"{fake_bin}:{os.environ['PATH']}" if fake_bin else os.environ["PATH"],
         "HONEYPOT_HOST_ENV": str(env_file),
-        "SSHD_PORTS_CMD": f"printf '%s\\n' {sshd_ports}",
         "UFW_STATUS_CMD": f"printf '{ufw}'",
         "SYSTEMCTL": "true",
+        **(extra_env or {}),
     }
+    if sshd_ports is not None:
+        env["SSHD_PORTS_CMD"] = f"printf '%s\\n' {sshd_ports}"
     out = subprocess.run(
         ["bash", str(INSTALLER), "--root", str(root), *args],
         env=env,
@@ -147,7 +149,8 @@ def test_jail_ignores_never_ban_and_the_honeypot_network(tmp_path):
     root = tmp_path / "root"
     (root / "etc/honeypot").mkdir(parents=True)
     (root / "etc/honeypot/never-ban").write_text("# me\n203.0.113.7  # box\n\n198.51.100.0/24\nnot an ip\n")
-    out, root = _run(tmp_path, host_env="SSHD_PORT=50022\nHONEYPOT_SUBNET=172.30.0.0/16\n")
+    repo = _repo_with_env(tmp_path, "HONEYPOT_SUBNET=172.30.0.0/16\n")
+    out, root = _run(tmp_path, host_env=f"SSHD_PORT=50022\nREPO_DIR={repo}\nHONEYPOT_SUBNET=172.30.0.0/16\n")
     assert out.returncode == 0, out.stdout + out.stderr
     jail = (root / "etc/fail2ban/jail.d/honeypot.local").read_text()
     assert "ignoreip = 127.0.0.1/8 ::1 172.30.0.0/16 203.0.113.7 198.51.100.0/24\n" in jail
@@ -242,3 +245,116 @@ def test_downloads_perms_units_follow_cowrie_volume(tmp_path):
     out, root = _run(tmp_path, "--uninstall")
     assert out.returncode == 0, out.stdout + out.stderr
     assert not (root / "usr/local/sbin/cowrie-downloads-perms.py").exists()
+
+
+def _fake_bin(tmp_path, sshd_t, ss="", socket_listen=None):
+    """Stub sshd/ss/systemctl so the real port detection runs against a known host."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(exist_ok=True)
+    scripts = {
+        "sshd": f"#!/bin/sh\n[ \"$1\" = -T ] && printf '%b' '{sshd_t}'\n",
+        "ss": f"#!/bin/sh\nprintf '%b' '{ss}'\n",
+        "systemctl": (
+            "#!/bin/sh\n"
+            'case "$*" in\n'
+            f'  *is-active*ssh.socket*) {"exit 0" if socket_listen else "exit 3"} ;;\n'
+            f"  *show*ssh.socket*) printf '%b' '{socket_listen or ''}' ;;\n"
+            "esac\n"
+        ),
+    }
+    for name, body in scripts.items():
+        (bin_dir / name).write_text(body)
+        (bin_dir / name).chmod(0o755)
+    return bin_dir
+
+
+def test_listenaddress_port_wins_over_default_port(tmp_path):
+    # "Port 22" stays the default while ListenAddress pins the real port: sshd is not on 22.
+    fake = _fake_bin(tmp_path, "port 22\\nlistenaddress 0.0.0.0:50022\\nlistenaddress [::]:50022\\n")
+    out, _ = _run(tmp_path, sshd_ports=None, fake_bin=fake)
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert "sshd listens on: 50022" in out.stdout
+
+
+def test_ssh_socket_on_22_is_detected(tmp_path):
+    # Socket activation: ss shows the listener as "systemd", not "sshd".
+    fake = _fake_bin(
+        tmp_path,
+        "port 50022\\nlistenaddress 0.0.0.0:50022\\n",
+        ss='LISTEN 0 4096 *:22 *:* users:(("systemd",pid=1,fd=50))\\n',
+        socket_listen="[::]:22 (Stream)\\n",
+    )
+    out, root = _run(tmp_path, sshd_ports=None, fake_bin=fake)
+    assert out.returncode == 2
+    assert "listens on port 22" in out.stdout
+    assert _tree(root) == {}
+
+
+UFW_HEAD = "Status: active\\n\\nTo Action From\\n-- ------ ----\\n"
+
+
+def test_ufw_accepts_ranges_lists_interfaces_and_source_rules(tmp_path):
+    for rule in (
+        "50000:50100/tcp ALLOW Anywhere",
+        "22,50022/tcp ALLOW Anywhere",
+        "50022/tcp on eth0 ALLOW IN Anywhere",
+        "50022 ALLOW IN 203.0.113.7",
+        "Anywhere ALLOW 203.0.113.7",
+    ):
+        out, _ = _run(tmp_path, ufw=UFW_HEAD + rule + "\\n")
+        assert out.returncode == 0, rule + "\n" + out.stdout + out.stderr
+
+
+def test_ufw_refuses_rules_that_do_not_open_the_port(tmp_path):
+    for rule in ("50022/udp ALLOW Anywhere", "50022/tcp DENY Anywhere", "50000:50010/tcp ALLOW Anywhere"):
+        out, root = _run(tmp_path, ufw=UFW_HEAD + rule + "\\n")
+        assert out.returncode == 2, rule
+        assert _tree(root) == {}
+
+
+def test_ufw_app_profile_only_warns(tmp_path):
+    out, _ = _run(tmp_path, ufw=UFW_HEAD + "OpenSSH ALLOW Anywhere\\n")
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert "application profile" in out.stdout
+
+
+def test_refuses_without_docker_before_any_change(tmp_path):
+    out, root = _run(tmp_path, extra_env={"DOCKER_CHECK_CMD": "false"})
+    assert out.returncode != 0
+    assert "Docker" in out.stdout + out.stderr
+    assert _tree(root) == {}
+
+
+def _repo_with_env(tmp_path, dot_env):
+    repo = tmp_path / "clone"
+    repo.mkdir(exist_ok=True)
+    (repo / "docker-compose.yml").write_text("services: {}\n")
+    (repo / ".env").write_text(dot_env)
+    return repo
+
+
+def test_refuses_honeypot_subnet_drift(tmp_path):
+    repo = _repo_with_env(tmp_path, "HONEYPOT_SUBNET=172.30.0.0/16\n")
+    out, root = _run(tmp_path, host_env=f"SSHD_PORT=50022\nREPO_DIR={repo}\nHONEYPOT_SUBNET=172.21.0.0/16\n")
+    assert out.returncode != 0
+    assert "HONEYPOT_SUBNET" in out.stdout + out.stderr
+    assert _tree(root) == {}
+
+
+def test_subnet_defaults_count_as_equal(tmp_path):
+    repo = _repo_with_env(tmp_path, "SSHD_PORT=50022\n")
+    out, _ = _run(tmp_path, host_env=f"SSHD_PORT=50022\nREPO_DIR={repo}\nHONEYPOT_SUBNET=172.21.0.0/16\n")
+    assert out.returncode == 0, out.stdout + out.stderr
+
+    repo = _repo_with_env(tmp_path, "HONEYPOT_SUBNET=172.30.0.0/16\n")
+    out, _ = _run(tmp_path, host_env=f"SSHD_PORT=50022\nREPO_DIR={repo}\n")
+    assert out.returncode != 0
+
+
+def test_uninstall_clears_docker_user_itself(tmp_path):
+    out, root = _run(tmp_path)
+    assert out.returncode == 0
+    out, _ = _run(tmp_path, "--uninstall")
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert "docker-user-firewall.sh --clear" in out.stdout
+    assert "restart docker" not in out.stdout

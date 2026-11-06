@@ -167,10 +167,16 @@ What the preflight checks, and what to do if it stops (exit code 2, nothing chan
 |---|---|---|
 | `SSH LOCKOUT RISK` + `sshd still listens on port 22` | step 0 not done or not applied | finish step 0 (restart ssh) |
 | `sshd listens on X but SSHD_PORT is Y` | host.env and sshd disagree | fix one of them |
-| `ufw is active but has no rule for port …` | the new port is not allowed | `ufw allow <SSHD_PORT>/tcp` |
+| `ufw is active but no ALLOW/LIMIT rule opens port …` | the new port is not allowed (single ports, lists, ranges, `on <iface>` and per-source rules all count) | `ufw allow <SSHD_PORT>/tcp` |
+| `WARNING: ufw rules use application profiles` | not blocking: profile ports (e.g. `OpenSSH`) are not checked | make sure a profile opens `SSHD_PORT` (`ufw app info <name>`) |
 | `WARNING: ufw is not active` | not blocking | make sure your provider firewall allows `SSHD_PORT` and 22 |
 | `REPO_DIR=… does not contain docker-compose.yml` | wrong `REPO_DIR` | point it at your clone, or remove the line |
 | `host.env must be owned by root and not group/world-writable` | loose permissions (it is run as root) | `chown root: /etc/honeypot-dashboard/host.env && chmod 600 …` |
+| `Docker Engine with the compose plugin is required` | Docker or its compose plugin is missing | install Docker Engine (step 1) |
+| `HONEYPOT_SUBNET is … in host.env but … in .env` | the two files disagree, so the egress block would miss Cowrie | set the same value in both |
+
+sshd detection reads `ListenAddress` ports (they override `Port`), the ports sshd really listens on,
+and `ssh.socket` when socket activation is on (Ubuntu 22.10+).
 
 What it installs (all idempotent, re-run it any time):
 
@@ -264,7 +270,7 @@ Without a reverse proxy, reach it through an SSH tunnel: temporarily add
 ssh -p 50022 <user>@<server>
 
 # Port 22 is answered by Cowrie
-ssh -o StrictHostKeyChecking=no root@<server>       # any password except "root": you land in the fake shell; type `exit`
+ssh -o StrictHostKeyChecking=no root@<server>       # e.g. password "letmein" (Cowrie refuses "root", "123456" and a few others on purpose): fake shell; type `exit`
 
 # Ingestion: each source reports a lag of 0 bytes
 docker compose exec -T dashboard python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/api/health').read().decode())"
@@ -311,8 +317,7 @@ docker compose pull cowrie && docker compose up -d cowrie   # newer Cowrie image
 
 ```bash
 docker compose down                     # add -v to also delete the volumes (all data!)
-scripts/install-host.sh --uninstall     # removes scripts, units, jail files; keeps logs, never-ban, host.env
-systemctl restart docker                # clears the DOCKER-USER rules
+scripts/install-host.sh --uninstall     # removes scripts, units, jail files, DOCKER-USER rules; keeps logs, never-ban, host.env
 ```
 
 Then move your real SSH back to 22 if you want, with the same care as step 0.

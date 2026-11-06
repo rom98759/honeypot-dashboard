@@ -7,6 +7,7 @@
 #   ban manual|manual-all <ip>   ban in the dashboard's own jails (scripts/fail2ban/honeypot.local.tmpl)
 #   unban all <ip>               lift the IP from every jail
 #   status all <ip>              "banned <jail>,<jail>" or "not_banned"
+# A ban of a protected IP (never-ban list, dashboard settings) is answered "protected".
 # where <ip> must match a simple IPv4/IPv6-shaped pattern. Anything else is logged and
 # dropped, unexecuted. Triggered by fban-queue-worker.path on any change to
 # QUEUE_DIR; safe to run by hand or re-run (idempotent: only unprocessed
@@ -59,7 +60,8 @@ for req in "$QUEUE_DIR"/req-*; do
     ban)
       if is_protected "$ip"; then
         logger -t fban-queue-worker "refused to ban protected IP $ip" || true
-        echo "error: $ip is protected (never-ban or dashboard settings)" > "$res.tmp" && mv "$res.tmp" "$res"
+        # Distinct answer so the dashboard reports a refusal (403), not a broken worker.
+        echo "protected" > "$res.tmp" && mv "$res.tmp" "$res"
       elif fail2ban-client set "$jail" banip "$ip" >/dev/null 2>&1; then
         echo "ok" > "$res.tmp" && mv "$res.tmp" "$res"
       else

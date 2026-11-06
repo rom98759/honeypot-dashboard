@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from app.admin_ips import is_admin_ip
 from app.correlation import active_bans, is_currently_banned
-from app.fban_control import FbanControlError
+from app.fban_control import FbanControlError, FbanProtected
 
 router = APIRouter()
 
@@ -144,6 +144,8 @@ async def ban_ip(request: Request, ip: str, body: BanRequest | None = None):
     fban_control = request.app.state.fban_control
     try:
         await asyncio.to_thread(fban_control.request_ban, ip, (body or BanRequest()).scope)
+    except FbanProtected as exc:
+        raise HTTPException(status_code=403, detail="protected IP (host never-ban list)") from exc
     except FbanControlError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except ValueError as exc:

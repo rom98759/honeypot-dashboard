@@ -37,10 +37,12 @@
 #   https://www.cloudflare.com/ips-v4 and https://www.cloudflare.com/ips-v6
 # Last refreshed: 2026-08-12.
 #
-# Usage: docker-user-firewall.sh [--dry-run | --print-rules | --print-restore]
+# Usage: docker-user-firewall.sh [--dry-run | --print-rules | --print-restore | --clear | --print-clear]
 #   --dry-run        validate the ruleset against the live tables (iptables-restore --test), apply nothing
 #   --print-rules    print the DOCKER-USER rules from the config, no root, no iptables
 #   --print-restore  print the exact iptables-restore payload (IPv4), no root
+#   --clear          empty DOCKER-USER (IPv4 and IPv6) down to a single RETURN: used by uninstall
+#   --print-clear    print the payload --clear applies (IPv4), no root
 set -euo pipefail
 
 HOST_ENV="${HONEYPOT_HOST_ENV:-/etc/honeypot-dashboard/host.env}"
@@ -180,7 +182,13 @@ restore_payload() {
   local family="$1"
   echo "*filter"
   echo ":DOCKER-USER - [0:0]"
-  if [[ "$family" == v4 ]]; then build_rules_v4; else build_rules_v6; fi
+  if [[ "$MODE" == clear || "$MODE" == print-clear ]]; then
+    echo "-A DOCKER-USER -j RETURN"
+  elif [[ "$family" == v4 ]]; then
+    build_rules_v4
+  else
+    build_rules_v6
+  fi
   echo "COMMIT"
 }
 
@@ -196,6 +204,9 @@ apply_table() {
       err "[$family] dry-run: ruleset validation failed"
       return 1
     fi
+  elif [[ "$MODE" == clear ]]; then
+    restore_payload "$family" | "$restore_bin" --noflush
+    log "[$family] DOCKER-USER cleared (single RETURN)"
   else
     restore_payload "$family" | "$restore_bin" --noflush
     log "[$family] DOCKER-USER rebuilt (atomic, --noflush: other chains untouched)"
@@ -209,10 +220,26 @@ main() {
       --dry-run) MODE=dry-run ;;
       --print-rules) MODE=print ;;
       --print-restore) MODE=print-restore ;;
+      --clear) MODE=clear ;;
+      --print-clear) MODE=print-clear ;;
       -h|--help) usage; exit 0 ;;
       *) err "unknown argument: $arg"; usage >&2; exit 1 ;;
     esac
   done
+
+  # Clearing must work even when the config no longer validates (renamed interface...).
+  if [[ "$MODE" == print-clear ]]; then
+    restore_payload v4
+    exit 0
+  fi
+  if [[ "$MODE" == clear ]]; then
+    require_root
+    require_cmds
+    acquire_lock
+    apply_table v4
+    apply_table v6
+    exit 0
+  fi
 
   WAN_IFACE="${WAN_IFACE:-$(default_wan_iface)}"
   validate_config

@@ -168,10 +168,16 @@ Ce que vérifie l'installeur, et quoi faire s'il s'arrête (code de sortie 2, ri
 |---|---|---|
 | `SSH LOCKOUT RISK` + `sshd still listens on port 22` | étape 0 pas faite ou pas appliquée | terminer l'étape 0 (redémarrer ssh) |
 | `sshd listens on X but SSHD_PORT is Y` | host.env et sshd ne sont pas d'accord | corriger l'un des deux |
-| `ufw is active but has no rule for port …` | le nouveau port n'est pas autorisé | `ufw allow <SSHD_PORT>/tcp` |
+| `ufw is active but no ALLOW/LIMIT rule opens port …` | le nouveau port n'est pas autorisé (ports seuls, listes, plages, règles `on <iface>` ou par source comptent tous) | `ufw allow <SSHD_PORT>/tcp` |
+| `WARNING: ufw rules use application profiles` | non bloquant : les ports des profils (ex. `OpenSSH`) ne sont pas vérifiés | vérifier qu'un profil ouvre `SSHD_PORT` (`ufw app info <nom>`) |
 | `WARNING: ufw is not active` | non bloquant | vérifier que le pare-feu de l'hébergeur autorise `SSHD_PORT` et 22 |
 | `REPO_DIR=… does not contain docker-compose.yml` | mauvais `REPO_DIR` | le pointer vers ton clone, ou supprimer la ligne |
 | `host.env must be owned by root and not group/world-writable` | droits trop larges (il est exécuté en root) | `chown root: /etc/honeypot-dashboard/host.env && chmod 600 …` |
+| `Docker Engine with the compose plugin is required` | Docker ou son plugin compose manque | installer Docker Engine (étape 1) |
+| `HONEYPOT_SUBNET is … in host.env but … in .env` | les deux fichiers divergent, le blocage sortant raterait Cowrie | mettre la même valeur dans les deux |
+
+La détection de sshd lit les ports de `ListenAddress` (prioritaires sur `Port`), les ports où sshd
+écoute vraiment, et `ssh.socket` si l'activation par socket est en place (Ubuntu 22.10+).
 
 Ce qu'il installe (tout est idempotent, relançable à tout moment) :
 
@@ -267,7 +273,7 @@ Sans reverse proxy, passe par un tunnel SSH : ajoute temporairement
 ssh -p 50022 <utilisateur>@<serveur>
 
 # Le port 22 répond avec Cowrie
-ssh -o StrictHostKeyChecking=no root@<serveur>      # n'importe quel mot de passe sauf "root" : faux shell ; taper `exit`
+ssh -o StrictHostKeyChecking=no root@<serveur>      # ex. mot de passe "letmein" (Cowrie refuse exprès "root", "123456" et quelques autres) : faux shell ; taper `exit`
 
 # Ingestion : chaque source annonce un retard de 0 octet
 docker compose exec -T dashboard python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/api/health').read().decode())"
@@ -314,8 +320,7 @@ docker compose pull cowrie && docker compose up -d cowrie   # nouvelle image Cow
 
 ```bash
 docker compose down                     # ajouter -v pour supprimer aussi les volumes (toutes les données !)
-scripts/install-host.sh --uninstall     # retire scripts, unités, fichiers de jails ; garde logs, never-ban, host.env
-systemctl restart docker                # vide les règles DOCKER-USER
+scripts/install-host.sh --uninstall     # retire scripts, unités, fichiers de jails, règles DOCKER-USER ; garde logs, never-ban, host.env
 ```
 
 Remets ensuite ton vrai SSH sur 22 si tu le souhaites, avec les mêmes précautions qu'à l'étape 0.
