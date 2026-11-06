@@ -40,67 +40,25 @@
 - [x] B2. Fichiers : événements `file_download` / `file_upload` ingérés (+ rattrapage des logs), onglet
       « Fichiers » du panneau session, page Fichiers par SHA-256, lien VirusTotal, zip chiffré « infected ».
 - [x] C. Recherche avancée : barre de requête + chips (`?filter=`) sur Vue d'ensemble, Carte, Sessions,
-      Commandes. Campagnes / Fichiers non filtrables (agrégats en cache) : à faire si le besoin se confirme.
-- [ ] Alertes Dependabot (le propriétaire gère les mises à jour).
+      Commandes.
+- [x] Dépendances : FastAPI 0.162 / Starlette 1.10 / urllib3 2.8 (Starlette 0.38, transitive, avait
+      14 avis publiés que Dependabot ne signalait pas) ; `npm audit` à 0.
+- [x] Déjà livré parmi les idées de départ : index `commands`/`ttylogs(session_id)`, replay en une seule
+      requête, page Commandes, heatmap jour × heure, distribution des durées, top identifiants et mots de
+      passe, graphiques cliquables qui filtrent, période partagée entre les pages, recherche globale (barre
+      latérale), page IP enrichie (ASN, rDNS, AbuseIPDB), export JSON / .cast d'une session, mise en page mobile.
 
-## Frontend / refonte visuelle
+## Idées restantes (non planifiées)
 
-- [x] Libellé « Tentatives sshd » de la page Corrélation : port lu depuis `SSHD_PORT`
-      (`/api/config`) au lieu d'un texte en dur.
-
-## Backend / perf
-
-- [ ] Ajouter des index sur `commands(session_id)` et `ttylogs(session_id)`
-      (`app/db.py`). Les deux sont interrogées par `session_id` à chaque
-      ouverture du détail d'une session (`app/routers/sessions.py`) mais ne
-      sont pas indexées — même pattern que l'indexation manquante déjà
-      corrigée pour `currently_banned` (commit 6b31f43).
-- [ ] Replay session : `ReplayPlayer` fait un `fetch` juste pour tester
-      `response.ok`, puis `AsciinemaPlayer.create()` refait une requête
-      identique — double lecture/parsing des ttylogs côté serveur à chaque
-      ouverture de session (`frontend/src/components/ReplayPlayer.tsx`).
-
-## Frontend / idées UI-UX (Phase 2 suite, à trier/prioriser)
-
-- [ ] Dark mode (thème sombre par défaut ou togglable — tokens CSS déjà
-      centralisés dans `:root` de `frontend/src/style.css`, il suffit de les
-      redéfinir).
-- [ ] Polish visuel général : hiérarchie typographique, transitions plus
-      douces sur les changements de période, cohérence des couleurs de
-      sévérité (les badges ne couvrent qu'une partie des états actuellement).
-- [ ] Page "Commandes" — classement des commandes les plus tapées par les
-      attaquants (table `commands`, actuellement visible uniquement en
-      scrollant une session à la fois dans le panneau détail), avec lien vers
-      les sessions concernées.
-- [ ] Heatmap horaire/jour de la semaine des attaques (données déjà en base
-      via `connect_time`).
-- [ ] Distribution des durées de session ; répartition par jail fail2ban.
-- [ ] Recherche globale (IP/session) accessible depuis n'importe quelle page.
-- [ ] Graphiques cliquables / drill-down (ex : cliquer un pays dans le donut
-      Overview filtre le Top IP, cliquer un protocole filtre Sessions).
-- [ ] Sélecteur de période partagé entre toutes les pages au lieu d'un état
-      indépendant par page (Overview, Carte ont chacun le leur aujourd'hui).
-- [ ] Export CSV/JSON des sessions ou de l'historique d'une IP.
-- [ ] Carte interactive : zoom/pan (`ZoomableGroup` de react-simple-maps,
-      absent actuellement de `AttackMap.tsx` — scroll-zoom + drag-pan +
-      double-clic), mini popup au clic sur un marker (IP/pays/nb sessions)
-      avant d'ouvrir le détail, mode heatmap/densité en plus du mode
-      points, scrubber temporel pour rejouer l'historique, choropleth par
-      pays cliquable pour drill-down.
-- [ ] Dashboard Overview plus riche : top identifiants/mots de passe
-      testés, durée moyenne de session, IP uniques (jour/semaine),
-      leaderboard "top offenders" (IP, pays, nb sessions, dernière vue)
-      cliquable vers la page IP.
-- [ ] Page IP détail : enrichir avec ASN/organisation, reverse DNS, lien
-      vers AbuseIPDB.
-- [ ] `TimelineChart` : brush/zoom sur une plage de dates (au lieu du
-      sélecteur de période uniquement), clic sur un point → filtre la
-      table sessions.
-- [ ] Flux d'activité en direct — journal chronologique de tous les
-      événements (sessions, bans, tentatives sshd) façon SIEM light.
-- [ ] Page Alertes — seuils configurables (ex : notifier si >N attaques/heure).
-- [ ] Responsive layout — en pause : le besoin n'est pas mobile/téléphone en
-      priorité, à revoir après les autres idées UI ci-dessus.
+- [ ] Pages Campagnes et Fichiers filtrables par la barre de recherche (agrégats en cache : recalcul par filtre).
+- [ ] Premier affichage de la Vue d'ensemble sur « all » (~3,5 s en prod, puis cache) : agrégats dans un
+      thread sur une connexion SQLite en lecture seule.
+- [ ] Thème sombre (tokens CSS déjà centralisés dans `:root`).
+- [ ] Répartition des bans par jail fail2ban.
+- [ ] Export CSV des sessions ou de l'historique d'une IP.
+- [ ] `TimelineChart` : sélection d'une plage de dates à la souris.
+- [ ] Flux d'activité en direct (sessions, bans, tentatives sshd) façon SIEM light.
+- [ ] Alertes sur seuil (ex. plus de N attaques par heure).
 
 ## Sécurité / ops
 
