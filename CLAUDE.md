@@ -103,8 +103,8 @@ Backlog : `TODO.md`. Doc publique bilingue : `README.md`/`README.fr.md`, `docs/i
 ```bash
 .venv/bin/uvicorn app.main:app --reload        # backend dev (:8000)
 cd frontend && npm run dev                      # frontend dev, proxy /api -> localhost:8000
-.venv/bin/pytest                                # tests backend (un test : tests/x.py::nom -v)
-cd frontend && npm test                         # tests frontend (vitest)
+.venv/bin/pytest                                # tests backend (deps : pip install -r requirements-dev.txt)
+cd frontend && npm test                         # tests frontend (vitest, Node 24 comme la CI)
 cd frontend && npm run build                    # tsc -b && vite build (aussi fait par le Dockerfile)
 docker compose up -d --build                    # build/run local ou VPS
 # Déploiement (après push sur origin/main) :
@@ -115,6 +115,11 @@ Pas de lint/format configuré : imiter le style existant. Après déploiement : 
 
 ## Conventions du projet
 - Un bug = un commit = un cycle de déploiement ; cocher la ligne dans `TODO.md`.
+- Dépôt public, `main` protégé (ruleset) : TOUT passe par une PR squash, typos comprises (pas de push direct,
+  ce projet déroge à la règle globale) ; merge seulement quand la CI GitHub Actions est verte (Backend tests,
+  Frontend tests and build, ShellCheck, Docker image builds). Backlog = issues GitHub (#3–#11), pas TODO.md.
+- Jamais de vraie IP, de domaine, de port SSH réel ni de nom d'hôte dans un commit : le test anti-fuite lit
+  `.owner-patterns` (non suivi) ; le copier depuis `~/backups/honeypot-publish/owner-patterns.txt` dans chaque worktree.
 - Déboguer avec des données réelles du VPS (sqlite du conteneur, vrais ttylogs) plutôt que des fixtures seules.
 - Sur le VPS, `~/honeypot-dashboard/` cohabite avec `~/budget/` (autre app) : vérifier le dossier avant `git pull`.
 
