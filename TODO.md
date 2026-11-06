@@ -41,7 +41,6 @@
       « Fichiers » du panneau session, page Fichiers par SHA-256, lien VirusTotal, zip chiffré « infected ».
 - [x] C. Recherche avancée : barre de requête + chips (`?filter=`) sur Vue d'ensemble, Carte, Sessions,
       Commandes. Campagnes / Fichiers non filtrables (agrégats en cache) : à faire si le besoin se confirme.
-- [ ] D. Annotations : notes + tags sur IP, session, campagne, en base, filtrables.
 - [ ] Alertes Dependabot (le propriétaire gère les mises à jour).
 
 ## Frontend / refonte visuelle
