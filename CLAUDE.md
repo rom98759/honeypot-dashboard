@@ -54,8 +54,14 @@ Backlog : `TODO.md`. Doc publique bilingue : `README.md`/`README.fr.md`, `docs/i
   `theme/chartTheme.ts`. La carte est une choroplèthe (`public/world.json` + `utils/isoCountries.ts`, repris
   d'Umami, MIT) alimentée par `countries` de `/api/overview` ; elle a besoin de `geo_cache.country_code`
   (rempli au lookup et par le backfill de démarrage).
-- Filtres façon Umami : `country`/`protocol`/`ip`/`username` dans l'URL (`theme/useFilters.ts`), passés à
-  `/api/overview` ; `previous` = mêmes totaux sur la période précédente (null pour `all`).
+- Recherche : langage `ip:45.* country:CN,RU -user:root cmd:wget dur>60 login:ok file:upload asn:…` dans
+  `?filter=` (`theme/useSearchFilter.ts`, barre `components/QueryBar.tsx`). `app/search_filter.py` fait autorité
+  (parse + SQL sur l'alias `s` de `sessions`, messages d'erreur en français affichés tels quels, 400) ;
+  `utils/searchFilter.ts` reprend la même grammaire pour les chips et la validation avant envoi : les garder
+  alignés (tests miroirs). Accepté par `/api/overview`, `/api/sessions`, `/api/commands` ; les anciens
+  `?ip=&country=&protocol=&username=` restent lus. `?command=` (Sessions) reste un filtre exact à part.
+  `ip_in_network()` est une fonction SQLite enregistrée dans `db.connect` (CIDR non alignés sur l'octet).
+  `previous` = mêmes totaux sur la période précédente (null pour `all`).
 - `/api/overview` et la heatmap passent par `app.state.stats_cache` (`ttl_cache.py`, TTL par période dans
   `routers/overview.py`, 10 s pour 24h à 60 s pour all) ; le front poll au même rythme. Un test qui insère
   puis relit l'overview doit vider ce cache.

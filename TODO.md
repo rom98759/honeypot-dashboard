@@ -39,8 +39,8 @@
 - [x] B1. Panneau session réorganisé + export JSON / .cast (#25) ; fiche campagne alignée, Campagnes mobile (#26).
 - [x] B2. Fichiers : événements `file_download` / `file_upload` ingérés (+ rattrapage des logs), onglet
       « Fichiers » du panneau session, page Fichiers par SHA-256, lien VirusTotal, zip chiffré « infected ».
-- [ ] C. Recherche avancée : chips multi-valeurs ET barre de requête texte
-      (`ip:45.* country:CN cmd:wget -asn:… dur>60`) pilotant les mêmes filtres, sur toutes les pages.
+- [x] C. Recherche avancée : barre de requête + chips (`?filter=`) sur Vue d'ensemble, Carte, Sessions,
+      Commandes. Campagnes / Fichiers non filtrables (agrégats en cache) : à faire si le besoin se confirme.
 - [ ] D. Annotations : notes + tags sur IP, session, campagne, en base, filtrables.
 - [ ] Alertes Dependabot (le propriétaire gère les mises à jour).
 

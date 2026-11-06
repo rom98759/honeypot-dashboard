@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException, Request
 from app.heatmap_stats import get_heatmap_stats
 from app.overview_stats import get_overview_stats
 from app.periods import VALID_PERIODS
+from app.search_filter import FilterError, compile_filter
 
 router = APIRouter()
 
@@ -19,15 +20,18 @@ async def get_overview(
     protocol: str | None = None,
     ip: str | None = None,
     username: str | None = None,
+    filter: str | None = None,
 ):
     if period not in VALID_PERIODS:
         raise HTTPException(status_code=400, detail=f"invalid period: {period}")
-    filters = {"country": country, "protocol": protocol, "ip": ip, "username": username}
-    key = ("overview", period, tuple(sorted(filters.items())))
+    try:
+        _, _, canonical = compile_filter(filter, country=country, protocol=protocol, ip=ip, username=username)
+    except FilterError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     return request.app.state.stats_cache.get_or_compute(
-        key,
+        ("overview", period, canonical),
         OVERVIEW_TTL_SECONDS[period],
-        lambda: get_overview_stats(request.app.state.db, period, filters),
+        lambda: get_overview_stats(request.app.state.db, period, {"filter": canonical}),
     )
 
 

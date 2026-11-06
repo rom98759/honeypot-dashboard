@@ -244,6 +244,28 @@ main#content {
 .filter-bar svg { width: 16px; height: 16px; color: var(--text-secondary); flex-shrink: 0; }
 .filter-input { flex: 1; border: none; background: none; outline: none; min-width: 0; }
 .filter-chips + * { margin-top: 0; }
+/* Search bar: full width, chips under it (layout only, Umami tokens). */
+.controls:has(.query-bar) { align-items: flex-start; }
+.query-bar { flex: 1 1 480px; min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.query-row { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.query-form {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-2);
+  background: var(--bg-surface); border: 1px solid var(--border-strong); border-radius: var(--radius);
+  padding: 0 var(--space-1) 0 var(--space-3); height: 36px;
+}
+.query-form:focus-within { border-color: var(--accent); }
+.query-form > svg { width: 16px; height: 16px; color: var(--text-secondary); flex-shrink: 0; }
+.query-form .btn-icon { width: 28px; height: 28px; }
+.query-input { flex: 1; min-width: 0; border: none; background: none; outline: none; color: var(--text-primary); font-size: var(--text-sm); }
+.query-input[aria-invalid] { color: var(--danger); }
+.query-error { margin: 0; font-size: var(--text-sm); color: var(--danger); }
+.query-help { left: auto; right: 0; width: min(420px, calc(100vw - 32px)); }
+.query-help dl { margin: 0; display: grid; gap: var(--space-2); font-size: var(--text-sm); }
+.query-help dl div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-2); }
+.query-help dt { overflow-wrap: anywhere; }
+.query-help dd { margin: 0; color: var(--text-secondary); }
+.query-help p { margin: 0; font-size: var(--text-sm); }
+.query-row > .filter-wrap:last-child .filter-popover { left: auto; right: 0; }
 
 /* ---------- Metric cards ---------- */
 .metrics-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-3); }

@@ -1,3 +1,5 @@
+import functools
+import ipaddress
 import sqlite3
 from pathlib import Path
 
@@ -138,10 +140,24 @@ def connect(db_path: Path) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA busy_timeout=5000")
+    conn.create_function("ip_in_network", 2, _ip_in_network, deterministic=True)
     conn.executescript(SCHEMA)
     _migrate_geo_cache_coordinates(conn)
     conn.commit()
     return conn
+
+
+@functools.lru_cache(maxsize=64)
+def _network(cidr: str):
+    return ipaddress.ip_network(cidr, strict=False)
+
+
+def _ip_in_network(ip: str | None, network: str) -> int:
+    """SQL ip_in_network(ip, cidr): search filters on ranges that are not octet-aligned."""
+    try:
+        return int(ipaddress.ip_address(ip) in _network(network))
+    except (TypeError, ValueError):
+        return 0
 
 
 def _migrate_geo_cache_coordinates(conn: sqlite3.Connection) -> None:

@@ -16,6 +16,9 @@ who attacks your server, what they type, and how the honeypot, the real sshd and
 
 - **Overview**: attempts, sessions, top credentials/countries/commands, period comparison, heatmap.
 - **Sessions**: every Cowrie session with a terminal **replay** (asciinema player).
+- **Search**: one query bar on the overview, map, sessions and commands pages, e.g.
+  `ip:45.* country:CN,RU -user:root cmd:wget dur>60 login:ok file:upload asn:ovh` (comma = OR,
+  `-` excludes, `*` wildcard, CIDR ranges); each term shows as a removable chip, and the URL can be shared.
 - **Campaigns**: sessions grouped by the script they ran, normalised so random tokens, IPs and
   passwords do not split a bot family.
 - **Files**: what attackers fetched (wget/curl), wrote (`echo … > file`) or uploaded (SFTP/scp), per

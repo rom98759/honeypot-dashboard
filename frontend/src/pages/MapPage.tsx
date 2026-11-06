@@ -1,11 +1,13 @@
 import { Globe } from "lucide-react";
 import { usePeriod } from "../theme/PeriodContext";
-import { useFilters } from "../theme/useFilters";
+import { useChangePeriod } from "../theme/useFilters";
+import { useSearchFilter } from "../theme/useSearchFilter";
+import { filterErrorOf } from "../api/client";
 import { useOverview } from "../api/overview";
 import { WorldMap } from "../components/WorldMap";
 import { ListTable } from "../components/ListTable";
 import { PeriodSelect } from "../components/PeriodSelect";
-import { FilterButton, ActiveFilters } from "../components/FilterBar";
+import { QueryBar } from "../components/QueryBar";
 import { PageHeader } from "../components/PageHeader";
 import { SkeletonBlock } from "../components/SkeletonBlock";
 import { ErrorState } from "../components/ErrorState";
@@ -14,8 +16,10 @@ import { countryRows } from "./OverviewPage";
 
 export function MapPage() {
   const [period] = usePeriod();
-  const { filters, setFilter, removeFilter, changePeriod } = useFilters();
-  const { data, isPending, isError, refetch } = useOverview(period, filters);
+  const changePeriod = useChangePeriod();
+  const search = useSearchFilter();
+  const { data, isPending, isError, error, refetch } = useOverview(period, search.filter);
+  const filterError = filterErrorOf(error);
 
   return (
     <>
@@ -30,30 +34,31 @@ export function MapPage() {
         {data && <span className="result-count">{formatNumber(data.countries.length)} pays</span>}
       </PageHeader>
       <div className="controls">
-        <div className="controls-group">
-          <FilterButton
-            suggestions={{
-              country: data?.countries.map((c) => c.country) ?? [],
-              protocol: data?.protocol_split.map((p) => p.protocol) ?? [],
-            }}
-            onAdd={setFilter}
-          />
-          <ActiveFilters filters={filters} onRemove={removeFilter} />
-        </div>
+        <QueryBar
+          search={search}
+          serverError={filterError}
+          suggestions={{
+            country: data?.countries.map((c) => c.country_code ?? c.country) ?? [],
+            proto: data?.protocol_split.map((p) => p.protocol) ?? [],
+          }}
+        />
         <PeriodSelect value={period} onChange={changePeriod} />
       </div>
       {isPending ? (
         <SkeletonBlock rows={8} />
-      ) : isError ? (
+      ) : filterError ? null : isError ? (
         <ErrorState message="Erreur de chargement, réessaie." onRetry={() => refetch()} />
       ) : (
         <div className="panel-row two-one">
           <section className="panel panel-flush">
-            <WorldMap countries={data.countries} onCountryClick={(c) => setFilter("country", c.country)} />
+            <WorldMap
+              countries={data.countries}
+              onCountryClick={(c) => search.addTerm("country", c.country_code ?? c.country)}
+            />
           </section>
           <section className="panel">
             <h2>Pays</h2>
-            <ListTable title="Pays" metric="Sessions" rows={countryRows(data, setFilter, 25)} />
+            <ListTable title="Pays" metric="Sessions" rows={countryRows(data, (code) => search.addTerm("country", code), 25)} />
           </section>
         </div>
       )}

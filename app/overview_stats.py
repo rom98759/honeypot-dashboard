@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from app.commands_stats import commands_from
 from app.correlation import currently_banned_query
+from app.search_filter import compile_filter
 from app.periods import bucket_expr, period_cutoff, period_delta
 
 DURATION_BUCKETS = ["<10s", "10-60s", "1-5min", "5-30min", ">30min"]
@@ -23,21 +24,11 @@ def _fail2ban_ts_to_iso(raw: str | None) -> str | None:
 
 
 def _filter_clause(filters: dict | None) -> tuple[str, list]:
-    clauses, params = [], []
-    filters = filters or {}
-    if filters.get("country"):
-        clauses.append("s.src_ip IN (SELECT ip FROM geo_cache WHERE country = ?)")
-        params.append(filters["country"])
-    if filters.get("protocol"):
-        clauses.append("COALESCE(s.protocol, 'ssh') = ?")
-        params.append(filters["protocol"])
-    if filters.get("ip"):
-        clauses.append("s.src_ip = ?")
-        params.append(filters["ip"])
-    if filters.get("username"):
-        clauses.append("s.login_username = ?")
-        params.append(filters["username"])
-    return "".join(f" AND {c}" for c in clauses), params
+    """`filters`: the search text under "filter", plus the older single-value keys."""
+    filters = dict(filters or {})
+    text = filters.pop("filter", None)
+    sql, params, _ = compile_filter(text, **{k: v for k, v in filters.items() if v})
+    return sql, params
 
 
 def _totals(db: sqlite3.Connection, where: str, params: list) -> dict:

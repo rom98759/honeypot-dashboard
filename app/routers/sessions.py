@@ -9,6 +9,7 @@ from app.admin_ips import is_admin_ip
 from app.campaigns_stats import campaign_of_paths
 from app.correlation import is_currently_banned
 from app.periods import VALID_PERIODS, period_cutoff
+from app.search_filter import FilterError, compile_filter
 from app.routers.campaigns import cached_aggregate
 from app.session_files import downloads_dir, session_files
 from app.ttyplayer import TTYLogError, ttylogs_to_asciicast
@@ -32,6 +33,7 @@ async def list_sessions(
     offset: int = Query(0, ge=0),
     sort: str = "connect_time",
     order: str = "desc",
+    filter: str | None = None,
 ):
     if sort not in SORTABLE_COLUMNS:
         raise HTTPException(status_code=400, detail=f"invalid sort column: {sort}")
@@ -40,21 +42,21 @@ async def list_sessions(
     if period is not None and period not in VALID_PERIODS:
         raise HTTPException(status_code=400, detail=f"invalid period: {period}")
 
+    try:
+        search_sql, search_params, _ = compile_filter(filter, ip=ip, protocol=protocol, country=country)
+    except FilterError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
     db = request.app.state.db
     where_clauses = []
     where_params: list = []
-    if ip:
-        where_clauses.append("src_ip = ?")
-        where_params.append(ip)
     if command:
+        # Links from the commands page name one exact command.
         where_clauses.append("session_id IN (SELECT session_id FROM commands WHERE input_text = ?)")
         where_params.append(command)
-    if protocol:
-        where_clauses.append("protocol = ?")
-        where_params.append(protocol)
-    if country:
-        where_clauses.append("src_ip IN (SELECT ip FROM geo_cache WHERE country = ?)")
-        where_params.append(country)
+    if search_sql:
+        where_clauses.append("1=1" + search_sql)
+        where_params.extend(search_params)
     if period:
         cutoff = period_cutoff(period)
         if cutoff:
@@ -69,11 +71,11 @@ async def list_sessions(
     where_clause = (" WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
 
     total = db.execute(
-        f"SELECT COUNT(*) AS n FROM sessions{where_clause}", where_params
+        f"SELECT COUNT(*) AS n FROM sessions s{where_clause}", where_params
     ).fetchone()["n"]
 
     rows = db.execute(
-        f"SELECT * FROM sessions{where_clause} ORDER BY {sort} {order.upper()} LIMIT ? OFFSET ?",
+        f"SELECT * FROM sessions s{where_clause} ORDER BY {sort} {order.upper()} LIMIT ? OFFSET ?",
         [*where_params, limit, offset],
     ).fetchall()
 

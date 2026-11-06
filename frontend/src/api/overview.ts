@@ -1,12 +1,10 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { fetchJSON } from "./client";
-import type { Filters, HeatmapData, OverviewData, OverviewPeriod } from "./types";
+import type { HeatmapData, OverviewData, OverviewPeriod } from "./types";
 
-export function overviewUrl(period: OverviewPeriod, filters: Filters = {}): string {
+export function overviewUrl(period: OverviewPeriod, filter = ""): string {
   const params = new URLSearchParams({ period });
-  for (const [key, value] of Object.entries(filters)) {
-    if (value) params.set(key, value);
-  }
+  if (filter) params.set("filter", filter);
   return `/api/overview?${params.toString()}`;
 }
 
@@ -17,10 +15,10 @@ export function overviewRefetchInterval(period: OverviewPeriod): number {
   return REFETCH_MS[period];
 }
 
-export function useOverview(period: OverviewPeriod = "24h", filters: Filters = {}) {
+export function useOverview(period: OverviewPeriod = "24h", filter = "") {
   return useQuery({
-    queryKey: ["overview", period, filters],
-    queryFn: () => fetchJSON<OverviewData>(overviewUrl(period, filters)),
+    queryKey: ["overview", period, filter],
+    queryFn: () => fetchJSON<OverviewData>(overviewUrl(period, filter)),
     refetchInterval: overviewRefetchInterval(period),
     refetchIntervalInBackground: false,
     // Changing a filter keeps the previous numbers on screen instead of flashing the skeleton.

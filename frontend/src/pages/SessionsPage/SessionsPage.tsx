@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { List } from "lucide-react";
 import { useSessions, PAGE_SIZE } from "../../api/sessions";
@@ -10,7 +9,9 @@ import { SortableTableHeader, type Column } from "../../components/SortableTable
 import { Pagination } from "../../components/Pagination";
 import { SessionDetailPanel } from "./SessionDetailPanel";
 import { PageHeader } from "../../components/PageHeader";
-import { SearchField } from "../../components/SearchField";
+import { QueryBar } from "../../components/QueryBar";
+import { useSearchFilter } from "../../theme/useSearchFilter";
+import { filterErrorOf } from "../../api/client";
 import { AcceptedLoginBadge } from "../../components/Badge";
 import { formatTimestamp } from "../../utils/formatDate";
 import { formatDuration, formatNumber } from "../../utils/format";
@@ -23,10 +24,8 @@ const COLUMNS: Column[] = [
 ];
 
 interface ParamUpdate {
-  ip?: string;
+  filter?: string;
   command?: string;
-  protocol?: string;
-  country?: string;
   period?: string;
   dateFrom?: string;
   dateTo?: string;
@@ -38,10 +37,9 @@ interface ParamUpdate {
 
 export function SessionsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const ip = searchParams.get("ip") ?? "";
+  const search = useSearchFilter();
+  const filter = search.filter;
   const command = searchParams.get("command") ?? "";
-  const protocol = searchParams.get("protocol") ?? "";
-  const country = searchParams.get("country") ?? "";
   const period = searchParams.get("period") ?? "";
   const dateFrom = searchParams.get("date_from") ?? "";
   const dateTo = searchParams.get("date_to") ?? "";
@@ -50,20 +48,9 @@ export function SessionsPage() {
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
   const sessionId = searchParams.get("session");
 
-  const [ipInput, setIpInput] = useState(ip);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-
-  useEffect(() => {
-    setIpInput(ip);
-  }, [ip]);
-
-  useEffect(() => () => clearTimeout(debounceRef.current), []);
-
-  const { data, isPending, isError, refetch } = useSessions({
-    ip,
+  const { data, isPending, isError, error, refetch } = useSessions({
+    filter,
     command,
-    protocol,
-    country,
     period,
     dateFrom,
     dateTo,
@@ -72,15 +59,13 @@ export function SessionsPage() {
     page,
   });
 
-  const current = { ip, command, protocol, country, period, dateFrom, dateTo, sort, order, page: String(page) };
+  const current = { filter, command, period, dateFrom, dateTo, sort, order, page: String(page) };
+  const filterError = filterErrorOf(error);
 
   function updateParams(next: ParamUpdate) {
-    clearTimeout(debounceRef.current);
     const params = new URLSearchParams();
-    if (next.ip) params.set("ip", next.ip);
+    if (next.filter) params.set("filter", next.filter);
     if (next.command) params.set("command", next.command);
-    if (next.protocol) params.set("protocol", next.protocol);
-    if (next.country) params.set("country", next.country);
     if (next.period) params.set("period", next.period);
     if (next.dateFrom) params.set("date_from", next.dateFrom);
     if (next.dateTo) params.set("date_to", next.dateTo);
@@ -89,14 +74,6 @@ export function SessionsPage() {
     if (next.page) params.set("page", next.page);
     if (next.session) params.set("session", next.session);
     setSearchParams(params);
-  }
-
-  function handleFilterChange(value: string) {
-    setIpInput(value);
-    clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      updateParams({ ...current, ip: value, page: undefined });
-    }, 300);
   }
 
   function handleSort(col: string) {
@@ -112,7 +89,7 @@ export function SessionsPage() {
     updateParams(current);
   }
 
-  function clearFilter(key: "command" | "protocol" | "country" | "period" | "dateRange") {
+  function clearFilter(key: "command" | "period" | "dateRange") {
     if (key === "dateRange") {
       updateParams({ ...current, dateFrom: "", dateTo: "", page: undefined });
       return;
@@ -120,17 +97,16 @@ export function SessionsPage() {
     updateParams({ ...current, [key]: "", page: undefined });
   }
 
-  if (isPending) return <SkeletonBlock rows={8} />;
-  if (isError) {
+  if (isPending && !filterError) return <SkeletonBlock rows={8} />;
+  if (isError && !filterError) {
     return <ErrorState message="Erreur de chargement, réessaie." onRetry={() => refetch()} />;
   }
 
-  const totalPages = Math.max(1, Math.ceil(data.total / PAGE_SIZE));
+  const total = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const chips: FilterChip[] = [];
-  if (command) chips.push({ label: `Commande : ${command}`, onClear: () => clearFilter("command") });
-  if (protocol) chips.push({ label: `Protocole : ${protocol}`, onClear: () => clearFilter("protocol") });
-  if (country) chips.push({ label: `Pays : ${country}`, onClear: () => clearFilter("country") });
+  if (command) chips.push({ label: `Commande exacte : ${command}`, onClear: () => clearFilter("command") });
   if (period) chips.push({ label: `Période : ${period}`, onClear: () => clearFilter("period") });
   if (dateFrom || dateTo) {
     chips.push({ label: `Plage : ${dateFrom} → ${dateTo}`, onClear: () => clearFilter("dateRange") });
@@ -147,15 +123,13 @@ export function SessionsPage() {
         }
       >
         <span className="result-count">
-          {formatNumber(data.total)} résultat{data.total > 1 ? "s" : ""}
+          {formatNumber(total)} résultat{total > 1 ? "s" : ""}
         </span>
       </PageHeader>
       <div className="controls">
-        <div className="controls-group">
-          <SearchField value={ipInput} placeholder="Filtrer par IP..." onChange={handleFilterChange} />
-          <FilterChips chips={chips} />
-        </div>
+        <QueryBar search={search} serverError={filterError} />
       </div>
+      <FilterChips chips={chips} />
       <section className="panel table-panel">
         <table className="sessions-table">
           <thead>
@@ -166,7 +140,7 @@ export function SessionsPage() {
             </tr>
           </thead>
           <tbody>
-            {data.items.length ? (
+            {data?.items.length ? (
               data.items.map((s) => (
                 <tr key={s.session_id} className="session-row" onClick={() => handleRowClick(s.session_id)}>
                   <td className="mono">

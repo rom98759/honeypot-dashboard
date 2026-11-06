@@ -16,7 +16,16 @@ def commands_from(sessions_first: bool) -> str:
     return "commands c JOIN sessions s ON s.session_id = c.session_id"
 
 
-def get_commands_stats(db: sqlite3.Connection, period: str, q: str, limit: int, offset: int) -> dict:
+def get_commands_stats(
+    db: sqlite3.Connection,
+    period: str,
+    q: str,
+    limit: int,
+    offset: int,
+    session_filter: tuple[str, list] = ("", []),
+) -> dict:
+    """`q` matches the command text; `session_filter` (search language, see search_filter)
+    restricts which sessions count."""
     where_clauses = []
     params: list = []
     cutoff = period_cutoff(period)
@@ -26,8 +35,11 @@ def get_commands_stats(db: sqlite3.Connection, period: str, q: str, limit: int, 
     if q:
         where_clauses.append("c.input_text LIKE ?")
         params.append(f"%{q}%")
+    if session_filter[0]:
+        where_clauses.append("1=1" + session_filter[0])
+        params.extend(session_filter[1])
     where = (" AND " + " AND ".join(where_clauses)) if where_clauses else ""
-    source = commands_from(sessions_first=cutoff is not None)
+    source = commands_from(sessions_first=cutoff is not None or bool(session_filter[0]))
 
     total = db.execute(
         f"SELECT COUNT(DISTINCT c.input_text) AS n FROM {source} WHERE 1=1" + where,

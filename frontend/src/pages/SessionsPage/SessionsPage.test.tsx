@@ -1,4 +1,4 @@
-import { screen, waitFor, fireEvent, act } from "@testing-library/react";
+import { screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { Link, Routes, Route } from "react-router-dom";
@@ -88,77 +88,56 @@ describe("SessionsPage", () => {
     expect(screen.getByRole("button", { name: "Suivant" })).toBeDisabled();
   });
 
-  it("debounces the IP filter without losing input focus", async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    const fetchMock = vi.fn(() => jsonResponse(SESSIONS_PAGE_1));
+  it("applies the search bar on Enter and keeps focus", async () => {
+    const fetchMock = vi.fn((_url: string) => jsonResponse(SESSIONS_PAGE_1));
     vi.stubGlobal("fetch", fetchMock);
     renderWithProviders(<SessionsPage />, { route: "/sessions" });
     await waitFor(() => expect(screen.getByText("1.2.3.4")).toBeInTheDocument());
 
-    const input = screen.getByPlaceholderText("Filtrer par IP...") as HTMLInputElement;
-    input.focus();
-    fireEvent.change(input, { target: { value: "9.9.9.9" } });
-    expect(document.activeElement).toBe(input);
-    expect(input.value).toBe("9.9.9.9");
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(300);
-    });
+    const input = screen.getByRole("textbox", { name: "Requête de recherche" });
+    await userEvent.type(input, "9.9.9.9 dur>60{Enter}");
     await waitFor(() =>
-      expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("ip=9.9.9.9"))
+      expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("filter=ip%3A9.9.9.9+dur%3E60"))
     );
     expect(document.activeElement).toBe(input);
+    expect(screen.getByText("IP", { selector: ".filter-chip b" })).toBeInTheDocument();
   });
 
-  it("resets to page 1 when the IP filter changes while on a later page", async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
+  it("resets to page 1 when the search changes while on a later page", async () => {
     const fetchMock = vi.fn((_url: string) => jsonResponse(SESSIONS_PAGE_1));
     vi.stubGlobal("fetch", fetchMock);
     renderWithProviders(<SessionsPage />, { route: "/sessions?page=3" });
     await waitFor(() => expect(screen.getByText("1.2.3.4")).toBeInTheDocument());
     expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("offset=50"));
 
-    const input = screen.getByPlaceholderText("Filtrer par IP...") as HTMLInputElement;
-    fireEvent.change(input, { target: { value: "9.9.9.9" } });
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(300);
-    });
-    await waitFor(() =>
-      expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("ip=9.9.9.9"))
-    );
-    const lastUrl = fetchMock.mock.calls[fetchMock.mock.calls.length - 1][0] as string;
-    expect(lastUrl).toContain("offset=0");
-    expect(lastUrl).not.toContain("offset=50");
+    await userEvent.type(screen.getByRole("textbox", { name: "Requête de recherche" }), "user:root{Enter}");
+    await waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("filter=user%3Aroot")));
+    expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("offset=0"));
   });
 
-  it("cancels a pending debounced filter update when a sort click happens before it fires", async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
+  it("keeps the search when sorting", async () => {
     const fetchMock = vi.fn((_url: string) => jsonResponse(SESSIONS_PAGE_1));
     vi.stubGlobal("fetch", fetchMock);
-    renderWithProviders(<SessionsPage />, { route: "/sessions" });
+    renderWithProviders(<SessionsPage />, { route: "/sessions?filter=country%3ACN" });
     await waitFor(() => expect(screen.getByText("1.2.3.4")).toBeInTheDocument());
 
-    const input = screen.getByPlaceholderText("Filtrer par IP...") as HTMLInputElement;
-    fireEvent.change(input, { target: { value: "9.9.9.9" } });
-
-    // Advance partway through the 300ms debounce window, then navigate away
-    // from the pending filter update by clicking a sort header.
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(100);
-    });
-    fireEvent.click(screen.getByRole("button", { name: /IP/ }));
-
-    // Advance past the original debounce deadline.
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(300);
-    });
-
+    fireEvent.click(screen.getByRole("button", { name: /^IP/ }));
     await waitFor(() =>
       expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("sort=src_ip&order=asc"))
     );
-    const lastUrl = fetchMock.mock.calls[fetchMock.mock.calls.length - 1][0] as string;
-    expect(lastUrl).not.toContain("ip=9.9.9.9");
+    expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("filter=country%3ACN"));
+  });
+
+  it("shows the server's message when it rejects the search", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve({ ok: false, status: 400, json: () => Promise.resolve({ detail: "ip : plage invalide" }) } as Response)
+      )
+    );
+    renderWithProviders(<SessionsPage />, { route: "/sessions?filter=ip%3A10.0.0.0%2F33" });
+    expect(await screen.findByRole("alert")).toHaveTextContent("ip : plage invalide");
+    expect(screen.getByRole("textbox", { name: "Requête de recherche" })).toBeInTheDocument();
   });
 
   it("opens the detail panel with the session id when a row is clicked, and Escape closes it", async () => {
@@ -289,10 +268,10 @@ describe("SessionsPage", () => {
     vi.stubGlobal("fetch", vi.fn(() => jsonResponse(SESSIONS_PAGE_1)));
     renderWithProviders(<SessionsPage />, { route: "/sessions?command=whoami" });
     await waitFor(() => expect(screen.getByText("1.2.3.4")).toBeInTheDocument());
-    expect(screen.getByText(/Commande : whoami/)).toBeInTheDocument();
+    expect(screen.getByText(/Commande exacte : whoami/)).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: /Effacer : Commande : whoami/ }));
-    await waitFor(() => expect(screen.queryByText(/Commande : whoami/)).not.toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: /Effacer : Commande exacte : whoami/ }));
+    await waitFor(() => expect(screen.queryByText(/Commande exacte : whoami/)).not.toBeInTheDocument());
   });
 
   it("passes the command param through to the sessions request", async () => {
@@ -324,7 +303,7 @@ describe("SessionsPage", () => {
     expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("command=whoami"));
   });
 
-  it("passes protocol, country, period, and date range params through to the sessions request", async () => {
+  it("reads older protocol/country links as search terms, with period and date range", async () => {
     const fetchMock = vi.fn((_url: string) => jsonResponse(SESSIONS_PAGE_1));
     vi.stubGlobal("fetch", fetchMock);
     renderWithProviders(<SessionsPage />, {
@@ -332,8 +311,7 @@ describe("SessionsPage", () => {
     });
     await waitFor(() => expect(screen.getByText("1.2.3.4")).toBeInTheDocument());
     const url = fetchMock.mock.calls[fetchMock.mock.calls.length - 1][0] as string;
-    expect(url).toContain("protocol=ssh");
-    expect(url).toContain("country=France");
+    expect(url).toContain("filter=country%3AFrance+proto%3Assh");
     expect(url).toContain("period=7d");
     expect(url).toContain("date_from=2026-08-12T10");
     expect(url).toContain("date_to=2026-08-12T13");
@@ -343,12 +321,12 @@ describe("SessionsPage", () => {
     vi.stubGlobal("fetch", vi.fn(() => jsonResponse(SESSIONS_PAGE_1)));
     renderWithProviders(<SessionsPage />, { route: "/sessions?protocol=ssh&country=France" });
     await waitFor(() => expect(screen.getByText("1.2.3.4")).toBeInTheDocument());
-    expect(screen.getByText(/Protocole : ssh/)).toBeInTheDocument();
-    expect(screen.getByText(/Pays : France/)).toBeInTheDocument();
+    expect(screen.getByText("Protocole", { selector: ".filter-chip b" })).toBeInTheDocument();
+    expect(screen.getByText("Pays", { selector: ".filter-chip b" })).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: /Effacer : Protocole : ssh/ }));
-    await waitFor(() => expect(screen.queryByText(/Protocole : ssh/)).not.toBeInTheDocument());
-    expect(screen.getByText(/Pays : France/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Retirer le filtre Protocole" }));
+    await waitFor(() => expect(screen.queryByText("Protocole", { selector: ".filter-chip b" })).toBeNull());
+    expect(screen.getByText("Pays", { selector: ".filter-chip b" })).toBeInTheDocument();
   });
 
   it("keeps every active filter in the URL after an in-page interaction (pagination) with several set at once", async () => {
@@ -363,7 +341,6 @@ describe("SessionsPage", () => {
     await waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("offset=25")));
     const url = fetchMock.mock.calls[fetchMock.mock.calls.length - 1][0] as string;
     expect(url).toContain("command=whoami");
-    expect(url).toContain("protocol=ssh");
-    expect(url).toContain("country=France");
+    expect(url).toContain("filter=country%3AFrance+proto%3Assh");
   });
 });

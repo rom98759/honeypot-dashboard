@@ -64,7 +64,7 @@ describe("useSessions", () => {
     );
   });
 
-  it("includes protocol, country, period, and date range in the query string when set", async () => {
+  it("includes the search filter, period, and date range in the query string when set", async () => {
     const fetchMock = vi.fn(
       async (_url: string) => ({ ok: true, json: async () => ({ items: [], total: 0 }) }) as Response
     );
@@ -76,8 +76,7 @@ describe("useSessions", () => {
           sort: "connect_time",
           order: "desc",
           page: 1,
-          protocol: "ssh",
-          country: "France",
+          filter: "proto:ssh country:FR",
           period: "7d",
           dateFrom: "2026-08-12T10",
           dateTo: "2026-08-12T13",
@@ -86,14 +85,13 @@ describe("useSessions", () => {
     );
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     const url = fetchMock.mock.calls[0][0] as string;
-    expect(url).toContain("protocol=ssh");
-    expect(url).toContain("country=France");
+    expect(url).toContain("filter=proto%3Assh+country%3AFR");
     expect(url).toContain("period=7d");
     expect(url).toContain("date_from=2026-08-12T10");
     expect(url).toContain("date_to=2026-08-12T13");
   });
 
-  it("omits protocol, country, period, and date range from the query string when unset", async () => {
+  it("omits the filter, period, and date range from the query string when unset", async () => {
     const fetchMock = vi.fn(
       async (_url: string) => ({ ok: true, json: async () => ({ items: [], total: 0 }) }) as Response
     );
@@ -104,8 +102,7 @@ describe("useSessions", () => {
     );
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     const url = fetchMock.mock.calls[0][0] as string;
-    expect(url).not.toContain("protocol=");
-    expect(url).not.toContain("country=");
+    expect(url).not.toContain("filter=");
     expect(url).not.toContain("period=");
     expect(url).not.toContain("date_from=");
     expect(url).not.toContain("date_to=");

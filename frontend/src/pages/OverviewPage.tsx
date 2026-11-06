@@ -1,14 +1,16 @@
 import { Link, useNavigate } from "react-router-dom";
 import { ExternalLink, List as ListIcon, Shield } from "lucide-react";
 import { usePeriod } from "../theme/PeriodContext";
-import { useFilters } from "../theme/useFilters";
+import { useChangePeriod } from "../theme/useFilters";
+import { useSearchFilter } from "../theme/useSearchFilter";
+import { filterErrorOf } from "../api/client";
 import { useOverview, useOverviewHeatmap } from "../api/overview";
 import { ActivityChart } from "../components/ActivityChart";
 import { ListTable, type ListRow } from "../components/ListTable";
 import { TabsPanel } from "../components/TabsPanel";
 import { MetricCard } from "../components/MetricCard";
 import { PeriodSelect } from "../components/PeriodSelect";
-import { FilterButton, ActiveFilters } from "../components/FilterBar";
+import { QueryBar } from "../components/QueryBar";
 import { LiveIndicator, PageHeader } from "../components/PageHeader";
 import { WorldMap } from "../components/WorldMap";
 import { WeeklyTraffic } from "../components/WeeklyTraffic";
@@ -20,7 +22,8 @@ import { buildSeries } from "../utils/timeSeries";
 import { bucketRangeToDates } from "../utils/bucket";
 import { formatDaysAgo } from "../utils/formatDate";
 import { countryLabel, flagEmoji, formatDuration, formatNumber, percentChange } from "../utils/format";
-import type { Filters, OverviewData } from "../api/types";
+import type { OverviewData } from "../api/types";
+import type { SearchField } from "../utils/searchFilter";
 
 function sessionsUrl(params: Record<string, string | undefined>): string {
   const clean = Object.fromEntries(Object.entries(params).filter(([, v]) => v)) as Record<string, string>;
@@ -29,19 +32,38 @@ function sessionsUrl(params: Record<string, string | undefined>): string {
 
 export function OverviewPage() {
   const [period] = usePeriod();
-  const { filters, setFilter, removeFilter, changePeriod } = useFilters();
+  const changePeriod = useChangePeriod();
+  const search = useSearchFilter();
+  const setFilter = search.addTerm;
   const navigate = useNavigate();
 
-  const { data, isPending, isError, refetch } = useOverview(period, filters);
+  const { data, isPending, isError, error, refetch } = useOverview(period, search.filter);
   const heatmap = useOverviewHeatmap();
+  const filterError = filterErrorOf(error);
 
-  if (isPending) return <SkeletonBlock rows={6} />;
+  if (isPending && !filterError) return <SkeletonBlock rows={6} />;
+  if (filterError || !data) {
+    if (!filterError) return <ErrorState message="Erreur de chargement, réessaie." onRetry={() => refetch()} />;
+    return (
+      <>
+        <PageHeader
+          title={
+            <>
+              <Shield />
+              Honeypot
+            </>
+          }
+        />
+        <QueryBar search={search} serverError={filterError} />
+      </>
+    );
+  }
   if (isError) {
     return <ErrorState message="Erreur de chargement, réessaie." onRetry={() => refetch()} />;
   }
 
   const prev = data.previous;
-  const sessionFilters = { period, ip: filters.ip, protocol: filters.protocol, country: filters.country };
+  const sessionFilters = { period, filter: search.filter };
 
   return (
     <>
@@ -57,10 +79,7 @@ export function OverviewPage() {
       </PageHeader>
 
       <div className="controls">
-        <div className="controls-group">
-          <FilterButton suggestions={suggestionsFrom(data)} onAdd={setFilter} />
-          <ActiveFilters filters={filters} onRemove={removeFilter} />
-        </div>
+        <QueryBar search={search} suggestions={suggestionsFrom(data)} />
         <div className="controls-group">
           <Link className="btn" to={sessionsUrl(sessionFilters)}>
             <ListIcon />
@@ -137,7 +156,7 @@ export function OverviewPage() {
                       </span>
                     ),
                     value: c.n,
-                    onClick: () => setFilter("username", c.login_username),
+                    onClick: () => setFilter("user", c.login_username),
                   }))}
                 />
               ),
@@ -154,7 +173,7 @@ export function OverviewPage() {
                     key: u.value,
                     label: <span className="mono">{u.value}</span>,
                     value: u.n,
-                    onClick: () => setFilter("username", u.value),
+                    onClick: () => setFilter("user", u.value),
                   }))}
                 />
               ),
@@ -171,6 +190,7 @@ export function OverviewPage() {
                     key: p.value,
                     label: <span className="mono">{p.value || "(vide)"}</span>,
                     value: p.n,
+                    onClick: p.value ? () => setFilter("pass", p.value) : undefined,
                   }))}
                 />
               ),
@@ -219,7 +239,7 @@ export function OverviewPage() {
                   title="Pays"
                   metric="Sessions"
                   total={data.total_connections}
-                  rows={countryRows(data, setFilter)}
+                  rows={countryRows(data, (code) => setFilter("country", code))}
                 />
               ),
             },
@@ -235,7 +255,7 @@ export function OverviewPage() {
                     key: p.protocol,
                     label: <span>{p.protocol.toUpperCase()}</span>,
                     value: p.n,
-                    onClick: () => setFilter("protocol", p.protocol),
+                    onClick: () => setFilter("proto", p.protocol),
                   }))}
                 />
               ),
@@ -306,7 +326,7 @@ export function OverviewPage() {
         <section className="panel panel-flush">
           <WorldMap
             countries={data.countries}
-            onCountryClick={(c) => setFilter("country", c.country)}
+            onCountryClick={(c) => setFilter("country", c.country_code ?? c.country)}
           />
         </section>
         <section className="panel">
@@ -328,7 +348,7 @@ export function OverviewPage() {
 
 export function countryRows(
   data: Pick<OverviewData, "countries">,
-  setFilter: (key: "country", value: string) => void,
+  onSelect: (country: string) => void,
   limit = 10
 ): ListRow[] {
   return data.countries.slice(0, limit).map((c) => ({
@@ -340,15 +360,16 @@ export function countryRows(
       </>
     ),
     value: c.n,
-    onClick: () => setFilter("country", c.country),
+    onClick: () => onSelect(c.country_code ?? c.country),
   }));
 }
 
-function suggestionsFrom(data: OverviewData): Partial<Record<keyof Filters, string[]>> {
+export function suggestionsFrom(data: OverviewData): Partial<Record<SearchField, string[]>> {
   return {
-    country: data.countries.map((c) => c.country),
-    protocol: data.protocol_split.map((p) => p.protocol),
+    country: data.countries.map((c) => c.country_code ?? c.country),
+    proto: data.protocol_split.map((p) => p.protocol),
     ip: data.top_offenders.map((o) => o.src_ip),
-    username: data.top_usernames.map((u) => u.value),
+    user: data.top_usernames.map((u) => u.value),
+    pass: data.top_passwords.map((p) => p.value).filter(Boolean),
   };
 }

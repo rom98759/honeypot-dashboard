@@ -73,7 +73,7 @@ describe("MapPage", () => {
     render();
     await userEvent.click(await screen.findByRole("button", { name: "Simulate country click" }));
     await waitFor(() =>
-      expect(fetchMock).toHaveBeenCalledWith("/api/overview?period=24h&country=China")
+      expect(fetchMock).toHaveBeenCalledWith("/api/overview?period=24h&filter=country%3ACN")
     );
   });
 

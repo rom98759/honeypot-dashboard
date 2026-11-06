@@ -17,6 +17,9 @@ vrai sshd et fail2ban.
 
 - **Vue d'ensemble** : tentatives, sessions, top identifiants/pays/commandes, comparaison de période, heatmap.
 - **Sessions** : chaque session Cowrie avec **replay** du terminal (lecteur asciinema).
+- **Recherche** : une barre de requête sur la vue d'ensemble, la carte, les sessions et les commandes, ex.
+  `ip:45.* country:CN,RU -user:root cmd:wget dur>60 login:ok file:upload asn:ovh` (virgule = OU,
+  `-` exclut, `*` joker, plages CIDR) ; chaque condition devient un chip supprimable, l'URL se partage.
 - **Campagnes** : sessions regroupées par script exécuté, normalisées pour que jetons aléatoires, IP et
   mots de passe ne coupent pas une famille de bots.
 - **Fichiers** : ce que les attaquants ont téléchargé (wget/curl), écrit (`echo … > fichier`) ou déposé

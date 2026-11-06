@@ -138,8 +138,6 @@ export interface OverviewData extends OverviewTotals {
   duration_distribution: { bucket: string; n: number }[];
 }
 
-export type FilterKey = "country" | "protocol" | "ip" | "username";
-export type Filters = Partial<Record<FilterKey, string>>;
 
 export type OverviewPeriod = "24h" | "7d" | "30d" | "all";
 

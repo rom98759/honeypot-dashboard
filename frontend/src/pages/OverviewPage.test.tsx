@@ -185,12 +185,13 @@ describe("OverviewPage", () => {
     await userEvent.click(screen.getByRole("button", { name: /France/ }));
 
     await waitFor(() =>
-      expect(overviewCalls(fetchMock)).toContain("/api/overview?period=24h&country=France")
+      expect(overviewCalls(fetchMock)).toContain("/api/overview?period=24h&filter=country%3AFR")
     );
     expect(screen.getByText("Pays", { selector: ".filter-chip b" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Requête de recherche" })).toHaveValue("country:FR");
 
     await userEvent.click(screen.getByRole("button", { name: "Retirer le filtre Pays" }));
-    await waitFor(() => expect(screen.getByTestId("location")).not.toHaveTextContent("country="));
+    await waitFor(() => expect(screen.getByTestId("location")).not.toHaveTextContent("filter="));
   });
 
   it("adds a filter from the filter popover", async () => {
@@ -200,13 +201,37 @@ describe("OverviewPage", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Filtre" }));
     const form = screen.getByRole("form", { name: "Ajouter un filtre" });
-    await userEvent.selectOptions(within(form).getByLabelText("Champ"), "protocol");
-    await userEvent.type(within(form).getByPlaceholderText("est égal à…"), "telnet");
+    await userEvent.selectOptions(within(form).getByLabelText("Champ"), "proto");
+    await userEvent.selectOptions(within(form).getByLabelText("Condition"), "not");
+    await userEvent.type(within(form).getByLabelText("Valeur"), "telnet");
     await userEvent.click(within(form).getByRole("button", { name: "Ajouter" }));
 
     await waitFor(() =>
-      expect(overviewCalls(fetchMock)).toContain("/api/overview?period=24h&protocol=telnet")
+      expect(overviewCalls(fetchMock)).toContain("/api/overview?period=24h&filter=-proto%3Atelnet")
     );
+    expect(screen.getByText("n'est pas", { selector: ".filter-chip .op" })).toBeInTheDocument();
+  });
+
+  it("applies a typed query on Enter and explains a syntax error without sending it", async () => {
+    const fetchMock = stubFetch();
+    renderPage();
+    await screen.findByText("Connexions");
+    const input = screen.getByRole("textbox", { name: "Requête de recherche" });
+
+    await userEvent.type(input, "foo:bar{Enter}");
+    expect(screen.getByRole("alert")).toHaveTextContent("champ inconnu « foo »");
+    expect(overviewCalls(fetchMock).some((u) => u.includes("filter="))).toBe(false);
+
+    await userEvent.clear(input);
+    await userEvent.type(input, "country:CN,RU -user:root dur>60{Enter}");
+    await waitFor(() =>
+      expect(overviewCalls(fetchMock)).toContain(
+        "/api/overview?period=24h&filter=country%3ACN%2CRU+-user%3Aroot+dur%3E60"
+      )
+    );
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByText("CN ou RU")).toBeInTheDocument();
+    expect(screen.getByText("Durée", { selector: ".filter-chip b" })).toBeInTheDocument();
   });
 
   it("applies filters already present in the URL and forwards them to the sessions link", async () => {
@@ -214,10 +239,11 @@ describe("OverviewPage", () => {
     renderPage("/overview?ip=1.2.3.4&protocol=ssh");
     await screen.findByText("Connexions");
 
-    expect(overviewCalls(fetchMock)[0]).toBe("/api/overview?period=24h&protocol=ssh&ip=1.2.3.4");
+    // Older ?ip= / ?protocol= links are read as search terms.
+    expect(overviewCalls(fetchMock)[0]).toBe("/api/overview?period=24h&filter=ip%3A1.2.3.4+proto%3Assh");
     expect(screen.getByRole("link", { name: /Voir les sessions/ })).toHaveAttribute(
       "href",
-      "/sessions?period=24h&ip=1.2.3.4&protocol=ssh"
+      "/sessions?period=24h&filter=ip%3A1.2.3.4+proto%3Assh"
     );
   });
 
@@ -234,7 +260,7 @@ describe("OverviewPage", () => {
 
     await userEvent.click(screen.getByText("1.2.3.4"));
     await waitFor(() =>
-      expect(overviewCalls(fetchMock)).toContain("/api/overview?period=24h&ip=1.2.3.4")
+      expect(overviewCalls(fetchMock)).toContain("/api/overview?period=24h&filter=ip%3A1.2.3.4")
     );
   });
 
@@ -270,7 +296,7 @@ describe("OverviewPage", () => {
     renderPage();
     await userEvent.click(await screen.findByRole("button", { name: "Simulate country click" }));
     await waitFor(() =>
-      expect(overviewCalls(fetchMock)).toContain("/api/overview?period=24h&country=France")
+      expect(overviewCalls(fetchMock)).toContain("/api/overview?period=24h&filter=country%3AFR")
     );
   });
 
