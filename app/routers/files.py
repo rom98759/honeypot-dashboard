@@ -44,7 +44,7 @@ async def get_file(request: Request, shasum: str):
 @router.get("/api/files/{shasum}/download")
 async def download_file(request: Request, shasum: str):
     shasum = shasum.lower()
-    if not SHA256_RE.match(shasum):
+    if not SHA256_RE.fullmatch(shasum):
         raise HTTPException(status_code=404, detail="file not found")
     directory = downloads_dir(request.app)
 
