@@ -1,24 +1,37 @@
 version: 2
 updates:
+  # Minor and patch updates come grouped; majors arrive one PR each so a breaking
+  # change never hides inside a batch.
   - package-ecosystem: pip
     directory: /
     schedule:
       interval: weekly
     groups:
       python:
-        patterns: ["*"]
+        update-types: [minor, patch]
   - package-ecosystem: npm
     directory: /frontend
     schedule:
       interval: weekly
     groups:
       frontend:
-        patterns: ["*"]
+        update-types: [minor, patch]
+    # Framework majors (React, Vite, TypeScript, maps) are planned work, tracked in an issue.
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
   - package-ecosystem: docker
     directory: /
     schedule:
       interval: monthly
+    # Node stays on an LTS line: odd majors (25, 27) are short-lived.
+    ignore:
+      - dependency-name: node
+        update-types: [version-update:semver-major]
