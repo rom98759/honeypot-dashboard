@@ -137,3 +137,10 @@ def test_api_endpoints_accept_the_filter(db):
     # Older links still work and combine with the search text.
     legacy = client.get("/api/sessions", params={"ip": "45.1.2.3", "filter": "user:root"}).json()
     assert legacy["total"] == 1
+
+
+def test_overlong_filter_text_is_refused_before_parsing():
+    with pytest.raises(FilterError, match="trop long"):
+        parse("A" * 5000)
+    with pytest.raises(FilterError, match="trop long"):
+        parse("a " * 3000)

@@ -19,6 +19,8 @@ from dataclasses import dataclass
 
 MAX_TERMS = 20
 MAX_VALUE_LENGTH = 200
+# Bounds the work any regex below can do on a query string an attacker controls.
+MAX_TEXT_LENGTH = 2000
 
 FIELDS = ("ip", "country", "asn", "proto", "user", "pass", "cmd", "dur", "login", "file")
 ALIASES = {
@@ -33,7 +35,7 @@ COMPARISONS = (">=", "<=", ">", "<")
 LOGIN_VALUES = ("ok", "failed", "none")
 FILE_KINDS = ("download", "upload", "redirect", "failed")
 
-_TERM_RE = re.compile(r"(-?)([a-zA-Z]+)(>=|<=|>|<|:)(.*)", re.S)
+_TERM_RE = re.compile(r"(-?)([a-zA-Z]{1,32})(>=|<=|>|<|:)(.*)", re.S)
 _IP_LIKE_RE = re.compile(r"^[0-9a-fA-F:.*]+(/\d{1,3})?$")
 _DURATION_RE = re.compile(r"^(\d+(?:\.\d+)?)(s|m|h)?$")
 _HEX_RE = re.compile(r"^[0-9a-fA-F]{6,64}$")
@@ -147,6 +149,8 @@ def _looks_like_ip(word: str) -> bool:
 
 
 def parse(text: str) -> list[Term]:
+    if len(text or "") > MAX_TEXT_LENGTH:
+        raise FilterError(f"filtre trop long (max {MAX_TEXT_LENGTH} caractères)")
     terms = []
     for token in _split_tokens(text or ""):
         m = _TERM_RE.fullmatch(token)

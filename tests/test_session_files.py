@@ -204,3 +204,20 @@ def test_download_unreadable_file_says_so(tmp_path):
     response = _client(tmp_path, readable=False).get(f"/api/files/{SHA}/download")
     assert response.status_code == 503
     assert "cowrie-downloads-perms" in response.json()["detail"]
+
+
+def test_stored_file_names_are_exactly_64_hex_chars(tmp_path):
+    from app.session_files import stored_size
+
+    sha = "a" * 64
+    # "$" in a regex also matches before a trailing newline: such a name must never reach the disk.
+    (tmp_path / (sha + "\n")).write_bytes(b"x")
+    assert stored_size(tmp_path, sha + "\n") is None
+    (tmp_path / sha).write_bytes(b"abc")
+    assert stored_size(tmp_path, sha) == 3
+
+
+def test_download_refuses_names_that_only_start_with_a_hash(tmp_path):
+    client = _client(tmp_path)
+    assert client.get("/api/files/" + "a" * 64 + "zz/download").status_code == 404
+    assert client.get("/api/files/" + "a" * 64 + "%0A/download").status_code == 404

@@ -20,7 +20,7 @@ from app.proxied_ip import PROXIED_SOURCE_IP
 
 log = logging.getLogger(__name__)
 
-SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+SHA256_RE = re.compile(r"[0-9a-f]{64}")  # always used with fullmatch: "$" would accept a trailing newline
 BACKFILL_NAME = "session_files"
 SORT_KEYS = {"sessions", "ips", "first_seen", "last_seen"}
 
@@ -81,10 +81,13 @@ def downloads_dir(app) -> Path:
 
 def stored_size(directory: Path, shasum: str) -> int | None:
     """Size of the stored copy, or None when Cowrie did not keep one."""
-    if not SHA256_RE.match(shasum):
+    base = os.path.normpath(directory)
+    path = os.path.normpath(os.path.join(base, shasum))
+    # Only a bare SHA-256 resolving inside the downloads directory reaches the disk.
+    if not SHA256_RE.fullmatch(shasum) or not path.startswith(base + os.sep):
         return None
     try:
-        st = os.lstat(directory / shasum)
+        st = os.lstat(path)
     except OSError:
         return None
     return st.st_size if stat.S_ISREG(st.st_mode) else None
@@ -92,10 +95,12 @@ def stored_size(directory: Path, shasum: str) -> int | None:
 
 def read_stored(directory: Path, shasum: str, max_bytes: int) -> bytes:
     """Raises FileNotFoundError (absent), PermissionError (not readable yet) or ValueError (too big)."""
-    if not SHA256_RE.match(shasum):
+    base = os.path.normpath(directory)
+    path = os.path.normpath(os.path.join(base, shasum))
+    if not SHA256_RE.fullmatch(shasum) or not path.startswith(base + os.sep):
         raise FileNotFoundError(shasum)
     # Cowrie's container can write this directory: never follow a link it planted.
-    fd = os.open(directory / shasum, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     with os.fdopen(fd, "rb") as fh:
         st = os.fstat(fh.fileno())
         if not stat.S_ISREG(st.st_mode):
@@ -166,7 +171,7 @@ def files_page(db: sqlite3.Connection, directory: Path, sort: str, limit: int, o
 
 
 def file_detail(db: sqlite3.Connection, directory: Path, shasum: str) -> dict | None:
-    if not SHA256_RE.match(shasum):
+    if not SHA256_RE.fullmatch(shasum):
         return None
     summary = db.execute(
         "SELECT COUNT(*) AS events, COUNT(DISTINCT f.session_id) AS sessions, "
