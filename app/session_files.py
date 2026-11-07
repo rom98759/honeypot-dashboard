@@ -79,21 +79,12 @@ def downloads_dir(app) -> Path:
     return Path(app.state.cowrie_var_path) / "lib" / "cowrie" / "downloads"
 
 
-def stored_path(directory: Path, shasum: str) -> Path | None:
-    """Path of Cowrie's copy of a file, or None for anything but a bare SHA-256 inside directory."""
-    if not SHA256_RE.fullmatch(shasum):
-        return None
-    base = os.path.normpath(directory)
-    path = os.path.normpath(os.path.join(base, shasum))
-    if os.path.dirname(path) != base:
-        return None
-    return Path(path)
-
-
 def stored_size(directory: Path, shasum: str) -> int | None:
     """Size of the stored copy, or None when Cowrie did not keep one."""
-    path = stored_path(directory, shasum)
-    if path is None:
+    base = os.path.normpath(directory)
+    path = os.path.normpath(os.path.join(base, shasum))
+    # Only a bare SHA-256 resolving inside the downloads directory reaches the disk.
+    if not SHA256_RE.fullmatch(shasum) or not path.startswith(base + os.sep):
         return None
     try:
         st = os.lstat(path)
@@ -104,8 +95,9 @@ def stored_size(directory: Path, shasum: str) -> int | None:
 
 def read_stored(directory: Path, shasum: str, max_bytes: int) -> bytes:
     """Raises FileNotFoundError (absent), PermissionError (not readable yet) or ValueError (too big)."""
-    path = stored_path(directory, shasum)
-    if path is None:
+    base = os.path.normpath(directory)
+    path = os.path.normpath(os.path.join(base, shasum))
+    if not SHA256_RE.fullmatch(shasum) or not path.startswith(base + os.sep):
         raise FileNotFoundError(shasum)
     # Cowrie's container can write this directory: never follow a link it planted.
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
