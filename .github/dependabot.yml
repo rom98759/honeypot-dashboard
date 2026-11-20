@@ -1,37 +1,29 @@
+# Weekly, one grouped PR per ecosystem for patch/minor (auto-merged when CI is green);
+# majors come as separate PRs and stay manual.
 version: 2
 updates:
-  # Minor and patch updates come grouped; majors arrive one PR each so a breaking
-  # change never hides inside a batch.
   - package-ecosystem: pip
     directory: /
-    schedule:
-      interval: weekly
-    groups:
-      python:
-        update-types: [minor, patch]
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 5
+    groups: { pip: { update-types: [minor, patch] } }
   - package-ecosystem: npm
     directory: /frontend
-    schedule:
-      interval: weekly
-    groups:
-      frontend:
-        update-types: [minor, patch]
-    # Framework majors (React, Vite, TypeScript, maps) are planned work, tracked in an issue.
-    ignore:
-      - dependency-name: "*"
-        update-types: [version-update:semver-major]
-  - package-ecosystem: github-actions
-    directory: /
-    schedule:
-      interval: monthly
-    groups:
-      actions:
-        patterns: ["*"]
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 5
+    groups: { npm: { update-types: [minor, patch] } }
   - package-ecosystem: docker
     directory: /
-    schedule:
-      interval: monthly
-    # Node stays on an LTS line: odd majors (25, 27) are short-lived.
-    ignore:
-      - dependency-name: node
-        update-types: [version-update:semver-major]
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 5
+    groups: { docker: { update-types: [minor, patch] } }
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 5
+    groups: { docker_compose: { update-types: [minor, patch] } }
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 5
+    groups: { github_actions: { update-types: [minor, patch] } }
