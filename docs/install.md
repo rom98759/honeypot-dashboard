@@ -165,7 +165,8 @@ account, root accepting any password). `cowrie/` overrides that and is mounted r
 - `cowrie/fs.pickle`: the fake filesystem, derived from the one in the Cowrie image by
   `scripts/build-cowrie-fs.py` (see its header) with the hostname and account renamed.
 
-Edit these files, then `docker compose up -d` (Cowrie reads them at start). It cannot be made undetectable: the
+Edit these files, then `docker compose up -d --force-recreate cowrie`: a plain `up -d` leaves the container
+running, and it keeps the old copy of a file replaced by `git pull`. It cannot be made undetectable: the
 SSH key-exchange order and some command outputs remain Cowrie's. The goal is to pass scripted checks.
 
 ## Step 4 — Install the host side
