@@ -51,6 +51,13 @@ def test_filesystem_has_no_default_account():
         assert not re.search(rb"phil|california|svr04", content, re.I), path
 
 
+def test_proc_has_no_entries_a_real_debian_host_lacks():
+    fs = _fs()
+    assert "/proc/docker" not in fs
+    assert "/proc/.reset" not in fs
+    assert "/proc/cpuinfo" in fs and "/proc/version" in fs
+
+
 def test_filesystem_sizes_match_rewritten_files():
     fs = _fs()
     for path in ("/etc/hostname", "/etc/passwd", "/etc/group", "/etc/shadow"):
