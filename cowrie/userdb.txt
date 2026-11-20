@@ -1,0 +1,8 @@
+# Which logins the fake server accepts. Syntax: login:x:password, first match wins,
+# `*` = anything, /regex/ (add `i` for case-insensitive); no rule matched = refused.
+#
+# Accepting any password for root is the classic honeypot tell: real servers refuse
+# almost everything. Here only the usual weak passwords of mass scanners get in, for
+# the usual default accounts. To go back to "accept everything", append `*:x:*`.
+
+/^(root|admin|ubuntu|pi|user|test|guest|oracle|postgres|debian|ubnt|support|git|ftpuser|ops)$/:x:/^(123456|1234|12345|123456789|12345678|password|passw0rd|p@ssw0rd|admin|admin123|root|root123|toor|qwerty|1q2w3e|1qaz2wsx|111111|000000|123123|abc123|changeme|default|test|linux|debian|ubuntu|raspberry|letmein|welcome|12345678910)$/i

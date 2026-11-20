@@ -3,7 +3,8 @@
 # scripts/install-host.sh: see docs/install.md.
 services:
   cowrie:
-    image: ${COWRIE_IMAGE:-cowrie/cowrie:latest}
+    # Pinned by digest so a Cowrie update is a reviewed change (Dependabot bumps it).
+    image: ${COWRIE_IMAGE:-cowrie/cowrie:latest@sha256:e7c4b4fe5fbb874e682c6c0c7a1daf1c3183c622d5cc2d281f453c1c4d9f97ac}
     container_name: honeypot-cowrie
     restart: unless-stopped
     networks:
@@ -15,6 +16,10 @@ services:
     volumes:
       - cowrie-etc:/cowrie/cowrie-git/etc
       - cowrie-var:/cowrie/cowrie-git/var
+      # Identity of the fake server (hostname, SSH version, accepted logins, filesystem).
+      - ./cowrie/cowrie.cfg:/cowrie/cowrie-git/etc/cowrie.cfg:ro
+      - ./cowrie/userdb.txt:/cowrie/cowrie-git/etc/userdb.txt:ro
+      - ./cowrie/fs.pickle:/cowrie/cowrie-git/custom/fs.pickle:ro
     cap_drop:
       - ALL
     security_opt:
