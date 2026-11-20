@@ -143,7 +143,7 @@ install -m 600 .env.example .env
 |---|---|---|---|
 | `SSHD_PORT` | conseillé | vide | Même valeur que dans host.env ; affiché sur la page Corrélation. |
 | `COWRIE_PORT` | non | `22` | Port hôte publié pour Cowrie. |
-| `COWRIE_IMAGE` | non | `cowrie/cowrie:latest` | Image Cowrie ; fige un tag pour une installation parfaitement reproductible. |
+| `COWRIE_IMAGE` | non | digest épinglé dans `docker-compose.yml` | Image Cowrie. À laisser vide : Dependabot met à jour le digest du compose, donc chaque mise à jour passe par une PR relue. |
 | `HONEYPOT_SUBNET` | non | `172.21.0.0/16` | Doit être identique à host.env : le blocage de sortie vise ce sous-réseau. Le dashboard affiche les sessions venant de sa passerelle (clients IPv6 relayés par Docker) comme « IPv6 (IP inconnue) » et les écarte des classements d'IP. |
 | `PROXY_NETWORK` | oui | `nginx-proxy-network` | Réseau Docker de ton reverse proxy. Il doit déjà exister. |
 | `COWRIE_ETC_VOLUME` | non | `honeypot-cowrie-etc` | Noms des volumes. À changer seulement pour réutiliser les volumes d'une ancienne installation. |
@@ -154,6 +154,21 @@ install -m 600 .env.example .env
 | `FBAN_ENABLED` | non | `0` | `1` = affiche les boutons Bannir/Débannir. Nécessite aussi `FBAN_ENABLED=1` dans host.env. |
 | `ADMIN_IPS` | non | vide | Tes propres IP/CIDR, séparées par des virgules : jamais bannissables depuis le dashboard. D'autres peuvent être ajoutées dans la page Réglages. |
 | `ABUSEIPDB_API_KEY` | non | vide | Clé gratuite [AbuseIPDB](https://www.abuseipdb.com/) pour la réputation des IP. Vide = désactivé. |
+
+### Comment le honeypot se présente
+
+Par défaut Cowrie se reconnaît facilement (hostname `svr04`, réponse `OpenSSH 7.9` à `ssh -V`, compte `phil`, root
+accepté avec n'importe quel mot de passe). `cowrie/` corrige cela et est monté en lecture seule dans le conteneur :
+
+- `cowrie/cowrie.cfg` : hostname, bannière SSH (OpenSSH 9.2 de Debian 12) et sortie de `ssh -V`, cohérents entre eux.
+- `cowrie/userdb.txt` : quels logins réussissent. Seuls les mots de passe faibles habituels des scanners passent, pour
+  les comptes par défaut habituels ; le reste est refusé, comme sur un vrai serveur. Ajouter `*:x:*` pour tout accepter.
+- `cowrie/fs.pickle` : le faux système de fichiers, dérivé de celui de l'image Cowrie par
+  `scripts/build-cowrie-fs.py` (voir son en-tête), avec hostname et compte renommés.
+
+Modifier ces fichiers puis `docker compose up -d` (Cowrie les lit au démarrage). Impossible de le rendre indétectable :
+l'ordre de négociation des clés SSH et certaines sorties de commandes restent celles de Cowrie. Le but est de passer
+les vérifications scriptées.
 
 ## Étape 4 — Installer la partie hôte
 

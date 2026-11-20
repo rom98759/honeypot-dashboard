@@ -43,6 +43,19 @@ def test_cowrie_is_hardened_and_published_on_22():
     assert set(cowrie["networks"]) == {"honeypot-net"}
 
 
+def test_cowrie_identity_files_are_mounted_read_only_and_image_is_pinned():
+    cowrie = _render()["services"]["cowrie"]
+    mounts = {v["target"]: v for v in cowrie["volumes"]}
+    for target in (
+        "/cowrie/cowrie-git/etc/cowrie.cfg",
+        "/cowrie/cowrie-git/etc/userdb.txt",
+        "/cowrie/cowrie-git/custom/fs.pickle",
+    ):
+        assert mounts[target]["read_only"] is True, target
+        assert Path(mounts[target]["source"]).is_file(), target
+    assert "@sha256:" in cowrie["image"]
+
+
 def test_honeypot_network_subnet_from_env():
     config = _render(HONEYPOT_SUBNET="172.30.0.0/16")
     subnets = [c["subnet"] for c in config["networks"]["honeypot-net"]["ipam"]["config"]]
