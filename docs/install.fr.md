@@ -161,8 +161,9 @@ Par défaut Cowrie se reconnaît facilement (hostname `svr04`, réponse `OpenSSH
 accepté avec n'importe quel mot de passe). `cowrie/` corrige cela et est monté en lecture seule dans le conteneur :
 
 - `cowrie/cowrie.cfg` : hostname, bannière SSH (OpenSSH 9.2 de Debian 12) et sortie de `ssh -V`, cohérents entre eux.
-- `cowrie/userdb.txt` : quels logins réussissent. Seuls les mots de passe faibles habituels des scanners passent, pour
-  les comptes par défaut habituels ; le reste est refusé, comme sur un vrai serveur. Ajouter `*:x:*` pour tout accepter.
+- `cowrie/userdb.txt` : quels logins réussissent. Tout est accepté pour voir chaque session ; un serveur qui accepte
+  n'importe quel mot de passe est une trace connue de honeypot : ne lister que les mots de passe faibles habituels
+  si tu préfères paraître plus strict.
 - `cowrie/fs.pickle` : le faux système de fichiers, dérivé de celui de l'image Cowrie par
   `scripts/build-cowrie-fs.py` (voir son en-tête), avec hostname et compte renommés.
 

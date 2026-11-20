@@ -160,8 +160,8 @@ Out of the box Cowrie is easy to recognise (hostname `svr04`, an `OpenSSH 7.9` a
 account, root accepting any password). `cowrie/` overrides that and is mounted read-only into the container:
 
 - `cowrie/cowrie.cfg`: hostname, the SSH banner (Debian 12 OpenSSH 9.2) and the `ssh -V` output, kept consistent.
-- `cowrie/userdb.txt`: which logins succeed. Only the usual weak passwords of mass scanners are accepted, for the
-  usual default accounts; everything else is refused, like on a real server. Append `*:x:*` to accept everything.
+- `cowrie/userdb.txt`: which logins succeed. Everything is accepted so you see every session; a server that takes
+  any password is a known honeypot tell, so list only the usual weak passwords there if you prefer to look stricter.
 - `cowrie/fs.pickle`: the fake filesystem, derived from the one in the Cowrie image by
   `scripts/build-cowrie-fs.py` (see its header) with the hostname and account renamed.
 
