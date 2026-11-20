@@ -166,7 +166,8 @@ accepté avec n'importe quel mot de passe). `cowrie/` corrige cela et est monté
 - `cowrie/fs.pickle` : le faux système de fichiers, dérivé de celui de l'image Cowrie par
   `scripts/build-cowrie-fs.py` (voir son en-tête), avec hostname et compte renommés.
 
-Modifier ces fichiers puis `docker compose up -d` (Cowrie les lit au démarrage). Impossible de le rendre indétectable :
+Modifier ces fichiers puis `docker compose up -d --force-recreate cowrie` : un simple `up -d` laisse le conteneur
+tourner, et il garde l'ancienne copie d'un fichier remplacé par `git pull`. Impossible de le rendre indétectable :
 l'ordre de négociation des clés SSH et certaines sorties de commandes restent celles de Cowrie. Le but est de passer
 les vérifications scriptées.
 
