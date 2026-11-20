@@ -2,7 +2,8 @@
 """Derive cowrie/fs.pickle from the filesystem pickle bundled in the Cowrie image.
 
 The bundled pickle is a Debian 12 tree, but it carries two well-known Cowrie tells:
-the hostname `svr04` and a `phil` account (`Phil California`). This rewrites both so the fake
+the hostname `svr04` and a `phil` account (`Phil California`); it also drops
+`/proc/docker` and `/proc/.reset`. This rewrites both so the fake
 shell stays consistent with `hostname` in cowrie/cowrie.cfg.
 
     cid=$(docker create "$COWRIE_IMAGE")
@@ -24,6 +25,8 @@ T_DIR, T_FILE = 1, 2
 OLD_HOSTNAME = b"svr04"
 OLD_USER = b"phil"
 OLD_GECOS = b"Phil California"
+# Entries of the bundled /proc that a real Debian 12 host does not have.
+NOT_IN_PROC = ("docker", ".reset")
 
 
 def find(root, path):
@@ -67,6 +70,9 @@ def main():
         node = find(root, path)
         if node is not None and node[A_TYPE] == T_FILE:
             rewrite_file(node, [(OLD_GECOS, user), (OLD_USER, user)])
+
+    proc = find(root, "/proc")
+    proc[A_CONTENTS] = [c for c in proc[A_CONTENTS] if c[A_NAME] not in NOT_IN_PROC]
 
     with open(args.dest, "wb") as fh:
         pickle.dump(root, fh, protocol=pickle.HIGHEST_PROTOCOL)
