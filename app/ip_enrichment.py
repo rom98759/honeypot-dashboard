@@ -79,7 +79,7 @@ class AbuseIpDbClient:
             return None, None, None
 
     def _consume_quota(self) -> bool:
-        today = datetime.datetime.now(datetime.timezone.utc).date()
+        today = datetime.datetime.now(datetime.UTC).date()
         if today != self._date:
             self._date = today
             self._count = 0

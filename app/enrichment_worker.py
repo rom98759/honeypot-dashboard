@@ -32,7 +32,7 @@ class EnrichmentWorker:
             (
                 result.asn, result.asn_org, result.reverse_dns,
                 result.abuseipdb_score, result.abuseipdb_total_reports, result.abuseipdb_last_reported_at,
-                datetime.datetime.now(datetime.timezone.utc).isoformat(), ip,
+                datetime.datetime.now(datetime.UTC).isoformat(), ip,
             ),
         )
         self.db.commit()

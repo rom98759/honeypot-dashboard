@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi.testclient import TestClient
 
@@ -11,7 +11,7 @@ def _iso(dt):
 
 
 def _seed(db):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     db.execute(
         "INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('s1', '1.2.3.4', ?)",
         (_iso(now),),

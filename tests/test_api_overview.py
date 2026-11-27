@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi.testclient import TestClient
 
@@ -12,7 +12,7 @@ def _iso(dt):
 
 def test_overview_reflects_seeded_sessions(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     db.execute(
         "INSERT INTO sessions (session_id, src_ip, connect_time, login_username) "
         "VALUES ('s1', '1.2.3.4', ?, 'root')",
@@ -43,7 +43,7 @@ def test_overview_reflects_seeded_sessions(tmp_path):
 
 def test_overview_default_period_is_24h(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     db.execute(
         "INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('recent', '1.2.3.4', ?)",
         (_iso(now),),
@@ -73,7 +73,7 @@ def test_overview_rejects_invalid_period(tmp_path):
 
 def test_overview_new_fields_present(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     db.execute(
         "INSERT INTO sessions (session_id, src_ip, connect_time, protocol, login_username, login_password) "
         "VALUES ('s1', '1.2.3.4', ?, 'telnet', 'root', '123456')",

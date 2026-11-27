@@ -56,16 +56,16 @@ async def download_file(request: Request, shasum: str):
             # No database access in build(): safe off the event loop.
             archive = await asyncio.to_thread(build)
         except FileNotFoundError:
-            raise HTTPException(status_code=404, detail="Cowrie kept no copy of this file")
+            raise HTTPException(status_code=404, detail="Cowrie kept no copy of this file") from None
         except PermissionError:
             raise HTTPException(
                 status_code=503,
                 detail="stored file not readable yet (host unit cowrie-downloads-perms, see docs/install.md)",
-            )
+            ) from None
         except ValueError:
-            raise HTTPException(status_code=413, detail="file too large to archive")
+            raise HTTPException(status_code=413, detail="file too large to archive") from None
         except OSError:  # a symlink (O_NOFOLLOW) or a vanished file
-            raise HTTPException(status_code=404, detail="Cowrie kept no copy of this file")
+            raise HTTPException(status_code=404, detail="Cowrie kept no copy of this file") from None
     return Response(
         content=archive,
         media_type="application/zip",

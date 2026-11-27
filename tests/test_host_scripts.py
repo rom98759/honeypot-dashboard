@@ -98,8 +98,8 @@ def test_firewall_restore_payload_only_declares_docker_user(tmp_path):
     assert lines[0] == "*filter"
     assert lines[1] == ":DOCKER-USER - [0:0]"
     assert lines[-1] == "COMMIT"
-    assert [l for l in lines if l.startswith(":")] == [":DOCKER-USER - [0:0]"]
-    assert all(l.startswith("-A DOCKER-USER ") for l in lines[2:-1])
+    assert [line for line in lines if line.startswith(":")] == [":DOCKER-USER - [0:0]"]
+    assert all(line.startswith("-A DOCKER-USER ") for line in lines[2:-1])
 
 
 def test_firewall_applies_with_noflush():

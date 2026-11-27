@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi.testclient import TestClient
 
@@ -15,7 +15,7 @@ def _iso(dt):
 
 def _client(tmp_path, extra=()):
     db = connect(tmp_path / "db.sqlite3")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     sessions = [*extra(now), *_default_sessions(now)] if extra else _default_sessions(now)
     for sid, ip, ts, ttylog, commands in sessions:
         db.execute("INSERT INTO sessions (session_id, src_ip, connect_time) VALUES (?, ?, ?)", (sid, ip, ts))

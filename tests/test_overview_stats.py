@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from app.db import connect
 from app.overview_stats import get_overview_stats
@@ -10,7 +10,7 @@ def _iso(dt):
 
 def test_totals_are_scoped_to_period(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     db.execute(
         "INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('recent', '1.2.3.4', ?)",
         (_iso(now),),
@@ -32,7 +32,7 @@ def test_totals_are_scoped_to_period(tmp_path):
 
 def test_total_commands_counts_every_command_of_the_period(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     db.execute(
         "INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('recent', '1.2.3.4', ?)", (_iso(now),)
     )
@@ -42,7 +42,7 @@ def test_total_commands_counts_every_command_of_the_period(tmp_path):
     )
     db.executemany(
         "INSERT INTO commands (session_id, timestamp, input_text) VALUES (?, 't', ?)",
-        [(f"recent", f"cmd{i}") for i in range(12)] + [("old", "uname")],
+        [("recent", f"cmd{i}") for i in range(12)] + [("old", "uname")],
     )
     db.commit()
 
@@ -52,7 +52,7 @@ def test_total_commands_counts_every_command_of_the_period(tmp_path):
 
 def test_currently_banned_ignores_period(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     db.execute(
         "INSERT INTO fail2ban_events (ip, action, jail, timestamp) VALUES ('9.9.9.9', 'Ban', 'recidive', ?)",
         ((now - timedelta(days=3)).strftime("%Y-%m-%d %H:%M:%S,000"),),
@@ -86,7 +86,7 @@ def test_last_ban_at_is_null_without_bans(tmp_path):
 
 def test_protocol_split_defaults_null_protocol_to_ssh(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     db.execute(
         "INSERT INTO sessions (session_id, src_ip, connect_time, protocol) VALUES ('s1', '1.2.3.4', ?, NULL)",
         (_iso(now),),
@@ -107,7 +107,7 @@ def test_protocol_split_defaults_null_protocol_to_ssh(tmp_path):
 
 def test_top_credentials_handles_null_password(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     db.execute(
         "INSERT INTO sessions (session_id, src_ip, connect_time, login_username, login_password) "
         "VALUES ('s1', '1.2.3.4', ?, 'root', NULL)",
@@ -126,7 +126,7 @@ def test_top_credentials_handles_null_password(tmp_path):
 
 def test_bans_timeline_counts_ban_and_restore_ban_but_not_unban(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     db.executemany(
         "INSERT INTO fail2ban_events (ip, action, jail, timestamp) VALUES (?, ?, 'sshd', ?)",
         [
@@ -143,7 +143,7 @@ def test_bans_timeline_counts_ban_and_restore_ban_but_not_unban(tmp_path):
 
 def test_timeline_bucket_is_hourly_for_24h_and_daily_for_30d(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     db.execute(
         "INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('s1', '1.2.3.4', ?)",
         (_iso(now),),
@@ -158,7 +158,7 @@ def test_timeline_bucket_is_hourly_for_24h_and_daily_for_30d(tmp_path):
 
 def test_bans_timeline_bucket_is_hourly_for_24h_and_daily_for_30d(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     db.execute(
         "INSERT INTO fail2ban_events (ip, action, jail, timestamp) VALUES ('1.2.3.4', 'Ban', 'sshd', ?)",
         (_iso(now),),
@@ -185,7 +185,7 @@ def test_bans_timeline_bucket_is_t_separated_for_real_fail2ban_timestamps(tmp_pa
 
 def test_bans_timeline_bucket_is_t_separated_hourly_for_24h(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     real_format_timestamp = now.strftime("%Y-%m-%d %H:%M:%S,000")
     db.execute(
         "INSERT INTO fail2ban_events (ip, action, jail, timestamp) VALUES ('1.2.3.4', 'Ban', 'sshd', ?)",
@@ -200,7 +200,7 @@ def test_bans_timeline_bucket_is_t_separated_hourly_for_24h(tmp_path):
 
 def test_bans_timeline_is_period_scoped(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     db.execute(
         "INSERT INTO fail2ban_events (ip, action, jail, timestamp) VALUES ('1.2.3.4', 'Ban', 'sshd', ?)",
         (_iso(now),),
@@ -219,7 +219,7 @@ def test_bans_timeline_is_period_scoped(tmp_path):
 
 def test_top_offenders_includes_country_and_last_seen(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     earlier = now - timedelta(hours=2)
     db.execute(
         "INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('s1', '1.2.3.4', ?)",
@@ -243,7 +243,7 @@ def test_top_offenders_includes_country_and_last_seen(tmp_path):
 
 def test_top_offenders_has_null_country_when_ungeolocated(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     db.execute(
         "INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('s1', '9.9.9.9', ?)",
         (_iso(now),),
@@ -258,7 +258,7 @@ def test_top_offenders_has_null_country_when_ungeolocated(tmp_path):
 
 def test_duration_distribution_buckets_and_zero_fills(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     db.executemany(
         "INSERT INTO sessions (session_id, src_ip, connect_time, duration_ms) VALUES (?, '1.2.3.4', ?, ?)",
         [
@@ -288,7 +288,7 @@ def test_duration_distribution_buckets_and_zero_fills(tmp_path):
 
 def test_duration_distribution_all_zero_when_no_closed_sessions(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     db.execute(
         "INSERT INTO sessions (session_id, src_ip, connect_time, duration_ms) VALUES ('s1', '1.2.3.4', ?, NULL)",
         (_iso(now),),

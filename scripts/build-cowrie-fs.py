@@ -62,7 +62,7 @@ def main():
 
     home = find(root, "/home/" + OLD_USER.decode())
     if home is None or home[A_TYPE] != T_DIR:
-        sys.exit("/home/%s not found: unexpected pickle layout" % OLD_USER.decode())
+        sys.exit(f"/home/{OLD_USER.decode()} not found: unexpected pickle layout")
     home[A_NAME] = args.user
 
     rewrite_file(find(root, "/etc/hostname"), [(OLD_HOSTNAME, host)])
@@ -76,7 +76,7 @@ def main():
 
     with open(args.dest, "wb") as fh:
         pickle.dump(root, fh, protocol=pickle.HIGHEST_PROTOCOL)
-    print("wrote %s (hostname=%s, user=%s)" % (args.dest, args.hostname, args.user))
+    print(f"wrote {args.dest} (hostname={args.hostname}, user={args.user})")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,9 @@
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = ["cowrie", "frontend"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+# Long lines are kept where splitting would hurt readability (SQL, messages).
+ignore = ["E501"]

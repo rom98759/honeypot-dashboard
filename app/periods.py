@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 VALID_PERIODS = {"24h", "7d", "30d", "all"}
 
@@ -16,7 +16,7 @@ def period_delta(period: str) -> timedelta:
 def period_cutoff(period: str) -> str | None:
     if period == "all":
         return None
-    return (datetime.now(timezone.utc) - _PERIOD_DELTAS[period]).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return (datetime.now(UTC) - _PERIOD_DELTAS[period]).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def bucket_expr(period: str, column: str) -> str:

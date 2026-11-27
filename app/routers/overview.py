@@ -27,7 +27,7 @@ async def get_overview(
     try:
         _, _, canonical = compile_filter(filter, country=country, protocol=protocol, ip=ip, username=username)
     except FilterError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return request.app.state.stats_cache.get_or_compute(
         ("overview", period, canonical),
         OVERVIEW_TTL_SECONDS[period],

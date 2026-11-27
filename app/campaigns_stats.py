@@ -13,7 +13,7 @@ import ipaddress
 import re
 import sqlite3
 from collections import Counter, defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from app.command_normalize import normalize_sequence, sequence_key
 from app.proxied_ip import PROXIED_SOURCE_IP
@@ -135,7 +135,7 @@ def compute_campaigns(db: sqlite3.Connection) -> dict:
         "SELECT COUNT(*) AS sessions, COUNT(DISTINCT src_ip) AS ips FROM sessions s "
         "WHERE NOT EXISTS (SELECT 1 FROM ttylogs t WHERE t.session_id = s.session_id)"
     ).fetchone()
-    new_cutoff = _iso(datetime.now(timezone.utc) - NEW_WINDOW)
+    new_cutoff = _iso(datetime.now(UTC) - NEW_WINDOW)
     return {
         "families": families,
         "campaigns": campaigns,
@@ -163,7 +163,7 @@ def campaign_of_paths(aggregate: dict, ttylog_paths: list[str]) -> dict | None:
 
 
 def _daily_activity(db: sqlite3.Connection, families: list[dict]) -> dict[str, list[int]]:
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(UTC).date()
     days = [(today - timedelta(days=i)).isoformat() for i in range(ACTIVITY_DAYS - 1, -1, -1)]
     family_of = {path: f["id"] for f in families for path in f["paths"]}
     activity = {f["id"]: dict.fromkeys(days, 0) for f in families}

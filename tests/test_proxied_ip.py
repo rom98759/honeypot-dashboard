@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.correlation import get_correlation_rows
 from app.db import connect
@@ -7,7 +7,7 @@ from app.proxied_ip import PROXIED_SOURCE_IP, gateway_ip
 from app.session_files import file_detail
 
 GATEWAY = "172.21.0.1"
-NOW = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+NOW = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def test_gateway_is_first_host_of_subnet():
