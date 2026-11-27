@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 
 from app.db import connect
 from app.heatmap_stats import get_heatmap_stats

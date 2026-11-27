@@ -1,12 +1,12 @@
 import ipaddress
 import os
 import re
-from datetime import datetime, timedelta, timezone
 import sqlite3
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from app.tailer import LogTailer
 from app.proxied_ip import PROXIED_SOURCE_IP
+from app.tailer import LogTailer
 
 FAIL2BAN_RE = re.compile(
     r"^(?P<ts>\S+ \S+)\s+fail2ban\.actions\s+\[\d+\]:\s+NOTICE\s+\[(?P<jail>[\w-]+)\]\s+"
@@ -84,7 +84,7 @@ def _active_ban_filter(now: datetime) -> tuple[str, list]:
 def currently_banned_query(now: datetime | None = None) -> tuple[str, list]:
     """IPs with at least one running ban. Every "banned" figure (overview KPI,
     correlation, IP page fallback) uses this so the screens cannot disagree."""
-    where, params = _active_ban_filter(now or datetime.now(timezone.utc))
+    where, params = _active_ban_filter(now or datetime.now(UTC))
     return f"SELECT DISTINCT f1.ip AS ip FROM fail2ban_events f1 WHERE {where}", params
 
 
@@ -94,7 +94,7 @@ def _iso_from_fail2ban(ts: str) -> str:
 
 def active_bans(db: sqlite3.Connection, ip: str, now: datetime | None = None) -> list[dict]:
     """Running bans of one IP, one per jail: when, until when, and what it blocks."""
-    where, params = _active_ban_filter(now or datetime.now(timezone.utc))
+    where, params = _active_ban_filter(now or datetime.now(UTC))
     rows = db.execute(
         f"SELECT f1.jail AS jail, MAX(f1.timestamp) AS ts FROM fail2ban_events f1 "
         f"WHERE {where} AND f1.ip = ? GROUP BY f1.jail ORDER BY ts DESC",
@@ -102,7 +102,7 @@ def active_bans(db: sqlite3.Connection, ip: str, now: datetime | None = None) ->
     ).fetchall()
     bans = []
     for r in rows:
-        started = datetime.strptime(r["ts"][:19], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        started = datetime.strptime(r["ts"][:19], "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
         bantime = BANTIMES.get(r["jail"], FALLBACK_BANTIME)
         bans.append({
             "jail": r["jail"],

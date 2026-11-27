@@ -1,6 +1,6 @@
 import json
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response
@@ -9,8 +9,8 @@ from app.admin_ips import is_admin_ip
 from app.campaigns_stats import campaign_of_paths
 from app.correlation import is_currently_banned
 from app.periods import VALID_PERIODS, period_cutoff
-from app.search_filter import FilterError, compile_filter
 from app.routers.campaigns import cached_aggregate
+from app.search_filter import FilterError, compile_filter
 from app.session_files import downloads_dir, session_files
 from app.ttyplayer import TTYLogError, ttylogs_to_asciicast
 
@@ -45,7 +45,7 @@ async def list_sessions(
     try:
         search_sql, search_params, _ = compile_filter(filter, ip=ip, protocol=protocol, country=country)
     except FilterError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     db = request.app.state.db
     where_clauses = []
@@ -139,7 +139,7 @@ async def get_session(request: Request, session_id: str):
 @router.get("/api/sessions/{session_id}/export")
 async def export_session(request: Request, session_id: str):
     detail = _session_detail(request, session_id)
-    detail["exported_at"] = datetime.now(timezone.utc).isoformat()
+    detail["exported_at"] = datetime.now(UTC).isoformat()
     return Response(
         content=json.dumps(detail, indent=2, ensure_ascii=False),
         media_type="application/json",
@@ -173,7 +173,7 @@ async def replay_session(request: Request, session_id: str, download: bool = Fal
     try:
         cast = ttylogs_to_asciicast(blobs)
     except TTYLogError:
-        raise HTTPException(status_code=404, detail="replay unavailable for this session")
+        raise HTTPException(status_code=404, detail="replay unavailable for this session") from None
 
     headers = _attachment(session_id, "cast") if download else None
     return Response(content=cast, media_type="application/x-asciicast+json", headers=headers)

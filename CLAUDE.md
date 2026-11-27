@@ -26,7 +26,9 @@ docker compose up -d --build                    # build/run local ou VPS
 # Déploiement (après merge sur origin/main) :
 ssh vps 'cd honeypot-dashboard && git pull && docker compose up -d --build'
 ```
-Pas de lint/format configuré : imiter le style existant. Après déploiement : `docker compose ps` et
+Lint Python : `.venv/bin/ruff check .` (config dans `pyproject.toml`, aussi en CI) ; pas de formateur
+imposé, imiter le style existant. Pas de lint front (typescript-eslint ne supporte pas encore TS 7).
+Après déploiement : `docker compose ps` et
 `docker compose logs --tail=20 dashboard`.
 
 ## Conventions du projet

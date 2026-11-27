@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -363,7 +363,7 @@ def test_list_sessions_filters_by_country_via_geo_cache(tmp_path):
 
 def test_list_sessions_filters_by_period(tmp_path):
     db = connect(tmp_path / "db.sqlite3")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     old = (now - timedelta(days=10)).strftime("%Y-%m-%dT%H:%M:%SZ")
     recent = (now - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
     db.executescript(

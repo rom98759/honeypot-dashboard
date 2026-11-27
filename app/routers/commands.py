@@ -21,5 +21,5 @@ async def list_commands(
     try:
         sql, params, _ = compile_filter(filter)
     except FilterError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return get_commands_stats(request.app.state.db, period, q, limit, offset, (sql, params))

@@ -46,7 +46,7 @@ def test_reverse_dns_lookup_no_ptr_returns_none(monkeypatch):
 
 def test_reverse_dns_lookup_timeout_returns_none(monkeypatch):
     def _raise(ip):
-        raise socket.timeout("timed out")
+        raise TimeoutError("timed out")
 
     monkeypatch.setattr(socket, "gethostbyaddr", _raise)
     assert reverse_dns_lookup("172.21.0.1", timeout=0.01) is None
@@ -118,7 +118,7 @@ def test_abuseipdb_quota_cap_skips_call_after_950_today(monkeypatch):
     client = AbuseIpDbClient(api_key="fake-key")
     import datetime
     client._count = 950
-    client._date = datetime.datetime.now(datetime.timezone.utc).date()
+    client._date = datetime.datetime.now(datetime.UTC).date()
 
     assert client.check("1.2.3.4") == (None, None, None)
     assert calls == []

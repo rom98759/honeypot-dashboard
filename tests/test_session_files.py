@@ -4,7 +4,7 @@ import io
 import json
 import os
 import zipfile
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -115,7 +115,7 @@ def test_backfill_reads_rotated_and_gzipped_logs_once(tmp_path):
 
 def _client(tmp_path, readable=True):
     db = connect(tmp_path / "db.sqlite3")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     recent = (now - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S.000000Z")
     db.executescript(
         f"""

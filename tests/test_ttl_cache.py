@@ -43,7 +43,7 @@ def test_expired_entries_are_dropped():
     clock = FakeClock()
     cache = TtlCache(clock=clock)
     for i in range(5):
-        cache.get_or_compute(i, 10, lambda: i)
+        cache.get_or_compute(i, 10, lambda i=i: i)
     clock.now = 20
     cache.get_or_compute("fresh", 10, lambda: 0)
     assert len(cache) == 1

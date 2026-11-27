@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi.testclient import TestClient
 
@@ -12,7 +12,7 @@ def _iso(dt):
 
 
 def _seed(db):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     rows = [
         # session_id, ip, age, protocol, username, password, duration_ms, close
         ("cn1", "1.1.1.1", timedelta(hours=1), "ssh", "root", "123456", 10_000, True),
@@ -138,7 +138,7 @@ def test_overview_endpoint_is_cached_per_period_and_filters():
     first = client.get("/api/overview?period=all").json()
     db.execute(
         "INSERT INTO sessions (session_id, src_ip, connect_time) VALUES ('new', '9.9.9.9', ?)",
-        (_iso(datetime.now(timezone.utc)),),
+        (_iso(datetime.now(UTC)),),
     )
     assert client.get("/api/overview?period=all").json()["total_connections"] == first["total_connections"]
     assert client.get("/api/overview?period=all&ip=9.9.9.9").json()["total_connections"] == 1

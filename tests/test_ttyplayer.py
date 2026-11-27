@@ -62,7 +62,7 @@ def test_splits_large_single_event_into_smaller_chunks():
 def test_colorizes_and_newline_terminates_interact_command_before_output():
     import struct
 
-    from app.ttyplayer import OP_CLOSE, OP_OPEN, OP_WRITE, TTYSTRUCT, TYPE_OUTPUT, TYPE_INTERACT
+    from app.ttyplayer import OP_CLOSE, OP_OPEN, OP_WRITE, TTYSTRUCT, TYPE_INTERACT, TYPE_OUTPUT
 
     command = b'printf \'FILTER:%s\\n\' "$filter_output"'  # no trailing newline, like a real bot payload
     output = b"-bash: syntax error: unexpected end of file\n"

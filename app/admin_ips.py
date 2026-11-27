@@ -8,7 +8,7 @@ import ipaddress
 import logging
 import os
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 log = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ def add_admin_network(db: sqlite3.Connection, raw: str, note: str | None) -> str
     with db:
         db.execute(
             "INSERT INTO admin_networks (cidr, note, created_at) VALUES (?, ?, ?)",
-            (cidr, (note or "").strip() or None, datetime.now(timezone.utc).isoformat()),
+            (cidr, (note or "").strip() or None, datetime.now(UTC).isoformat()),
         )
     return cidr
 

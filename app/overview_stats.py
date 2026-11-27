@@ -1,12 +1,12 @@
 import re
 import sqlite3
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from app.commands_stats import commands_from
 from app.correlation import currently_banned_query
-from app.search_filter import compile_filter
 from app.periods import bucket_expr, period_cutoff, period_delta
 from app.proxied_ip import PROXIED_SOURCE_IP
+from app.search_filter import compile_filter
 
 DURATION_BUCKETS = ["<10s", "10-60s", "1-5min", "5-30min", ">30min"]
 FILTER_KEYS = ("country", "protocol", "ip", "username")
@@ -59,7 +59,7 @@ def get_overview_stats(db: sqlite3.Connection, period: str, filters: dict | None
     previous = None
     if cutoff:
         prev_start = (
-            datetime.strptime(cutoff, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+            datetime.strptime(cutoff, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
             - period_delta(period)
         ).strftime("%Y-%m-%dT%H:%M:%SZ")
         previous = _totals(
@@ -68,7 +68,7 @@ def get_overview_stats(db: sqlite3.Connection, period: str, filters: dict | None
             [prev_start, cutoff] + filter_params,
         )
 
-    active_since = (datetime.now(timezone.utc) - ACTIVE_WINDOW).strftime("%Y-%m-%dT%H:%M:%SZ")
+    active_since = (datetime.now(UTC) - ACTIVE_WINDOW).strftime("%Y-%m-%dT%H:%M:%SZ")
     active_sessions = db.execute(
         "SELECT COUNT(*) AS n FROM sessions s WHERE close_time IS NULL AND connect_time >= ?"
         + filter_where,

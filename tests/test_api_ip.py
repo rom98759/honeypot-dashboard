@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi.testclient import TestClient
 
@@ -8,7 +8,7 @@ from app.main import create_app
 
 def _recent_ban_ts(hours: float = 1) -> str:
     """fail2ban's own timestamp layout, `hours` ago."""
-    return (datetime.now(timezone.utc) - timedelta(hours=hours)).strftime("%Y-%m-%d %H:%M:%S,000")
+    return (datetime.now(UTC) - timedelta(hours=hours)).strftime("%Y-%m-%d %H:%M:%S,000")
 
 
 def test_ip_summary_404_for_unknown_ip(tmp_path):

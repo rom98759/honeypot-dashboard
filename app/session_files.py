@@ -12,7 +12,7 @@ import re
 import sqlite3
 import stat
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from app.cowrie_parser import FileTransfer, parse_event
@@ -67,7 +67,7 @@ def backfill_session_files(db: sqlite3.Connection, cowrie_json_path: Path) -> in
             log.warning("file events backfill: skipped %s: %s", path, exc)
     db.execute(
         "INSERT INTO backfills (name, done_at) VALUES (?, ?)",
-        (BACKFILL_NAME, datetime.now(timezone.utc).isoformat()),
+        (BACKFILL_NAME, datetime.now(UTC).isoformat()),
     )
     db.commit()
     if inserted:
@@ -156,7 +156,7 @@ def _aggregate(db: sqlite3.Connection) -> list[dict]:
 
 def files_page(db: sqlite3.Connection, directory: Path, sort: str, limit: int, offset: int) -> dict:
     items = _aggregate(db)
-    week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%S")
+    week_ago = (datetime.now(UTC) - timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%S")
     totals = {
         "files": len(items),
         "events": sum(i["events"] for i in items),

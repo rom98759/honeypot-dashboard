@@ -1,15 +1,14 @@
 import shutil
+from datetime import UTC, datetime
 from pathlib import Path
-
-from datetime import datetime, timezone
 
 from app.correlation import (
     FailbanIngester,
+    SshdAuthIngester,
     active_bans,
     currently_banned_query,
-    parse_bantimes,
-    SshdAuthIngester,
     get_correlation_rows,
+    parse_bantimes,
     parse_fail2ban_line,
     parse_sshd_auth_line,
 )
@@ -158,7 +157,7 @@ def test_ban_expires_after_its_jail_bantime(tmp_path, monkeypatch):
         ],
     )
     db.commit()
-    sql, params = currently_banned_query(now=datetime(2026, 11, 3, 12, 0, tzinfo=timezone.utc))
+    sql, params = currently_banned_query(now=datetime(2026, 11, 3, 12, 0, tzinfo=UTC))
     assert {r["ip"] for r in db.execute(sql, params)} == {"1.1.1.1", "3.3.3.3"}
 
 
@@ -180,7 +179,7 @@ def test_active_bans_are_per_jail_with_scope_and_expiry(tmp_path, monkeypatch):
         ],
     )
     db.commit()
-    bans = active_bans(db, "192.0.2.9", now=datetime(2026, 11, 3, 12, 0, tzinfo=timezone.utc))
+    bans = active_bans(db, "192.0.2.9", now=datetime(2026, 11, 3, 12, 0, tzinfo=UTC))
     assert bans == [{
         "jail": "manual-all",
         "banned_at": "2026-11-03T09:00:00.500Z",

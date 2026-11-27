@@ -1,7 +1,6 @@
 import asyncio
-from urllib.parse import urlparse
-
 from typing import Literal
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
